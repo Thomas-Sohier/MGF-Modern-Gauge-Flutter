@@ -1,0 +1,26 @@
+name: modern_gauge_flutter
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  go_router: ^16.2.4
+  provider: ^6.1.5+1
+  shared_preferences: ^2.5.3
+  syncfusion_flutter_gauges: ^31.1.23
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
