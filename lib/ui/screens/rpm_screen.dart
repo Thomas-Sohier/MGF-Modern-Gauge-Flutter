@@ -18,6 +18,8 @@ class RpmScreen extends StatefulWidget {
 }
 
 class _RpmScreenState extends State<RpmScreen> with ScreenNavigationMixin<RpmScreen> {
+  late final OdbService _odbService;
+
   @override
   void nextScreen() {
     const currentRoute = RouteNames.dashboardRoute + RouteNames.rpmRoute;
@@ -33,16 +35,17 @@ class _RpmScreenState extends State<RpmScreen> with ScreenNavigationMixin<RpmScr
   @override
   void initState() {
     super.initState();
+    _odbService = context.read<OdbService>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<OdbService>().startOdbDataStream();
+        _odbService.startOdbDataStream();
       }
     });
   }
 
   @override
   void dispose() {
-    context.read<OdbService>().stopOdbDataStream();
+    _odbService.stopOdbDataStream();
     super.dispose();
   }
 
