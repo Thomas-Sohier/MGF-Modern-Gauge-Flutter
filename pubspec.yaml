@@ -8,6 +8,7 @@ environment:
   sdk: ^3.9.2
 
 dependencies:
+  dbus: ^0.7.11
   flutter:
     sdk: flutter
   go_router: ^16.2.4

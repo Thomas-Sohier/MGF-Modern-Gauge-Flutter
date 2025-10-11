@@ -1,0 +1,15 @@
+// lib/mpris_listener_base.dart
+import 'package:flutter/foundation.dart';
+import 'package:modern_gauge_flutter/services/mpris_listener.dart';
+
+abstract class MprisListenerBase with ChangeNotifier {
+  MediaInfo? get mediaInfo;
+  Duration get position;
+  String get playbackStatus;
+  bool get isPlaying;
+
+  Future<void> start();
+
+  @override
+  bool get hasListeners;
+}

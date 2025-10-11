@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/providers/app_state_provider.dart';
 import 'package:modern_gauge_flutter/providers/dial_provider.dart';
+import 'package:modern_gauge_flutter/providers/mpris_provider.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/routes/app_router.dart';
+import 'package:modern_gauge_flutter/services/mpris_listener.dart';
 import 'package:modern_gauge_flutter/services/odb_service.dart';
 import 'package:modern_gauge_flutter/ui/themes/app_theme.dart';
 import 'package:provider/provider.dart';
@@ -15,10 +17,10 @@ class App extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider(create: (_) => OdbService(), dispose: (_, service) => service.dispose()),
-        ChangeNotifierProvider(create: (context) => AppStateProvider(context.read<OdbService>())),
-        ChangeNotifierProvider(create: (context) => DialProvider(context.read<OdbService>())),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
-        // Ajoute d'autres providers si nécessaire
+        ChangeNotifierProvider(create: (context) => DialProvider(context.read<OdbService>())),
+        ChangeNotifierProvider<MprisListenerBase>(create: (context) => MprisListener()..start()),
+        ChangeNotifierProvider(create: (context) => AppStateProvider(context.read<OdbService>())),
       ],
       child: Builder(
         builder: (context) {
