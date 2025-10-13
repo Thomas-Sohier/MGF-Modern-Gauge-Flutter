@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:marquee/marquee.dart';
 import 'package:modern_gauge_flutter/mixins/screen_navigation_mixin.dart';
 import 'package:modern_gauge_flutter/providers/mpris_provider.dart';
 import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
@@ -65,15 +66,59 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
         selector: (_, listener) => listener.playbackStatus,
         builder: (context, status, _) {
           if (status == PlaybackStatus.stopped) {
-            return const Center(
-              child: Text(
-                "Aucun lecteur de musique actif détecté...",
-                style: TextStyle(color: Colors.white),
-              ),
-            );
+            return _NoMusicPlayerUI();
           }
           return _MusicPlayerUI();
         },
+      ),
+    );
+  }
+}
+
+class _NoMusicPlayerUI extends StatelessWidget {
+  const _NoMusicPlayerUI({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            colors: [Colors.deepPurple.shade700, Colors.teal.shade400],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              spreadRadius: 2,
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.headset_off_outlined,
+              color: Colors.white,
+              size: 100,
+            ),
+            const SizedBox(height: 30),
+            const Text(
+              "Aucun lecteur de musique actif détecté...",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -110,7 +155,7 @@ class _InfoPanel extends StatelessWidget {
             Positioned(
               top: 5,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 200),
+                constraints: const BoxConstraints(maxHeight: 25, maxWidth: 200),
                 child: _TitleText(),
               ),
             ),
@@ -144,12 +189,15 @@ class _TitleText extends StatelessWidget {
   Widget build(BuildContext context) {
     return Selector<MprisListenerBase, String>(
       selector: (_, listener) => listener.mediaInfo?.title ?? 'Titre inconnu',
-      builder: (_, title, __) => Text(
-        title,
+      builder: (_, title, __) => Marquee(
+        text: title,
+        blankSpace: 60,
         style: _kInfoTitleTextStyle,
-        textAlign: TextAlign.center,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        pauseAfterRound: Duration(seconds: 2),
+        showFadingOnlyWhenScrolling: true,
+        fadingEdgeStartFraction: 0.12,
+        fadingEdgeEndFraction: 0.12,
       ),
     );
   }
