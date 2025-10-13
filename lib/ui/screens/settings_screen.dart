@@ -1,315 +1,262 @@
+// Fichier: settings_screen.dart
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:modern_gauge_flutter/ui/widgets/settings_entry/settings_entries.dart';
 import 'package:provider/provider.dart';
 
-import 'package:modern_gauge_flutter/models/settings_data.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/services/settings_service.dart';
 
-/// The screen for managing application settings.
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
   @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  // --- CONSTANTS ---
+  static const double _itemHeight = 130.0;
+  static const int _settingsCount = 5;
+  static const Duration _scrollDuration = Duration(milliseconds: 300);
+  static const Curve _scrollCurve = Curves.easeInOut;
+
+  // --- LATE FINAL ---
+  late final ScrollController _scrollController;
+  late final FocusNode _pageFocusNode;
+  late final List<FocusNode> _itemFocusNodes;
+  late final List<_SettingItemConfig> _settingConfigs;
+
+  // --- STATE ---
+  int _selectedIndex = 0;
+  bool _isEditing = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _scrollController = ScrollController();
+    _pageFocusNode = FocusNode();
+    _itemFocusNodes = List.generate(_settingsCount, (_) => FocusNode());
+    _settingConfigs = List.generate(
+      _settingsCount,
+      (index) => _SettingItemConfig(
+        title: 'Luminosité #$index',
+        focusNode: _itemFocusNodes[index],
+      ),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusScope.of(context).requestFocus(_pageFocusNode);
+      _scrollToCenter();
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _pageFocusNode.dispose();
+    for (var node in _itemFocusNodes) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  void _scrollToCenter() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+
+      final viewportHeight = _scrollController.position.viewportDimension;
+      final targetScrollOffset =
+          (_selectedIndex * _itemHeight) -
+          (viewportHeight / 2) +
+          (_itemHeight / 2);
+
+      final clampedOffset = targetScrollOffset.clamp(
+        0.0,
+        _scrollController.position.maxScrollExtent,
+      );
+
+      _scrollController.animateTo(
+        clampedOffset,
+        duration: _scrollDuration,
+        curve: _scrollCurve,
+      );
+    });
+  }
+
+  void _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+
+    if (_isEditing) {
+      _handleEditingKeyEvent(event);
+    } else {
+      _handleNavigationKeyEvent(event);
+    }
+  }
+
+  void _handleEditingKeyEvent(KeyEvent event) {
+    if (event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.tab) {
+      _exitEditMode();
+    }
+  }
+
+  void _handleNavigationKeyEvent(KeyEvent event) {
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _moveDown();
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _moveUp();
+    } else if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.select) {
+      _enterEditMode();
+    } else if (event.logicalKey == LogicalKeyboardKey.escape) {
+      if (Navigator.canPop(context)) Navigator.pop(context);
+    }
+  }
+
+  void _moveDown() {
+    setState(() {
+      _selectedIndex = (_selectedIndex + 1).clamp(0, _settingsCount - 1);
+    });
+    _scrollToCenter();
+  }
+
+  void _moveUp() {
+    setState(() {
+      _selectedIndex = (_selectedIndex - 1).clamp(0, _settingsCount - 1);
+    });
+    _scrollToCenter();
+  }
+
+  void _enterEditMode() {
+    setState(() => _isEditing = true);
+    _itemFocusNodes[_selectedIndex].requestFocus();
+  }
+
+  void _exitEditMode() {
+    final settingsProvider = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    );
+    setState(() => _isEditing = false);
+    _pageFocusNode.requestFocus();
+    SettingsService.saveSettings(settingsProvider.settings);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final settingsProvider = Provider.of<SettingsProvider>(context);
-    final currentSettings = settingsProvider.settings;
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: const Text('Settings', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            // --- General Settings ---
-            _buildSectionTitle(context, 'General'),
-            _buildToggleSetting(
-              context,
-              title: 'Sound Effects',
-              value: currentSettings.soundEnabled,
-              onChanged: (bool value) {
-                settingsProvider.toggleSound(value);
-                SettingsService.saveSettings(settingsProvider.settings);
-              },
-            ),
-            _buildBrightnessSlider(
-              context,
-              value: currentSettings.screenBrightness,
-              onChanged: (double value) {
-                settingsProvider.setScreenBrightness(value);
-                // Note: Brightness might be saved less frequently or when leaving the screen
-                // For this example, we save on change.
-                SettingsService.saveSettings(settingsProvider.settings);
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            // --- Display Settings ---
-            _buildSectionTitle(context, 'Display'),
-            _buildThemeModePicker(
-              context,
-              currentValue: currentSettings.themeMode,
-              onChanged: (ThemeModeOption? value) {
-                if (value != null) {
-                  settingsProvider.setThemeMode(value);
-                  SettingsService.saveSettings(settingsProvider.settings);
-                }
-              },
-            ),
-
-            // TODO: Add an option for background image selection here
-            // _buildImageSelector(context, currentSettings.backgroundImagePath, (path) {
-            //   settingsProvider.setBackgroundImage(path);
-            //   SettingsService.saveSettings(settingsProvider.settings);
-            // }),
-            const SizedBox(height: 20),
-
-            // --- Sleep Mode Settings ---
-            _buildSectionTitle(context, 'Sleep Mode'),
-            _buildAutoSleepDelayPicker(
-              context,
-              currentValue: currentSettings.autoSleepDelaySeconds,
-              onChanged: (int? value) {
-                if (value != null) {
-                  settingsProvider.setAutoSleepDelay(value);
-                  SettingsService.saveSettings(settingsProvider.settings);
-                }
-              },
-            ),
-            _buildWakeUpModePicker(
-              context,
-              currentValue: currentSettings.wakeUpMode,
-              onChanged: (WakeUpMode? value) {
-                if (value != null) {
-                  settingsProvider.setWakeUpMode(value);
-                  SettingsService.saveSettings(settingsProvider.settings);
-                }
-              },
-            ),
-
-            const SizedBox(height: 30),
-            _buildResetSettingsButton(context),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Builds a title for a settings section.
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10.0),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white70, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  /// Builds a toggle switch for a boolean setting.
-  Widget _buildToggleSetting(
-    BuildContext context, {
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Card(
-      color: Colors.grey[850],
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      child: SwitchListTile(
-        title: Text(title, style: const TextStyle(color: Colors.white)),
-        value: value,
-        onChanged: onChanged,
-        activeThumbColor: Theme.of(context).primaryColor,
-      ),
-    );
-  }
-
-  /// Builds a slider for screen brightness.
-  Widget _buildBrightnessSlider(
-    BuildContext context, {
-    required double value,
-    required ValueChanged<double> onChanged,
-  }) {
-    return Card(
-      color: Colors.grey[850],
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Screen Brightness', style: TextStyle(color: Colors.white)),
-            Slider(
-              value: value,
-              min: 0.1, // Minimum brightness
-              max: 1.0, // Maximum brightness
-              divisions: 9, // 10 steps from 0.1 to 1.0
-              label: '${(value * 100).round()}%',
-              onChanged: onChanged,
-              activeColor: Theme.of(context).primaryColor,
-              inactiveColor: Colors.grey[600],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Builds a dropdown for ThemeMode selection.
-  Widget _buildThemeModePicker(
-    BuildContext context, {
-    required ThemeModeOption currentValue,
-    required ValueChanged<ThemeModeOption?> onChanged,
-  }) {
-    return Card(
-      color: Colors.grey[850],
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      child: ListTile(
-        title: const Text('Theme Mode', style: TextStyle(color: Colors.white)),
-        trailing: DropdownButton<ThemeModeOption>(
-          value: currentValue,
-          dropdownColor: Colors.grey[800],
-          style: const TextStyle(color: Colors.white),
-          underline: Container(), // Remove underline
-          onChanged: onChanged,
-          items: ThemeModeOption.values.map((ThemeModeOption mode) {
-            return DropdownMenuItem<ThemeModeOption>(
-              value: mode,
-              child: Text(mode.toString().split('.').last.capitalize(), style: const TextStyle(color: Colors.white)),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  /// Builds a dropdown for Auto Sleep Delay selection.
-  Widget _buildAutoSleepDelayPicker(
-    BuildContext context, {
-    required int currentValue,
-    required ValueChanged<int?> onChanged,
-  }) {
-    final List<Map<String, dynamic>> delayOptions = [
-      {'label': 'Never', 'value': 0},
-      {'label': '1 Minute', 'value': 60},
-      {'label': '5 Minutes', 'value': 300},
-      {'label': '10 Minutes', 'value': 600},
-      {'label': '30 Minutes', 'value': 1800},
-    ];
-
-    return Card(
-      color: Colors.grey[850],
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      child: ListTile(
-        title: const Text('Auto Sleep Delay', style: TextStyle(color: Colors.white)),
-        trailing: DropdownButton<int>(
-          value: currentValue,
-          dropdownColor: Colors.grey[800],
-          style: const TextStyle(color: Colors.white),
-          underline: Container(),
-          onChanged: onChanged,
-          items: delayOptions.map((option) {
-            return DropdownMenuItem<int>(
-              value: option['value'] as int,
-              child: Text(option['label'] as String, style: const TextStyle(color: Colors.white)),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  /// Builds a dropdown for Wake Up Mode selection.
-  Widget _buildWakeUpModePicker(
-    BuildContext context, {
-    required WakeUpMode currentValue,
-    required ValueChanged<WakeUpMode?> onChanged,
-  }) {
-    return Card(
-      color: Colors.grey[850],
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      child: ListTile(
-        title: const Text('Wake Up Mode', style: TextStyle(color: Colors.white)),
-        trailing: DropdownButton<WakeUpMode>(
-          value: currentValue,
-          dropdownColor: Colors.grey[800],
-          style: const TextStyle(color: Colors.white),
-          underline: Container(),
-          onChanged: onChanged,
-          items: WakeUpMode.values.map((WakeUpMode mode) {
-            return DropdownMenuItem<WakeUpMode>(
-              value: mode,
-              child: Text(mode.toString().split('.').last.capitalize(), style: const TextStyle(color: Colors.white)),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  /// Builds a button to reset all settings to their default values.
-  Widget _buildResetSettingsButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20.0),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red.withOpacity(0.8), // Button background color
-          foregroundColor: Colors.white, // Text color
-          padding: const EdgeInsets.symmetric(vertical: 15),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-        onPressed: () {
-          // Show a confirmation dialog before resetting
-          showDialog(
-            context: context,
-            builder: (BuildContext dialogContext) {
-              return AlertDialog(
-                backgroundColor: Colors.grey[900], // Dark background for dialog
-                title: const Text('Reset Settings?', style: TextStyle(color: Colors.white)),
-                content: const Text(
-                  'Are you sure you want to reset all settings to default values?',
-                  style: TextStyle(color: Colors.white70),
-                ),
-                actions: <Widget>[
-                  TextButton(
-                    child: const Text('Cancel', style: TextStyle(color: Colors.white)),
-                    onPressed: () {
-                      Navigator.of(dialogContext).pop(); // Dismiss dialog
-                    },
-                  ),
-                  TextButton(
-                    child: const Text('Reset', style: TextStyle(color: Colors.redAccent)),
-                    onPressed: () {
-                      Provider.of<SettingsProvider>(context, listen: false).resetSettings();
-                      SettingsService.clearSettings(); // Clear persistent storage
-                      Navigator.of(dialogContext).pop(); // Dismiss dialog
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(const SnackBar(content: Text('Settings reset to default!')));
-                    },
-                  ),
-                ],
+    return KeyboardListener(
+      focusNode: _pageFocusNode,
+      onKeyEvent: _handleKeyEvent,
+      child: AspectRatio(
+        aspectRatio: 1,
+        child: ClipOval(
+          child: ListView.builder(
+            controller: _scrollController,
+            itemExtent: _SettingsScreenState._itemHeight,
+            itemCount: _settingsCount,
+            itemBuilder: (context, index) {
+              return _SettingItemWidget(
+                config: _settingConfigs[index],
+                isFocused: index == _selectedIndex,
+                isEditing: _isEditing,
               );
             },
-          );
-        },
-        child: const Text('Reset All Settings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+        ),
       ),
     );
   }
 }
 
-// Extension to capitalize the first letter of a string
-extension StringExtension on String {
-  String capitalize() {
-    if (isEmpty) return this;
-    return "${this[0].toUpperCase()}${substring(1)}";
+/// Configuration immuable d'un élément de paramètre
+class _SettingItemConfig {
+  final String title;
+  final FocusNode focusNode;
+
+  const _SettingItemConfig({required this.title, required this.focusNode});
+}
+
+/// Widget pour un élément de paramètre
+class _SettingItemWidget extends StatelessWidget {
+  final _SettingItemConfig config;
+  final bool isFocused;
+  final bool isEditing;
+
+  const _SettingItemWidget({
+    required this.config,
+    required this.isFocused,
+    required this.isEditing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsCardEntry(
+      isFocused: isFocused,
+      title: config.title,
+      child: Consumer<SettingsProvider>(
+        builder: (context, settingsProvider, _) {
+          return SettingSliderEntry(
+            value: settingsProvider.settings.screenBrightness,
+            focusNode: config.focusNode,
+            isEditing: isEditing,
+            onChanged: (value) {
+              Provider.of<SettingsProvider>(
+                context,
+                listen: false,
+              ).setScreenBrightness(value);
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SettingsCardEntry extends StatelessWidget {
+  final bool isFocused;
+  final String title;
+  final Widget child;
+
+  const _SettingsCardEntry({
+    required this.isFocused,
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: _SettingsScreenState._itemHeight,
+      child: Card(
+        color: Colors.grey[850],
+        margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 32.0),
+        shape: RoundedRectangleBorder(
+          side: BorderSide(
+            color: isFocused
+                ? Theme.of(context).primaryColor
+                : Colors.transparent,
+            width: 2,
+          ),
+          borderRadius: BorderRadius.circular(8.0),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(color: Colors.white, fontSize: 18),
+              ),
+              child,
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
