@@ -12,6 +12,7 @@ dependencies:
   flutter:
     sdk: flutter
   go_router: ^16.2.4
+  image: ^4.5.4
   provider: ^6.1.5+1
   shared_preferences: ^2.5.3
   syncfusion_flutter_gauges: ^31.1.23

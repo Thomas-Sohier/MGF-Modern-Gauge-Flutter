@@ -1,5 +1,3 @@
-// lib/ui/mixins/screen_navigation_mixin.dart
-
 import 'package:flutter/material.dart';
 
 /// Un mixin pour ajouter une navigation par gestes (tap/swipe) à un écran.
@@ -14,7 +12,9 @@ mixin ScreenNavigationMixin<T extends StatefulWidget> on State<T> {
     return GestureDetector(
       onTap: nextScreen,
       onHorizontalDragEnd: (details) {
-        if (details.primaryVelocity == null || details.primaryVelocity!.abs() < 100) return;
+        if (details.primaryVelocity == null ||
+            details.primaryVelocity!.abs() < 100)
+          return;
         if (details.primaryVelocity! < 0) {
           nextScreen();
         } else if (details.primaryVelocity! > 0) {

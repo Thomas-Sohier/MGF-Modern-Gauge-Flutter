@@ -10,7 +10,9 @@ class DashboardShellScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Center(child: GaugeTexturedBackground(child: child)),
+      body: Center(
+        child: ClipOval(child: GaugeTexturedBackground(child: child)),
+      ),
     );
   }
 }

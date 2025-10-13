@@ -56,10 +56,19 @@ class MusicDial extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     // --- Dessin sur le Canvas ---
-    final rect = Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
+    final rect = Rect.fromCircle(
+      center: center,
+      radius: radius - strokeWidth / 2,
+    );
     canvas.drawArc(rect, startAngle, totalSweepAngle, false, backgroundPaint);
     final progressSweepAngle = totalSweepAngle * progress;
-    canvas.drawArc(rect, startAngle, progressSweepAngle, false, foregroundPaint);
+    canvas.drawArc(
+      rect,
+      startAngle,
+      progressSweepAngle,
+      false,
+      foregroundPaint,
+    );
   }
 
   @override

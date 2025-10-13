@@ -5,7 +5,7 @@ import 'package:modern_gauge_flutter/services/mpris_listener.dart';
 abstract class MprisListenerBase with ChangeNotifier {
   MediaInfo? get mediaInfo;
   Duration get position;
-  String get playbackStatus;
+  PlaybackStatus get playbackStatus;
   bool get isPlaying;
 
   Future<void> start();
