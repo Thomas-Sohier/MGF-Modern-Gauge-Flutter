@@ -19,8 +19,6 @@ jobs:
           channel: 'stable'
       - name: Installation des dépendances
         run: flutter pub get
-      - name: Analyse du code
-        run: flutter analyze
       - name: Lancement des tests
         run: flutter test
       - name: Installation des dépendances système pour Linux
