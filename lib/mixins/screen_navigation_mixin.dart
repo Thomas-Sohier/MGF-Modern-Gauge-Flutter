@@ -12,9 +12,9 @@ mixin ScreenNavigationMixin<T extends StatefulWidget> on State<T> {
     return GestureDetector(
       onTap: nextScreen,
       onHorizontalDragEnd: (details) {
-        if (details.primaryVelocity == null ||
-            details.primaryVelocity!.abs() < 100)
+        if (details.primaryVelocity == null || details.primaryVelocity!.abs() < 100) {
           return;
+        }
         if (details.primaryVelocity! < 0) {
           nextScreen();
         } else if (details.primaryVelocity! > 0) {

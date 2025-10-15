@@ -15,13 +15,11 @@ class AppRouter {
     routes: <RouteBase>[
       GoRoute(
         path: RouteNames.splashRoute,
-        builder: (BuildContext context, GoRouterState state) => const SplashScreen(),
+        pageBuilder: (context, state) => const NoTransitionPage(child: SplashScreen()),
       ),
 
       ShellRoute(
-        builder: (BuildContext context, GoRouterState state, Widget child) {
-          return DashboardShellScreen(child: child);
-        },
+        pageBuilder: (context, state, child) => NoTransitionPage(child: DashboardShellScreen(child: child)),
         routes: <RouteBase>[
           GoRoute(
             path: RouteNames.dashboardRoute + RouteNames.timeRoute,
@@ -40,7 +38,7 @@ class AppRouter {
 
       GoRoute(
         path: RouteNames.settingsRoute,
-        builder: (BuildContext context, GoRouterState state) => const SettingsScreen(),
+        pageBuilder: (context, state) => const NoTransitionPage(child: SettingsScreen()),
       ),
     ],
     errorBuilder: (context, state) => const Scaffold(body: Center(child: Text('Error: Page not found'))),

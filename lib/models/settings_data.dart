@@ -1,4 +1,4 @@
-enum ThemeModeOption { system, light, dark }
+import 'package:flutter/material.dart';
 
 enum WakeUpMode { onStart, longPress } // Mise en veille si: Démarrage, Appui long
 
@@ -13,7 +13,7 @@ class SettingsData {
   final double screenBrightness;
 
   /// Mode de thème (clair, sombre, système)
-  final ThemeModeOption themeMode;
+  final ThemeMode themeMode;
 
   /// Délai avant la mise en veille automatique
   final int autoSleepDelaySeconds;
@@ -26,7 +26,7 @@ class SettingsData {
     this.backgroundImagePath,
     this.screenBrightness = 1.0,
     // Par défaut, un thème sombre pour le tableau de bord
-    this.themeMode = ThemeModeOption.dark,
+    this.themeMode = ThemeMode.dark,
     // 5 minutes par défaut
     this.autoSleepDelaySeconds = 300,
     this.wakeUpMode = WakeUpMode.onStart,
@@ -36,7 +36,7 @@ class SettingsData {
     bool? soundEnabled,
     String? backgroundImagePath,
     double? screenBrightness,
-    ThemeModeOption? themeMode,
+    ThemeMode? themeMode,
     int? autoSleepDelaySeconds,
     WakeUpMode? wakeUpMode,
   }) {

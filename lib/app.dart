@@ -28,7 +28,7 @@ class App extends StatelessWidget {
             title: 'ODB Dashboard',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.light,
+            themeMode: Provider.of<SettingsProvider>(context, listen: true).settings.themeMode,
             routerConfig: AppRouter.router,
             debugShowCheckedModeBanner: false,
           );

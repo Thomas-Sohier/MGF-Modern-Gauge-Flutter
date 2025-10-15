@@ -36,7 +36,7 @@ class SettingsProvider with ChangeNotifier {
     // SettingsService.saveSettings(_settings);
   }
 
-  void setThemeMode(ThemeModeOption mode) {
+  void setThemeMode(ThemeMode mode) {
     _settings = _settings.copyWith(themeMode: mode);
     notifyListeners();
     // SettingsService.saveSettings(_settings);

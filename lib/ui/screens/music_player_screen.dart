@@ -13,11 +13,7 @@ import 'package:modern_gauge_flutter/utils/color_util.dart';
 import 'package:provider/provider.dart';
 
 // --- STYLES AJUSTÉS POUR LA NOUVELLE INTERFACE ---
-const _kInfoTitleTextStyle = TextStyle(
-  color: Colors.black87,
-  fontWeight: FontWeight.bold,
-  fontSize: 18,
-);
+const _kInfoTitleTextStyle = TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 18);
 const _kInfoTimeTextStyle = TextStyle(
   color: Colors.black,
   fontSize: 18,
@@ -45,8 +41,7 @@ class MusicPlayerScreen extends StatefulWidget {
   State<MusicPlayerScreen> createState() => _MusicPlayerScreenState();
 }
 
-class _MusicPlayerScreenState extends State<MusicPlayerScreen>
-    with ScreenNavigationMixin<MusicPlayerScreen> {
+class _MusicPlayerScreenState extends State<MusicPlayerScreen> with ScreenNavigationMixin<MusicPlayerScreen> {
   @override
   void nextScreen() {
     const currentRoute = RouteNames.dashboardRoute + RouteNames.musicRoute;
@@ -76,7 +71,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
 }
 
 class _NoMusicPlayerUI extends StatelessWidget {
-  const _NoMusicPlayerUI({Key? key}) : super(key: key);
+  const _NoMusicPlayerUI({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -102,20 +97,12 @@ class _NoMusicPlayerUI extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Icon(
-              Icons.headset_off_outlined,
-              color: Colors.white,
-              size: 100,
-            ),
+            const Icon(Icons.headset_off_outlined, color: Colors.white, size: 100),
             const SizedBox(height: 30),
             const Text(
               "Aucun lecteur de musique actif détecté...",
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-              ),
+              style: TextStyle(color: Colors.white70, fontSize: 18, fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -131,10 +118,7 @@ class _MusicPlayerUI extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: const [_AlbumArt(), _ProgressDial(), _InfoPanel()],
-    );
+    return Stack(alignment: Alignment.center, children: const [_AlbumArt(), _ProgressDial(), _InfoPanel()]);
   }
 }
 
@@ -168,11 +152,7 @@ class _InfoPanel extends StatelessWidget {
                   spacing: 6,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    _CurrentPositionText(),
-                    _PlaybackStatusIndicator(),
-                    _TotalDurationText(),
-                  ],
+                  children: const [_CurrentPositionText(), _PlaybackStatusIndicator(), _TotalDurationText()],
                 ),
               ),
             ),
@@ -210,8 +190,7 @@ class _CurrentPositionText extends StatelessWidget {
   Widget build(BuildContext context) {
     return Selector<MprisListenerBase, Duration>(
       selector: (_, listener) => listener.position,
-      builder: (_, position, __) =>
-          Text(formatDuration(position), style: _kInfoTimeTextStyle),
+      builder: (_, position, __) => Text(formatDuration(position), style: _kInfoTimeTextStyle),
     );
   }
 }
@@ -224,9 +203,7 @@ class _PlaybackStatusIndicator extends StatelessWidget {
     return Selector<MprisListenerBase, PlaybackStatus>(
       selector: (_, listener) => listener.playbackStatus,
       builder: (_, status, __) {
-        final iconData = status == PlaybackStatus.playing
-            ? Icons.pause_rounded
-            : Icons.play_arrow_rounded;
+        final iconData = status == PlaybackStatus.playing ? Icons.pause_rounded : Icons.play_arrow_rounded;
         return Icon(iconData, color: Colors.black54, size: 30);
       },
     );
@@ -240,8 +217,7 @@ class _TotalDurationText extends StatelessWidget {
   Widget build(BuildContext context) {
     return Selector<MprisListenerBase, Duration>(
       selector: (_, listener) => listener.mediaInfo?.duration ?? Duration.zero,
-      builder: (_, totalDuration, __) =>
-          Text(formatDuration(totalDuration), style: _kInfoTimeTextStyle),
+      builder: (_, totalDuration, __) => Text(formatDuration(totalDuration), style: _kInfoTimeTextStyle),
     );
   }
 }
@@ -290,10 +266,7 @@ class _AlbumArt extends StatelessWidget {
       builder: (_, artUrl, __) {
         const icon = Icon(Icons.music_note, size: 150, color: Colors.grey);
         return Container(
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Color(0xFFE0E5E8),
-          ),
+          decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFE0E5E8)),
           child: ClipRRect(
             borderRadius: const BorderRadius.all(Radius.circular(1000)),
             child: artUrl != null
@@ -321,11 +294,8 @@ class _ProgressDial extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Selector<MprisListenerBase, (Duration, Duration, String?)>(
-      selector: (_, listener) => (
-        listener.position,
-        listener.mediaInfo?.duration ?? Duration.zero,
-        listener.mediaInfo?.artUrl,
-      ),
+      selector: (_, listener) =>
+          (listener.position, listener.mediaInfo?.duration ?? Duration.zero, listener.mediaInfo?.artUrl),
       builder: (_, data, __) {
         final (position, totalDuration, artUrl) = data;
         final progress = (totalDuration.inMilliseconds > 0)
@@ -381,9 +351,7 @@ class _DynamicColorDialState extends State<_DynamicColorDial> {
   }
 
   Future<ColorScheme> _extractColor() async {
-    final colorScheme = await _ColorExtractorService().extractDominantColor(
-      widget.artUrl,
-    );
+    final colorScheme = await _ColorExtractorService().extractDominantColor(widget.artUrl);
     if (mounted) {
       setState(() {
         _foregroundColor = colorScheme.primary;

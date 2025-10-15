@@ -1,4 +1,5 @@
 import 'dart:convert'; // Pour encoder/décoder en JSON
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:modern_gauge_flutter/models/settings_data.dart';
@@ -47,7 +48,7 @@ class SettingsService {
       soundEnabled: json['soundEnabled'] as bool? ?? true,
       backgroundImagePath: json['backgroundImagePath'] as String?,
       screenBrightness: (json['screenBrightness'] as num?)?.toDouble() ?? 1.0,
-      themeMode: ThemeModeOption.values[json['themeMode'] as int? ?? ThemeModeOption.dark.index],
+      themeMode: ThemeMode.values[json['themeMode'] as int? ?? ThemeMode.dark.index],
       autoSleepDelaySeconds: json['autoSleepDelaySeconds'] as int? ?? 300,
       wakeUpMode: WakeUpMode.values[json['wakeUpMode'] as int? ?? WakeUpMode.onStart.index],
     );
