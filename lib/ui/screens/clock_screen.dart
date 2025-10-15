@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:modern_gauge_flutter/mixins/screen_navigation_mixin.dart';
 import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
-import 'package:modern_gauge_flutter/ui/widgets/time_painter.dart';
+import 'package:modern_gauge_flutter/ui/widgets/analog_clock.dart';
 
 class ClockScreen extends StatefulWidget {
   const ClockScreen({super.key});
@@ -48,8 +48,6 @@ class _ClockScreenState extends State<ClockScreen> with ScreenNavigationMixin<Cl
 
   @override
   Widget build(BuildContext context) {
-    return buildNavigableScreen(
-      child: CustomPaint(painter: AnalogClockPainter(dateTime: _currentTime)),
-    );
+    return buildNavigableScreen(child: AnalogClock(dateTime: _currentTime));
   }
 }

@@ -118,7 +118,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
     setState(() => _isEditing = false);
     _pageFocusNode.requestFocus();
-    SettingsService.saveSettings(settingsProvider.settings);
+    SettingsService().saveSettings(settingsProvider.settings);
   }
 
   @override

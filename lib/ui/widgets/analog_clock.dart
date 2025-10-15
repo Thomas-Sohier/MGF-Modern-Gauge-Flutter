@@ -1,10 +1,26 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:modern_gauge_flutter/ui/themes/clock_theme.dart';
 
-class AnalogClockPainter extends CustomPainter {
+class AnalogClock extends StatelessWidget {
   final DateTime dateTime;
 
-  AnalogClockPainter({required this.dateTime});
+  const AnalogClock({super.key, required this.dateTime});
+
+  @override
+  Widget build(BuildContext context) {
+    final clockTheme = Theme.of(context).extension<AnalogClockTheme>()!;
+    return CustomPaint(
+      painter: _AnalogClockPainter(dateTime: dateTime, theme: clockTheme),
+    );
+  }
+}
+
+class _AnalogClockPainter extends CustomPainter {
+  final DateTime dateTime;
+  final AnalogClockTheme theme;
+
+  _AnalogClockPainter({required this.dateTime, required this.theme});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -13,16 +29,16 @@ class AnalogClockPainter extends CustomPainter {
     final center = Offset(centerX, centerY);
     final radius = min(centerX, centerY);
 
-    // --- Configuration des ombres (inchangé) ---
+    // --- Configuration des ombres (utilise le thème) ---
     final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.5)
+      ..color = (theme.shadowColor ?? Colors.black.withOpacity(0.5))
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
     final shadowOffset = Offset(radius * 0.015, radius * 0.015);
 
-    // --- 2. Dessin des marqueurs et des chiffres (logique modifiée) ---
+    // --- 2. Dessin des marqueurs et des chiffres (utilise le thème) ---
     final textPainter = TextPainter(textAlign: TextAlign.center, textDirection: TextDirection.ltr);
     final hourTickPaint = Paint()
-      ..color = Colors.black
+      ..color = theme.hourTickColor ?? Colors.black
       ..strokeWidth = 2.0;
 
     for (int i = 0; i < 60; i++) {
@@ -38,7 +54,11 @@ class AnalogClockPainter extends CustomPainter {
           final numberToDisplay = hour == 0 ? '12' : '$hour';
           textPainter.text = TextSpan(
             text: numberToDisplay,
-            style: TextStyle(color: Colors.black, fontSize: radius * 0.18, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: theme.numberColor ?? Colors.black, // Utilise la couleur du thème
+              fontSize: radius * 0.18,
+              fontWeight: FontWeight.w600,
+            ),
           );
           textPainter.layout();
           final textOffset = Offset(
@@ -47,22 +67,21 @@ class AnalogClockPainter extends CustomPainter {
           );
           textPainter.paint(canvas, textOffset);
         } else {
-          // Marqueurs courts pour les autres heures.
           final tickStart = Offset(centerX + cos(angle) * (radius * 0.82), centerY + sin(angle) * (radius * 0.82));
           final tickEnd = Offset(centerX + cos(angle) * (radius * 0.92), centerY + sin(angle) * (radius * 0.92));
           canvas.drawLine(tickStart, tickEnd, hourTickPaint);
         }
       } else {
         // Marqueurs de minutes (points)
-        final dotPaint = Paint()..color = Colors.black54;
+        final dotPaint = Paint()..color = theme.minuteDotColor ?? Colors.black54;
         final dotPosition = Offset(centerX + cos(angle) * (radius * 0.87), centerY + sin(angle) * (radius * 0.87));
         canvas.drawCircle(dotPosition, 1.0, dotPaint);
       }
     }
 
-    // --- 3. Dessin des aiguilles (inchangé) ---
+    // --- 3. Dessin des aiguilles (utilise le thème) ---
     final handPaint = Paint()
-      ..color = const Color.fromARGB(255, 184, 43, 43)
+      ..color = theme.handColor ?? const Color.fromARGB(255, 184, 43, 43)
       ..style = PaintingStyle.fill;
 
     final hourAngle = ((dateTime.hour % 12 + dateTime.minute / 60) * 30 - 90) * (pi / 180);
@@ -102,9 +121,8 @@ class AnalogClockPainter extends CustomPainter {
     canvas.drawPath(hourHandPath, handPaint);
     canvas.drawPath(minuteHandPath, handPaint);
 
-    // --- 4. Dessin du pivot central (inchangé) ---
+    // --- 4. Dessin du pivot central (utilise le thème) ---
     final pivotRadius = radius * 0.12;
-    // J'ai ré-ajouté la ligne manquante pour le fond du pivot
     canvas.drawCircle(center, pivotRadius, Paint()..color = Colors.black);
     canvas.drawCircle(center, pivotRadius * 0.7, Paint()..color = Colors.black);
     final ridgesPaint = Paint()
@@ -126,7 +144,7 @@ class AnalogClockPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant AnalogClockPainter oldDelegate) {
-    return dateTime != oldDelegate.dateTime;
+  bool shouldRepaint(covariant _AnalogClockPainter oldDelegate) {
+    return dateTime != oldDelegate.dateTime || theme != oldDelegate.theme;
   }
 }

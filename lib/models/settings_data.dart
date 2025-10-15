@@ -50,6 +50,30 @@ class SettingsData {
     );
   }
 
+  /// Factory constructor pour créer une instance de SettingsData à partir d'un map JSON.
+  factory SettingsData.fromJson(Map<String, dynamic> json) {
+    return SettingsData(
+      soundEnabled: json['soundEnabled'] as bool? ?? true,
+      backgroundImagePath: json['backgroundImagePath'] as String?,
+      screenBrightness: (json['screenBrightness'] as num?)?.toDouble() ?? 1.0,
+      themeMode: ThemeMode.values[json['themeMode'] as int? ?? ThemeMode.dark.index],
+      autoSleepDelaySeconds: json['autoSleepDelaySeconds'] as int? ?? 300,
+      wakeUpMode: WakeUpMode.values[json['wakeUpMode'] as int? ?? WakeUpMode.onStart.index],
+    );
+  }
+
+  /// Méthode pour convertir une instance de SettingsData en un map JSON.
+  Map<String, dynamic> toJson() {
+    return {
+      'soundEnabled': soundEnabled,
+      'backgroundImagePath': backgroundImagePath,
+      'screenBrightness': screenBrightness,
+      'themeMode': themeMode.index,
+      'autoSleepDelaySeconds': autoSleepDelaySeconds,
+      'wakeUpMode': wakeUpMode.index,
+    };
+  }
+
   @override
   String toString() {
     return 'SettingsData(soundEnabled: $soundEnabled, backgroundImagePath: $backgroundImagePath, screenBrightness: $screenBrightness, themeMode: $themeMode, autoSleepDelaySeconds: $autoSleepDelaySeconds, wakeUpMode: $wakeUpMode)';

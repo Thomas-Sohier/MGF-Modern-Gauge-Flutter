@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:modern_gauge_flutter/ui/themes/clock_theme.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_background_theme.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
 
@@ -52,13 +53,22 @@ class AppTheme {
     iconTheme: const IconThemeData(
       color: textColorDark, // Default icon color
     ),
-    extensions: const <ThemeExtension<dynamic>>[
+    extensions: <ThemeExtension<dynamic>>[
       GaugeTheme(
         activeColor: Colors.white,
         inactiveColor: Color(0xFF303030),
         dangerColor: Colors.redAccent,
         dangerInactiveColor: Color(0x33FF0000),
         borderColor: Colors.white54,
+      ),
+      AnalogClockTheme(
+        handColor: const Color.fromARGB(255, 184, 43, 43),
+        hourTickColor: Colors.white,
+        minuteDotColor: Colors.grey,
+        numberColor: Colors.white,
+        centerPivotColor: Colors.white,
+        centerPivotRidgeColor: Colors.grey.shade400,
+        shadowColor: Colors.black54,
       ),
       GaugeThemeBackground(
         centerColor: Color.fromARGB(255, 39, 39, 39),
@@ -115,6 +125,15 @@ class AppTheme {
         dangerColor: Colors.red.shade700,
         dangerInactiveColor: Colors.red.withValues(alpha: 0.15),
         borderColor: Colors.black54,
+      ),
+      AnalogClockTheme(
+        handColor: Color.fromARGB(255, 184, 43, 43),
+        hourTickColor: Colors.black,
+        minuteDotColor: Colors.grey.shade700,
+        numberColor: Colors.black87,
+        centerPivotColor: Colors.black,
+        centerPivotRidgeColor: Colors.grey,
+        shadowColor: Colors.black38,
       ),
       GaugeThemeBackground(
         centerColor: Color(0xFFE0E0E0),

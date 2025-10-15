@@ -22,8 +22,9 @@ class App extends StatelessWidget {
         ChangeNotifierProvider<MprisListenerBase>(create: (context) => MprisListener()..start()),
         ChangeNotifierProvider(create: (context) => AppStateProvider(context.read<OdbService>())),
       ],
-      child: Builder(
-        builder: (context) {
+      child: Selector<SettingsProvider, ThemeMode>(
+        selector: (_, listener) => listener.settings.themeMode,
+        builder: (context, status, _) {
           return MaterialApp.router(
             title: 'ODB Dashboard',
             theme: AppTheme.lightTheme,
