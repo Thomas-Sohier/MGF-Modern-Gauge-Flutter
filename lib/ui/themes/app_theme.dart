@@ -6,17 +6,18 @@ import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
 /// Defines the color and typography themes for the entire application.
 class AppTheme {
   // --- Common Colors ---
-  static const Color primaryColor = Colors.lightBlueAccent; // Accent color for gauges/interactions
-  static const Color accentColor = Color(0xFF673AB7); // Another accent if needed
+  static const Color lightPrimaryColor = Color.fromARGB(255, 0, 66, 37);
+  static const Color darkPrimaryColor = Color.fromARGB(255, 0, 177, 100);
+  static const Color accentColor = Colors.white;
   static const Color textColorLight = Colors.black87;
   static const Color textColorDark = Colors.white;
 
   // --- Dark Theme ---
   static final ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
-    primaryColor: primaryColor,
+    primaryColor: darkPrimaryColor,
     colorScheme: const ColorScheme.dark(
-      primary: primaryColor,
+      primary: darkPrimaryColor,
       secondary: accentColor,
       surface: Color(0xFF1E1E1E), // Main background color
       onPrimary: Colors.white,
@@ -82,9 +83,9 @@ class AppTheme {
   // --- Light Theme (Optional, but good to have a base) ---
   static final ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
-    primaryColor: primaryColor,
+    primaryColor: lightPrimaryColor,
     colorScheme: const ColorScheme.light(
-      primary: primaryColor,
+      primary: lightPrimaryColor,
       secondary: accentColor,
       surface: Colors.white,
       onPrimary: Colors.white,
@@ -95,7 +96,7 @@ class AppTheme {
     ),
     scaffoldBackgroundColor: Colors.white,
     appBarTheme: const AppBarTheme(
-      backgroundColor: primaryColor,
+      backgroundColor: lightPrimaryColor,
       foregroundColor: textColorLight,
       elevation: 2,
       centerTitle: true,

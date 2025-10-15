@@ -9,20 +9,13 @@ abstract class SettingsAbstractEntry extends StatelessWidget {
   String get title;
 
   /// Le focus Node pour gérer les events
-  FocusNode get focusNode;
+  FocusNode? get focusNode;
 
   /// Retourne le widget principal (slider, switch, etc.)
-  Widget buildEntry(BuildContext context, bool isEditing);
+  Widget buildEntry(BuildContext context, bool isFocused, bool isEditing);
 
   @override
   Widget build(BuildContext context) {
-    final isEditing = Focus.of(context).canRequestFocus;
-
-    return FocusScope(
-      canRequestFocus: isEditing,
-      skipTraversal: !isEditing,
-      descendantsAreFocusable: isEditing,
-      child: buildEntry(context, isEditing),
-    );
+    return const SizedBox();
   }
 }

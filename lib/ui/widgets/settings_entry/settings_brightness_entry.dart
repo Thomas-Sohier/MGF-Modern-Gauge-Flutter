@@ -12,20 +12,23 @@ class SettingBrightnessEntry extends SettingsAbstractEntry {
   FocusNode get focusNode => _focusNode;
 
   @override
-  Widget buildEntry(BuildContext context, bool isEditing) {
+  Widget buildEntry(BuildContext context, bool isFocused, bool isEditing) {
     final provider = Provider.of<SettingsProvider>(context);
-    final isEditing = Focus.of(context).canRequestFocus;
 
-    return Slider(
-      focusNode: focusNode,
-      value: provider.settings.screenBrightness,
-      min: 0.1,
-      max: 1.0,
-      divisions: 9,
-      label: '${(provider.settings.screenBrightness * 100).round()}%',
-      onChanged: isEditing ? (val) => provider.setScreenBrightness(val) : null,
-      activeColor: Theme.of(context).primaryColor,
-      inactiveColor: Colors.grey[600],
+    return SettingsCardEntry(
+      title: title,
+      isFocused: isFocused,
+      child: Slider(
+        focusNode: focusNode,
+        value: provider.settings.screenBrightness,
+        min: 0.1,
+        max: 1.0,
+        divisions: 9,
+        label: '${(provider.settings.screenBrightness * 100).round()}%',
+        onChanged: isEditing ? (val) => provider.setScreenBrightness(val) : null,
+        activeColor: Theme.of(context).primaryColor,
+        inactiveColor: Colors.grey[600],
+      ),
     );
   }
 }

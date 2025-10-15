@@ -11,15 +11,19 @@ class SettingThemeEntry extends SettingsAbstractEntry {
   @override
   FocusNode get focusNode => _focusNode;
   @override
-  Widget buildEntry(BuildContext context, bool isEditing) {
+  Widget buildEntry(BuildContext context, bool isFocused, bool isEditing) {
     final provider = Provider.of<SettingsProvider>(context);
     final isLight = provider.settings.themeMode == ThemeMode.dark;
 
-    return Switch.adaptive(
-      focusNode: focusNode,
-      value: isLight,
-      onChanged: isEditing ? (val) => provider.setThemeMode(val ? ThemeMode.dark : ThemeMode.light) : null,
-      activeThumbColor: Theme.of(context).primaryColor,
+    return SettingsCardEntry(
+      title: title,
+      isFocused: isFocused,
+      child: Switch.adaptive(
+        focusNode: focusNode,
+        value: isLight,
+        onChanged: isEditing ? (val) => provider.setThemeMode(val ? ThemeMode.dark : ThemeMode.light) : null,
+        activeThumbColor: Theme.of(context).primaryColor,
+      ),
     );
   }
 }

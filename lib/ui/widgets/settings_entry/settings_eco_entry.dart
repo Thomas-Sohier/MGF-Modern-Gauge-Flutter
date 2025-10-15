@@ -12,15 +12,19 @@ class SettingEcoEntry extends SettingsAbstractEntry {
   FocusNode get focusNode => _focusNode;
 
   @override
-  Widget buildEntry(BuildContext context, bool isEditing) {
+  Widget buildEntry(BuildContext context, bool isFocused, bool isEditing) {
     final provider = Provider.of<SettingsProvider>(context);
     final isEco = true;
 
-    return Switch.adaptive(
-      focusNode: focusNode,
-      value: isEco,
-      onChanged: isEditing ? (val) => false : null,
-      activeThumbColor: Theme.of(context).primaryColor,
+    return SettingsCardEntry(
+      title: title,
+      isFocused: isFocused,
+      child: Switch.adaptive(
+        focusNode: focusNode,
+        value: isEco,
+        onChanged: isEditing ? (val) => false : null,
+        activeThumbColor: Theme.of(context).primaryColor,
+      ),
     );
   }
 }
