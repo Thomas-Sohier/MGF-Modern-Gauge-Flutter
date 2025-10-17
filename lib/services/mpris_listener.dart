@@ -24,7 +24,6 @@ class MprisListener implements MprisListenerBase {
 
   // Position sync config
   static const _positionSyncInterval = Duration(milliseconds: 500);
-  static const _positionUpdateDebounce = Duration(milliseconds: 100);
 
   late final DBusClient _client;
   final ChangeNotifier _changeNotifier = ChangeNotifier();
@@ -39,9 +38,7 @@ class MprisListener implements MprisListenerBase {
 
   MediaInfo? _mediaInfo;
   Duration _position = Duration.zero;
-  Duration _lastSyncedPosition = Duration.zero;
   PlaybackStatus _playbackStatus = PlaybackStatus.stopped;
-  DateTime? _lastStatusChangeTime;
 
   @override
   MediaInfo? get mediaInfo => _mediaInfo;
@@ -60,9 +57,7 @@ class MprisListener implements MprisListenerBase {
   @override
   Future<void> start() async {
     if (!Platform.isLinux) {
-      log(
-        'MprisListener INFO: Skipping initialization. Not on Linux platform.',
-      );
+      log('MprisListener INFO: Skipping initialization. Not on Linux platform.');
       return;
     }
 
@@ -80,16 +75,12 @@ class MprisListener implements MprisListenerBase {
       (signal) {
         if (!signal.name.startsWith(_mprisPrefix)) return;
 
-        final hasNewOwner =
-            signal.newOwner != null && signal.newOwner!.isNotEmpty;
-        final hasOldOwner =
-            signal.oldOwner != null && signal.oldOwner!.isNotEmpty;
+        final hasNewOwner = signal.newOwner != null && signal.newOwner!.isNotEmpty;
+        final hasOldOwner = signal.oldOwner != null && signal.oldOwner!.isNotEmpty;
 
         if (hasNewOwner && _playerObject == null) {
           _connectToPlayer(signal.name);
-        } else if (!hasNewOwner &&
-            hasOldOwner &&
-            signal.name == _currentPlayerName) {
+        } else if (!hasNewOwner && hasOldOwner && signal.name == _currentPlayerName) {
           _disconnectAndReset();
         }
       },
@@ -103,10 +94,7 @@ class MprisListener implements MprisListenerBase {
   Future<void> _scanForInitialPlayer() async {
     try {
       final names = await _client.listNames();
-      final playerOwner = names.firstWhere(
-        (name) => name.startsWith(_mprisPrefix),
-        orElse: () => '',
-      );
+      final playerOwner = names.firstWhere((name) => name.startsWith(_mprisPrefix), orElse: () => '');
 
       if (playerOwner.isNotEmpty) {
         await _connectToPlayer(playerOwner);
@@ -138,14 +126,10 @@ class MprisListener implements MprisListenerBase {
     if (_playerObject == null) return;
 
     try {
-      final properties = await _playerObject!.getAllProperties(
-        _playerInterface,
-      );
+      final properties = await _playerObject!.getAllProperties(_playerInterface);
 
       _updateMetadata(properties['Metadata']?.asStringVariantDict() ?? {});
-      _updatePlaybackStatus(
-        properties['PlaybackStatus']?.asString() ?? 'Stopped',
-      );
+      _updatePlaybackStatus(properties['PlaybackStatus']?.asString() ?? 'Stopped');
 
       await _syncPosition();
     } catch (e) {
@@ -189,16 +173,10 @@ class MprisListener implements MprisListenerBase {
 
   Future<void> _syncPosition() async {
     if (_playerObject == null) return;
-
     try {
-      final positionVariant = await _playerObject!.getProperty(
-        _playerInterface,
-        'Position',
-      );
-
+      final positionVariant = await _playerObject!.getProperty(_playerInterface, 'Position');
       final newPosition = Duration(microseconds: positionVariant.asInt64());
       _updatePosition(positionVariant.asInt64());
-      _lastSyncedPosition = newPosition;
     } catch (e) {
       log("ERREUR sync position: $e");
     }
@@ -223,11 +201,7 @@ class MprisListener implements MprisListenerBase {
 
     if (_playbackStatus != newStatus) {
       _playbackStatus = newStatus;
-      _lastStatusChangeTime = DateTime.now();
-
       log("Playback status: ${_playbackStatus.name}");
-
-      // Start/stop position sync based on playback state
       if (isPlaying) {
         _startPositionSyncTimer();
       } else {
@@ -251,10 +225,7 @@ class MprisListener implements MprisListenerBase {
       _currentPlayerName = null;
       _mediaInfo = null;
       _position = Duration.zero;
-      _lastSyncedPosition = Duration.zero;
       _playbackStatus = PlaybackStatus.stopped;
-      _lastStatusChangeTime = null;
-
       if (notify) {
         notifyListeners();
       }
@@ -272,9 +243,7 @@ class MprisListener implements MprisListenerBase {
         title: metadata['xesam:title']?.asString(),
         artist: metadata['xesam:artist']?.asStringArray().join(', '),
         album: metadata['xesam:album']?.asString(),
-        artUrl: artUrl?.startsWith('file://') ?? false
-            ? Uri.decodeComponent(artUrl!.substring(7))
-            : artUrl,
+        artUrl: artUrl?.startsWith('file://') ?? false ? Uri.decodeComponent(artUrl!.substring(7)) : artUrl,
         duration: Duration(microseconds: durationInMicroseconds),
       );
 
@@ -289,12 +258,10 @@ class MprisListener implements MprisListenerBase {
   }
 
   @override
-  void addListener(VoidCallback listener) =>
-      _changeNotifier.addListener(listener);
+  void addListener(VoidCallback listener) => _changeNotifier.addListener(listener);
 
   @override
-  void removeListener(VoidCallback listener) =>
-      _changeNotifier.removeListener(listener);
+  void removeListener(VoidCallback listener) => _changeNotifier.removeListener(listener);
 
   @override
   void notifyListeners() => _changeNotifier.notifyListeners();

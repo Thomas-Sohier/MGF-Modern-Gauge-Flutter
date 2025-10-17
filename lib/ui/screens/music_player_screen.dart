@@ -71,7 +71,7 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with ScreenNaviga
 }
 
 class _NoMusicPlayerUI extends StatelessWidget {
-  const _NoMusicPlayerUI({super.key});
+  const _NoMusicPlayerUI();
 
   @override
   Widget build(BuildContext context) {
@@ -85,12 +85,7 @@ class _NoMusicPlayerUI extends StatelessWidget {
             end: Alignment.bottomRight,
           ),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              spreadRadius: 2,
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
+            BoxShadow(color: Colors.black.withAlpha(90), spreadRadius: 2, blurRadius: 10, offset: const Offset(0, 5)),
           ],
         ),
         child: Column(
@@ -333,12 +328,11 @@ class _DynamicColorDial extends StatefulWidget {
 class _DynamicColorDialState extends State<_DynamicColorDial> {
   Color _foregroundColor = Colors.blue;
   Color _containerColor = Colors.white;
-  late Future<ColorScheme> _colorFuture;
 
   @override
   void initState() {
     super.initState();
-    _colorFuture = _extractColor();
+    _extractColor();
   }
 
   @override
@@ -346,7 +340,7 @@ class _DynamicColorDialState extends State<_DynamicColorDial> {
     super.didUpdateWidget(oldWidget);
     // Si l'artUrl change, extraire la nouvelle couleur
     if (oldWidget.artUrl != widget.artUrl) {
-      _colorFuture = _extractColor();
+      _extractColor();
     }
   }
 

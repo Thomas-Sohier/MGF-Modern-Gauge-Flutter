@@ -25,7 +25,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const Curve _animationCurve = Curves.easeInOut;
 
   static const double _itemHeight = 120.0;
-  static const double _titleHeight = 40.0; // Hauteur pour les titres
   static const Duration _scrollDuration = Duration(milliseconds: 300);
   static const Curve _scrollCurve = Curves.easeInOut;
 

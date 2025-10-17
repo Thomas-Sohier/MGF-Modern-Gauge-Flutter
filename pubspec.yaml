@@ -19,6 +19,8 @@ dependencies:
   syncfusion_flutter_gauges: ^31.1.23
 
 dev_dependencies:
+  mockito: ^5.4.4
+  build_runner: ^2.4.7
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
