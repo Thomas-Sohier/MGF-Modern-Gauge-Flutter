@@ -13,6 +13,25 @@ jobs:
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
+      - name: Generate snapshot tag
+        id: generate_tag 
+        run: echo "TAG_NAME=snapshot-$(date +'%Y%m%d%H%M%S')-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+      - name: Create and push tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.generate_tag.outputs.TAG_NAME }} -a -m "Snapshot release ${{ steps.generate_tag.outputs.TAG_NAME }}"
+          git push origin ${{ steps.generate_tag.outputs.TAG_NAME }}
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.generate_tag.outputs.TAG_NAME }}
+          release_name: "Snapshot ${{ steps.generate_tag.outputs.TAG_NAME }}"
+          body: "Automated snapshot release."
+          draft: true
+          prerelease: false
       - name: Installation de Flutter
         uses: subosito/flutter-action@v2
         with:
