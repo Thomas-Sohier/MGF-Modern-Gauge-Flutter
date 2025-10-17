@@ -1,4 +1,4 @@
-name: Flutter CI
+name: Flutter CI for flutter-pi
 
 on:
   push:
@@ -14,33 +14,36 @@ jobs:
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
+
       - name: Installation de Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+
       - name: Installation des dépendances
         run: flutter pub get
+
       - name: Lancement des tests
         run: flutter test
-      - name: Installation des dépendances système pour Linux
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
-      - name: Construction de l'application Linux (Release)
-        run: flutter build linux --release
+
+      - name: Construction de l'application pour flutter-pi (Release)
+        run: flutter build bundle
+
       - name: Génération du nom du tag snapshot
         id: generate_tag 
         run: echo "TAG_NAME=snapshot-$(date +'%Y%m%d%H%M%S')-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
       - name: Archivage des artefacts de la release
-        run: tar -czvf snapshot-linux-x64.tar.gz -C build/linux/x64/release/bundle .
-      - name: Lister les fichiers avant la release
-        run: ls -R
+        run: tar -czvf flutter-pi-assets.tar.gz -C build/flutter_assets .
+
       - name: Création de la Release GitHub et téléversement de l'artefact
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.generate_tag.outputs.TAG_NAME }}
           name: "Snapshot ${{ steps.generate_tag.outputs.TAG_NAME }}"
-          body: "Automated snapshot release."
+          body: "Automated flutter-pi snapshot release."
           draft: false 
           prerelease: true 
-          files: snapshot-linux-x64.tar.gz
+          files: flutter-pi-assets.tar.gz
+
+Avec ce workflow, chaque "push" sur la branche main créera une nouvelle "pre-release" sur GitHub contenant une archive flutter-pi-assets.tar.gz. Vous pourrez ensuite déployer cette archive sur votre appareil embarqué (comme un Raspberry Pi) et l'exécuter avec flutter-pi.
