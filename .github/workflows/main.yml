@@ -28,17 +28,10 @@ jobs:
       - name: Lancement des tests de l'application
         run: cd app && flutter test
 
-      - name: Checkout de flutter-pi et des sous-modules
-        uses: actions/checkout@v4
-        with:
-          repository: ardera/flutter-pi
-          path: flutter-pi
-          submodules: 'recursive'
-
       - name: Construction du moteur flutter-pi
         run: |
-          cd flutter-pi
-          ./flutterpi_tool build --arch=arm64 --cpu=pi3 --release
+          flutter pub global activate flutterpi_tool
+          flutterpi_tool build --arch=arm64 --cpu=pi3 --release
 
       - name: Construction du bundle de l'application
         run: cd app && flutter build bundle
