@@ -32,11 +32,9 @@ jobs:
         id: generate_tag 
         run: echo "TAG_NAME=snapshot-$(date +'%Y%m%d%H%M%S')-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
       - name: Archivage des artefacts de la release
-        id: archive_artifacts
-        run: |
-          cd build/linux/x64/release/bundle
-          # On utilise le tag généré pour nommer l'archive, c'est plus propre
-          tar -czvf ../../../../snapshot-linux-x64.tar.gz .
+        run: tar -czvf snapshot-linux-x64.tar.gz -C build/linux/x64/release/bundle .
+      - name: Lister les fichiers avant la release
+        run: ls -R
       - name: Création de la Release GitHub et téléversement de l'artefact
         uses: softprops/action-gh-release@v1
         with:
@@ -45,5 +43,4 @@ jobs:
           body: "Automated snapshot release."
           draft: false 
           prerelease: true 
-          files: |
-            snapshot-linux-x64.tar.gz
+          files: snapshot-linux-x64.tar.gz
