@@ -12,36 +12,56 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout du code
+      - name: Checkout du code de l'application
         uses: actions/checkout@v4
+        with:
+          path: app
 
       - name: Installation de Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Installation des dépendances
-        run: flutter pub get
+      - name: Installation des dépendances de l'application
+        run: cd app && flutter pub get
 
-      - name: Lancement des tests
-        run: flutter test
+      - name: Lancement des tests de l'application
+        run: cd app && flutter test
 
-      - name: Construction de l'application pour flutter-pi (Release)
-        run: flutter build bundle
+      - name: Checkout de flutter-pi et des sous-modules
+        uses: actions/checkout@v4
+        with:
+          repository: ardera/flutter-pi
+          path: flutter-pi
+          submodules: 'recursive'
+
+      - name: Construction du moteur flutter-pi
+        run: |
+          cd flutter-pi
+          ./flutterpi_tool build --arch=arm64 --cpu=pi3 --release
+
+      - name: Construction du bundle de l'application
+        run: cd app && flutter build bundle
+
+      - name: Préparation des artefacts pour la release
+        run: |
+          mkdir deploy
+          cp -r flutter-pi/build/flutter-pi/release/* deploy/
+          cp -r app/build/flutter_assets deploy/
 
       - name: Génération du nom du tag snapshot
         id: generate_tag 
         run: echo "TAG_NAME=snapshot-$(date +'%Y%m%d%H%M%S')-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
       - name: Archivage des artefacts de la release
-        run: tar -czvf flutter-pi-assets.tar.gz -C build/flutter_assets .
+        run: tar -czvf flutter-pi-deploy.tar.gz -C deploy .
 
       - name: Création de la Release GitHub et téléversement de l'artefact
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.generate_tag.outputs.TAG_NAME }}
           name: "Snapshot ${{ steps.generate_tag.outputs.TAG_NAME }}"
-          body: "Automated flutter-pi snapshot release."
+          body: "Automated flutter-pi snapshot release including engine and app bundle."
           draft: false 
           prerelease: true 
-          files: flutter-pi-assets.tar.gz
+          files: flutter-pi-deploy.tar.gz
