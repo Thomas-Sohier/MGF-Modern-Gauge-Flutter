@@ -21,17 +21,12 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-
-      - name: Installation des dépendances de l'application
-        run: cd app && flutter pub get
-
-      - name: Lancement des tests de l'application
-        run: cd app && flutter test
-
-      - name: Construction du bundle de l'application
-        run: cd app && flutter build bundle
-
-      - name: Construction du moteur flutter-pi
+          flutter-version: 3.35.4
+      - name: Installation des dépendances
+        run: flutter pub get
+      - name: Lancement des tests
+        run: flutter test
+      - name: Installation des dépendances système pour Linux
         run: |
           flutter pub global activate flutterpi_tool
           flutterpi_tool build --arch=arm64 --cpu=pi3 --release
