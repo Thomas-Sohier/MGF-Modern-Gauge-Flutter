@@ -28,11 +28,6 @@ jobs:
       - name: Lancement des tests de l'application
         run: cd app && flutter test
 
-      - name: Construction du moteur flutter-pi
-        run: |
-          flutter pub global activate flutterpi_tool
-          flutterpi_tool build --arch=arm64 --cpu=pi3 --release
-
       - name: Construction du bundle de l'application
         run: cd app && flutter build bundle
 
@@ -41,6 +36,11 @@ jobs:
           mkdir deploy
           cp -r flutter-pi/build/flutter-pi/release/* deploy/
           cp -r app/build/flutter_assets deploy/
+
+      - name: Construction du moteur flutter-pi
+        run: |
+          flutter pub global activate flutterpi_tool
+          flutterpi_tool build --arch=arm64 --cpu=pi3 --release
 
       - name: Génération du nom du tag snapshot
         id: generate_tag 
