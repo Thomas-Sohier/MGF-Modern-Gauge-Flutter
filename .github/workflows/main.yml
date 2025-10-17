@@ -45,5 +45,3 @@ jobs:
           draft: false 
           prerelease: true 
           files: flutter-pi-assets.tar.gz
-
-Avec ce workflow, chaque "push" sur la branche main créera une nouvelle "pre-release" sur GitHub contenant une archive flutter-pi-assets.tar.gz. Vous pourrez ensuite déployer cette archive sur votre appareil embarqué (comme un Raspberry Pi) et l'exécuter avec flutter-pi.
