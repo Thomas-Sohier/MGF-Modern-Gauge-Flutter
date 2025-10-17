@@ -41,8 +41,7 @@ jobs:
       - name: Préparation des artefacts pour la release
         run: |
           mkdir deploy
-          cp -r flutter-pi/build/flutter-pi/release/* deploy/
-          cp -r app/build/flutter_assets deploy/
+          cp -r app/build/flutter-pi/pi3-64/* deploy/
 
       - name: Génération du nom du tag snapshot
         id: generate_tag 
