@@ -22,10 +22,13 @@ jobs:
         with:
           channel: 'stable'
           flutter-version: 3.35.4
+          
       - name: Installation des dépendances
         run: flutter pub get
+
       - name: Lancement des tests
         run: flutter test
+
       - name: Installation des dépendances système pour Linux
         run: |
           flutter pub global activate flutterpi_tool
