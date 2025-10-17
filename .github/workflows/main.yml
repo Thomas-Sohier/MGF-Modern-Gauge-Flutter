@@ -36,14 +36,14 @@ jobs:
         run: |
           cd build/linux/x64/release/bundle
           # On utilise le tag généré pour nommer l'archive, c'est plus propre
-          tar -czvf ../../../../snapshot-linux-x64.tar.gz .
+          tar -czvf ../../../../snapshot-mgf-linux-x64.tar.gz .
       - name: Création de la Release GitHub et téléversement de l'artefact
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.generate_tag.outputs.TAG_NAME }}
           name: "Snapshot ${{ steps.generate_tag.outputs.TAG_NAME }}"
           body: "Automated snapshot release."
-          draft: true 
+          draft: false 
           prerelease: true 
           files: |
             snapshot-mgf-linux-x64.tar.gz
