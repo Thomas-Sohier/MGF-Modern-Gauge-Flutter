@@ -13,17 +13,20 @@ dependencies:
     sdk: flutter
   go_router: ^16.2.4
   image: ^4.5.4
+  intl: ^0.20.2
+  logger: ^2.6.2
   marquee: ^2.3.0
+  path_provider: ^2.1.5
   provider: ^6.1.5+1
   shared_preferences: ^2.5.3
   syncfusion_flutter_gauges: ^31.1.23
 
 dev_dependencies:
-  mockito: ^5.4.4
   build_runner: ^2.4.7
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
+  mockito: ^5.4.4
 
 flutter:
   uses-material-design: true

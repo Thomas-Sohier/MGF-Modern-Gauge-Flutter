@@ -33,7 +33,7 @@ class App extends StatelessWidget {
         Provider(create: (_) => odbService, dispose: (_, service) => service.dispose()),
         ChangeNotifierProvider(create: (_) => settingsProvider),
         ChangeNotifierProvider(create: (context) => dialProvider),
-        ChangeNotifierProvider<MprisListenerBase>(create: (context) => mprisListener),
+        ChangeNotifierProvider<MprisListenerBase>(create: (context) => mprisListener..start()),
         ChangeNotifierProvider(create: (context) => appStateProvider),
       ],
       child: Selector<SettingsProvider, ThemeMode>(

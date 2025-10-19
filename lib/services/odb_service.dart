@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:modern_gauge_flutter/models/dial_data.dart';
 import 'package:modern_gauge_flutter/providers/app_state_provider.dart';
+import 'package:modern_gauge_flutter/services/log_service.dart';
 
 class OdbService {
   final _controller = StreamController<DialData>.broadcast();
@@ -22,7 +23,7 @@ class OdbService {
     _dataFetchTimer = Timer.periodic(const Duration(milliseconds: 400), (timer) {
       _readAndProcessOdbData();
     });
-    if (kDebugMode) print('OdbService stream started.');
+    LogService.info('[OdbService] - initialized');
   }
 
   void stopOdbDataStream() {
@@ -30,7 +31,7 @@ class OdbService {
     _dataFetchTimer?.cancel();
     _isServiceRunning = false;
     _statusController.add(OdbConnectionStatus.disconnected);
-    if (kDebugMode) print('OdbService stream stopped.');
+    LogService.info('[OdbService] - stopped');
   }
 
   void _readAndProcessOdbData() {
@@ -53,12 +54,13 @@ class OdbService {
       odometer: newOdometer,
     );
     _controller.add(data);
+    LogService.debug('[OdbService] - data: $data');
   }
 
   void dispose() {
     stopOdbDataStream();
     _controller.close();
     _statusController.close();
-    if (kDebugMode) print('OdbService disposed.');
+    LogService.debug('[OdbService] - disposed');
   }
 }

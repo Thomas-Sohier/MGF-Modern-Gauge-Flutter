@@ -3,7 +3,9 @@ import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dbus/dbus.dart';
+import 'package:logger/logger.dart';
 import 'package:modern_gauge_flutter/providers/mpris_provider.dart';
+import 'package:modern_gauge_flutter/services/log_service.dart';
 
 class MediaInfo {
   final String? title;
@@ -57,7 +59,7 @@ class MprisListener implements MprisListenerBase {
   @override
   Future<void> start() async {
     if (!Platform.isLinux) {
-      log('MprisListener INFO: Skipping initialization. Not on Linux platform.');
+      LogService.warning('[MprisListener] - Skipping initialization. Not on Linux platform.');
       return;
     }
 
@@ -66,7 +68,7 @@ class MprisListener implements MprisListenerBase {
       _listenForPlayerChanges();
       await _scanForInitialPlayer();
     } catch (e) {
-      log("MprisListener ERREUR: Impossible de se connecter à D-Bus: $e");
+      LogService.warning("[MprisListener] - Cannot connecte to D-Bus: $e");
     }
   }
 
@@ -85,7 +87,7 @@ class MprisListener implements MprisListenerBase {
         }
       },
       onError: (e) {
-        log("ERREUR nameOwnerChanged: $e");
+        LogService.error("[MprisListener] - nameOwnerChanged: $e");
         _disconnectAndReset();
       },
     );
@@ -100,7 +102,7 @@ class MprisListener implements MprisListenerBase {
         await _connectToPlayer(playerOwner);
       }
     } catch (e) {
-      log("ERREUR lors du scan initial: $e");
+      LogService.error("[MprisListener] - error while inital scan : $e");
     }
   }
 
@@ -117,7 +119,7 @@ class MprisListener implements MprisListenerBase {
       _startPositionSyncTimer();
       notifyListeners();
     } catch (e) {
-      log("ERREUR lors de la connexion: $e");
+      LogService.error("[MprisListener] - error while connect : $e");
       await _disconnectAndReset();
     }
   }
@@ -133,7 +135,7 @@ class MprisListener implements MprisListenerBase {
 
       await _syncPosition();
     } catch (e) {
-      log("ERREUR fetch initial state: $e");
+      LogService.error("[MprisListener] - fetch initial state: $e");
       rethrow;
     }
   }
@@ -145,6 +147,7 @@ class MprisListener implements MprisListenerBase {
     _propertiesSubscription = _playerObject!.propertiesChanged.listen(
       (signal) {
         final props = signal.changedProperties;
+        LogService.debug("[MprisListener] - propertiesChanged: $props");
 
         // Handle metadata changes
         if (props.containsKey('Metadata')) {
@@ -165,7 +168,7 @@ class MprisListener implements MprisListenerBase {
         notifyListeners();
       },
       onError: (e) {
-        log("ERREUR propertiesChanged: $e");
+        LogService.error("[MprisListener] - propertiesChanged: $e");
         _disconnectAndReset();
       },
     );
@@ -175,10 +178,9 @@ class MprisListener implements MprisListenerBase {
     if (_playerObject == null) return;
     try {
       final positionVariant = await _playerObject!.getProperty(_playerInterface, 'Position');
-      final newPosition = Duration(microseconds: positionVariant.asInt64());
       _updatePosition(positionVariant.asInt64());
     } catch (e) {
-      log("ERREUR sync position: $e");
+      LogService.error("[MprisListener] - sync position: $e");
     }
   }
 
@@ -230,7 +232,7 @@ class MprisListener implements MprisListenerBase {
         notifyListeners();
       }
     } catch (e) {
-      log("ERREUR disconnectAndReset: $e");
+      LogService.error("[MprisListener] - disconnectAndReset: $e");
     }
   }
 
@@ -247,9 +249,9 @@ class MprisListener implements MprisListenerBase {
         duration: Duration(microseconds: durationInMicroseconds),
       );
 
-      log("Metadata updated: ${_mediaInfo?.title} - ${_mediaInfo?.artist}");
+      LogService.info("[MprisListener] - updated: ${_mediaInfo?.title} - ${_mediaInfo?.artist}");
     } catch (e) {
-      log("ERREUR updateMetadata: $e");
+      LogService.error("[MprisListener] - updateMetadata: $e");
     }
   }
 
@@ -277,7 +279,7 @@ class MprisListener implements MprisListenerBase {
       _changeNotifier.dispose();
       await _client.close();
     } catch (e) {
-      log("ERREUR dispose: $e");
+      LogService.debug("[MprisListener] - dispose: $e");
     }
   }
 }

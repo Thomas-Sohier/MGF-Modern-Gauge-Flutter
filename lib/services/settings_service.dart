@@ -1,38 +1,23 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:modern_gauge_flutter/models/settings_data.dart';
+import 'package:modern_gauge_flutter/services/log_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Service de gestion des paramètres utilisant le pattern Singleton.
-///
-/// L'instance de SharedPreferences est chargée une seule fois et conservée,
-/// optimisant ainsi les accès répétés.
+/// Service de gestion des paramètres
 class SettingsService {
   static const String _settingsKey = 'app_settings';
-
-  // --- Implémentation du Singleton ---
-  // Instance privée et statique
   static final SettingsService _instance = SettingsService._internal();
+  SettingsService._internal();
+  SharedPreferences? _prefs;
 
-  // Constructeur factory qui retourne toujours la même instance
   factory SettingsService() {
     return _instance;
   }
 
-  // Constructeur privé, utilisé uniquement à l'intérieur de la classe
-  SettingsService._internal();
-  // --- Fin du Singleton ---
-
-  SharedPreferences? _prefs;
-
-  /// Méthode d'initialisation asynchrone.
-  /// Doit être appelée une seule fois au démarrage de l'application.
-  /// (par exemple, dans votre fonction `main`).
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
-    if (kDebugMode) {
-      print('SettingsService initialized.');
-    }
+    LogService.info('[SettingsService] - initialized.');
   }
 
   // S'assure que le service a été initialisé avant utilisation.
@@ -53,9 +38,7 @@ class SettingsService {
         final Map<String, dynamic> decodedJson = json.decode(settingsJson);
         return SettingsData.fromJson(decodedJson);
       } catch (e) {
-        if (kDebugMode) {
-          print('Error decoding settings JSON, returning default settings: $e');
-        }
+        LogService.error('[SettingsService] - Error decoding settings JSON, returning default settings: $e');
         return SettingsData();
       }
     }
@@ -67,6 +50,7 @@ class SettingsService {
     _ensureInitialized();
     final String encodedJson = json.encode(settings.toJson());
     await _prefs!.setString(_settingsKey, encodedJson);
+    LogService.info('[SettingsService] - Settings saved $encodedJson.');
   }
 
   /// Supprime tous les paramètres sauvegardés.
