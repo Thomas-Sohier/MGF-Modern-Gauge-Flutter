@@ -3,26 +3,28 @@
 // Do not manually edit this file.
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'dart:async' as _i13;
-import 'dart:ui' as _i11;
+import 'dart:async' as _i14;
+import 'dart:ui' as _i12;
 
 import 'package:flutter/material.dart' as _i6;
 import 'package:go_router/src/configuration.dart' as _i5;
 import 'package:go_router/src/delegate.dart' as _i7;
 import 'package:go_router/src/information_provider.dart' as _i8;
-import 'package:go_router/src/match.dart' as _i19;
+import 'package:go_router/src/match.dart' as _i20;
 import 'package:go_router/src/parser.dart' as _i9;
-import 'package:go_router/src/router.dart' as _i17;
+import 'package:go_router/src/router.dart' as _i18;
 import 'package:go_router/src/state.dart' as _i4;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i18;
+import 'package:mockito/src/dummies.dart' as _i19;
 import 'package:modern_gauge_flutter/models/dial_data.dart' as _i3;
+import 'package:modern_gauge_flutter/models/ecu_data.dart' as _i10;
 import 'package:modern_gauge_flutter/models/settings_data.dart' as _i2;
-import 'package:modern_gauge_flutter/providers/app_state_provider.dart' as _i14;
-import 'package:modern_gauge_flutter/providers/dial_provider.dart' as _i15;
-import 'package:modern_gauge_flutter/providers/settings_provider.dart' as _i10;
-import 'package:modern_gauge_flutter/services/mpris_listener.dart' as _i16;
-import 'package:modern_gauge_flutter/services/odb_service.dart' as _i12;
+import 'package:modern_gauge_flutter/providers/app_state_provider.dart' as _i15;
+import 'package:modern_gauge_flutter/providers/dial_provider.dart' as _i16;
+import 'package:modern_gauge_flutter/providers/ecu_provider.dart' as _i21;
+import 'package:modern_gauge_flutter/providers/settings_provider.dart' as _i11;
+import 'package:modern_gauge_flutter/services/mpris_listener.dart' as _i17;
+import 'package:modern_gauge_flutter/services/odb_service.dart' as _i13;
 
 // ignore_for_file: type=lint
 // ignore_for_file: avoid_redundant_argument_values
@@ -89,10 +91,15 @@ class _FakeGoRouteInformationParser_8 extends _i1.SmartFake
     : super(parent, parentInvocation);
 }
 
+class _FakeEcuData_9 extends _i1.SmartFake implements _i10.EcuData {
+  _FakeEcuData_9(Object parent, Invocation parentInvocation)
+    : super(parent, parentInvocation);
+}
+
 /// A class which mocks [SettingsProvider].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockSettingsProvider extends _i1.Mock implements _i10.SettingsProvider {
+class MockSettingsProvider extends _i1.Mock implements _i11.SettingsProvider {
   MockSettingsProvider() {
     _i1.throwOnMissingStub(this);
   }
@@ -162,13 +169,13 @@ class MockSettingsProvider extends _i1.Mock implements _i10.SettingsProvider {
   );
 
   @override
-  void addListener(_i11.VoidCallback? listener) => super.noSuchMethod(
+  void addListener(_i12.VoidCallback? listener) => super.noSuchMethod(
     Invocation.method(#addListener, [listener]),
     returnValueForMissingStub: null,
   );
 
   @override
-  void removeListener(_i11.VoidCallback? listener) => super.noSuchMethod(
+  void removeListener(_i12.VoidCallback? listener) => super.noSuchMethod(
     Invocation.method(#removeListener, [listener]),
     returnValueForMissingStub: null,
   );
@@ -189,26 +196,26 @@ class MockSettingsProvider extends _i1.Mock implements _i10.SettingsProvider {
 /// A class which mocks [OdbService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockOdbService extends _i1.Mock implements _i12.OdbService {
+class MockOdbService extends _i1.Mock implements _i13.OdbService {
   MockOdbService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i13.Stream<_i3.DialData> get dataStream =>
+  _i14.Stream<_i3.DialData> get dataStream =>
       (super.noSuchMethod(
             Invocation.getter(#dataStream),
-            returnValue: _i13.Stream<_i3.DialData>.empty(),
+            returnValue: _i14.Stream<_i3.DialData>.empty(),
           )
-          as _i13.Stream<_i3.DialData>);
+          as _i14.Stream<_i3.DialData>);
 
   @override
-  _i13.Stream<_i14.OdbConnectionStatus> get statusStream =>
+  _i14.Stream<_i15.OdbConnectionStatus> get statusStream =>
       (super.noSuchMethod(
             Invocation.getter(#statusStream),
-            returnValue: _i13.Stream<_i14.OdbConnectionStatus>.empty(),
+            returnValue: _i14.Stream<_i15.OdbConnectionStatus>.empty(),
           )
-          as _i13.Stream<_i14.OdbConnectionStatus>);
+          as _i14.Stream<_i15.OdbConnectionStatus>);
 
   @override
   void startOdbDataStream() => super.noSuchMethod(
@@ -232,7 +239,7 @@ class MockOdbService extends _i1.Mock implements _i12.OdbService {
 /// A class which mocks [DialProvider].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockDialProvider extends _i1.Mock implements _i15.DialProvider {
+class MockDialProvider extends _i1.Mock implements _i16.DialProvider {
   MockDialProvider() {
     _i1.throwOnMissingStub(this);
   }
@@ -311,13 +318,13 @@ class MockDialProvider extends _i1.Mock implements _i15.DialProvider {
   );
 
   @override
-  void addListener(_i11.VoidCallback? listener) => super.noSuchMethod(
+  void addListener(_i12.VoidCallback? listener) => super.noSuchMethod(
     Invocation.method(#addListener, [listener]),
     returnValueForMissingStub: null,
   );
 
   @override
-  void removeListener(_i11.VoidCallback? listener) => super.noSuchMethod(
+  void removeListener(_i12.VoidCallback? listener) => super.noSuchMethod(
     Invocation.method(#removeListener, [listener]),
     returnValueForMissingStub: null,
   );
@@ -332,7 +339,7 @@ class MockDialProvider extends _i1.Mock implements _i15.DialProvider {
 /// A class which mocks [MprisListener].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockMprisListener extends _i1.Mock implements _i16.MprisListener {
+class MockMprisListener extends _i1.Mock implements _i17.MprisListener {
   MockMprisListener() {
     _i1.throwOnMissingStub(this);
   }
@@ -346,12 +353,12 @@ class MockMprisListener extends _i1.Mock implements _i16.MprisListener {
           as Duration);
 
   @override
-  _i16.PlaybackStatus get playbackStatus =>
+  _i17.PlaybackStatus get playbackStatus =>
       (super.noSuchMethod(
             Invocation.getter(#playbackStatus),
-            returnValue: _i16.PlaybackStatus.playing,
+            returnValue: _i17.PlaybackStatus.playing,
           )
-          as _i16.PlaybackStatus);
+          as _i17.PlaybackStatus);
 
   @override
   bool get isPlaying =>
@@ -364,22 +371,22 @@ class MockMprisListener extends _i1.Mock implements _i16.MprisListener {
           as bool);
 
   @override
-  _i13.Future<void> start() =>
+  _i14.Future<void> start() =>
       (super.noSuchMethod(
             Invocation.method(#start, []),
-            returnValue: _i13.Future<void>.value(),
-            returnValueForMissingStub: _i13.Future<void>.value(),
+            returnValue: _i14.Future<void>.value(),
+            returnValueForMissingStub: _i14.Future<void>.value(),
           )
-          as _i13.Future<void>);
+          as _i14.Future<void>);
 
   @override
-  void addListener(_i11.VoidCallback? listener) => super.noSuchMethod(
+  void addListener(_i12.VoidCallback? listener) => super.noSuchMethod(
     Invocation.method(#addListener, [listener]),
     returnValueForMissingStub: null,
   );
 
   @override
-  void removeListener(_i11.VoidCallback? listener) => super.noSuchMethod(
+  void removeListener(_i12.VoidCallback? listener) => super.noSuchMethod(
     Invocation.method(#removeListener, [listener]),
     returnValueForMissingStub: null,
   );
@@ -391,19 +398,19 @@ class MockMprisListener extends _i1.Mock implements _i16.MprisListener {
   );
 
   @override
-  _i13.Future<void> dispose() =>
+  _i14.Future<void> dispose() =>
       (super.noSuchMethod(
             Invocation.method(#dispose, []),
-            returnValue: _i13.Future<void>.value(),
-            returnValueForMissingStub: _i13.Future<void>.value(),
+            returnValue: _i14.Future<void>.value(),
+            returnValueForMissingStub: _i14.Future<void>.value(),
           )
-          as _i13.Future<void>);
+          as _i14.Future<void>);
 }
 
 /// A class which mocks [AppStateProvider].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockAppStateProvider extends _i1.Mock implements _i14.AppStateProvider {
+class MockAppStateProvider extends _i1.Mock implements _i15.AppStateProvider {
   MockAppStateProvider() {
     _i1.throwOnMissingStub(this);
   }
@@ -414,12 +421,12 @@ class MockAppStateProvider extends _i1.Mock implements _i14.AppStateProvider {
           as bool);
 
   @override
-  _i14.OdbConnectionStatus get odbStatus =>
+  _i15.OdbConnectionStatus get odbStatus =>
       (super.noSuchMethod(
             Invocation.getter(#odbStatus),
-            returnValue: _i14.OdbConnectionStatus.disconnected,
+            returnValue: _i15.OdbConnectionStatus.disconnected,
           )
-          as _i14.OdbConnectionStatus);
+          as _i15.OdbConnectionStatus);
 
   @override
   bool get isInitializing =>
@@ -441,7 +448,7 @@ class MockAppStateProvider extends _i1.Mock implements _i14.AppStateProvider {
   );
 
   @override
-  void setOdbConnectionStatus(_i14.OdbConnectionStatus? status) =>
+  void setOdbConnectionStatus(_i15.OdbConnectionStatus? status) =>
       super.noSuchMethod(
         Invocation.method(#setOdbConnectionStatus, [status]),
         returnValueForMissingStub: null,
@@ -466,13 +473,13 @@ class MockAppStateProvider extends _i1.Mock implements _i14.AppStateProvider {
   );
 
   @override
-  void addListener(_i11.VoidCallback? listener) => super.noSuchMethod(
+  void addListener(_i12.VoidCallback? listener) => super.noSuchMethod(
     Invocation.method(#addListener, [listener]),
     returnValueForMissingStub: null,
   );
 
   @override
-  void removeListener(_i11.VoidCallback? listener) => super.noSuchMethod(
+  void removeListener(_i12.VoidCallback? listener) => super.noSuchMethod(
     Invocation.method(#removeListener, [listener]),
     returnValueForMissingStub: null,
   );
@@ -487,7 +494,7 @@ class MockAppStateProvider extends _i1.Mock implements _i14.AppStateProvider {
 /// A class which mocks [GoRouter].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockGoRouter extends _i1.Mock implements _i17.GoRouter {
+class MockGoRouter extends _i1.Mock implements _i18.GoRouter {
   MockGoRouter() {
     _i1.throwOnMissingStub(this);
   }
@@ -611,7 +618,7 @@ class MockGoRouter extends _i1.Mock implements _i17.GoRouter {
                 #fragment: fragment,
               },
             ),
-            returnValue: _i18.dummyValue<String>(
+            returnValue: _i19.dummyValue<String>(
               this,
               Invocation.method(
                 #namedLocation,
@@ -633,7 +640,7 @@ class MockGoRouter extends _i1.Mock implements _i17.GoRouter {
   );
 
   @override
-  void restore(_i19.RouteMatchList? matchList) => super.noSuchMethod(
+  void restore(_i20.RouteMatchList? matchList) => super.noSuchMethod(
     Invocation.method(#restore, [matchList]),
     returnValueForMissingStub: null,
   );
@@ -660,15 +667,15 @@ class MockGoRouter extends _i1.Mock implements _i17.GoRouter {
   );
 
   @override
-  _i13.Future<T?> push<T extends Object?>(String? location, {Object? extra}) =>
+  _i14.Future<T?> push<T extends Object?>(String? location, {Object? extra}) =>
       (super.noSuchMethod(
             Invocation.method(#push, [location], {#extra: extra}),
-            returnValue: _i13.Future<T?>.value(),
+            returnValue: _i14.Future<T?>.value(),
           )
-          as _i13.Future<T?>);
+          as _i14.Future<T?>);
 
   @override
-  _i13.Future<T?> pushNamed<T extends Object?>(
+  _i14.Future<T?> pushNamed<T extends Object?>(
     String? name, {
     Map<String, String>? pathParameters = const {},
     Map<String, dynamic>? queryParameters = const {},
@@ -684,23 +691,23 @@ class MockGoRouter extends _i1.Mock implements _i17.GoRouter {
                 #extra: extra,
               },
             ),
-            returnValue: _i13.Future<T?>.value(),
+            returnValue: _i14.Future<T?>.value(),
           )
-          as _i13.Future<T?>);
+          as _i14.Future<T?>);
 
   @override
-  _i13.Future<T?> pushReplacement<T extends Object?>(
+  _i14.Future<T?> pushReplacement<T extends Object?>(
     String? location, {
     Object? extra,
   }) =>
       (super.noSuchMethod(
             Invocation.method(#pushReplacement, [location], {#extra: extra}),
-            returnValue: _i13.Future<T?>.value(),
+            returnValue: _i14.Future<T?>.value(),
           )
-          as _i13.Future<T?>);
+          as _i14.Future<T?>);
 
   @override
-  _i13.Future<T?> pushReplacementNamed<T extends Object?>(
+  _i14.Future<T?> pushReplacementNamed<T extends Object?>(
     String? name, {
     Map<String, String>? pathParameters = const {},
     Map<String, dynamic>? queryParameters = const {},
@@ -716,20 +723,20 @@ class MockGoRouter extends _i1.Mock implements _i17.GoRouter {
                 #extra: extra,
               },
             ),
-            returnValue: _i13.Future<T?>.value(),
+            returnValue: _i14.Future<T?>.value(),
           )
-          as _i13.Future<T?>);
+          as _i14.Future<T?>);
 
   @override
-  _i13.Future<T?> replace<T>(String? location, {Object? extra}) =>
+  _i14.Future<T?> replace<T>(String? location, {Object? extra}) =>
       (super.noSuchMethod(
             Invocation.method(#replace, [location], {#extra: extra}),
-            returnValue: _i13.Future<T?>.value(),
+            returnValue: _i14.Future<T?>.value(),
           )
-          as _i13.Future<T?>);
+          as _i14.Future<T?>);
 
   @override
-  _i13.Future<T?> replaceNamed<T>(
+  _i14.Future<T?> replaceNamed<T>(
     String? name, {
     Map<String, String>? pathParameters = const {},
     Map<String, dynamic>? queryParameters = const {},
@@ -745,9 +752,9 @@ class MockGoRouter extends _i1.Mock implements _i17.GoRouter {
                 #extra: extra,
               },
             ),
-            returnValue: _i13.Future<T?>.value(),
+            returnValue: _i14.Future<T?>.value(),
           )
-          as _i13.Future<T?>);
+          as _i14.Future<T?>);
 
   @override
   void pop<T extends Object?>([T? result]) => super.noSuchMethod(
@@ -764,6 +771,79 @@ class MockGoRouter extends _i1.Mock implements _i17.GoRouter {
   @override
   void dispose() => super.noSuchMethod(
     Invocation.method(#dispose, []),
+    returnValueForMissingStub: null,
+  );
+}
+
+/// A class which mocks [EcuProvider].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockEcuProvider extends _i1.Mock implements _i21.EcuProvider {
+  MockEcuProvider() {
+    _i1.throwOnMissingStub(this);
+  }
+
+  @override
+  _i10.EcuData get currentData =>
+      (super.noSuchMethod(
+            Invocation.getter(#currentData),
+            returnValue: _FakeEcuData_9(this, Invocation.getter(#currentData)),
+          )
+          as _i10.EcuData);
+
+  @override
+  bool get hasListeners =>
+      (super.noSuchMethod(Invocation.getter(#hasListeners), returnValue: false)
+          as bool);
+
+  @override
+  _i14.Future<void> setEcuType(String? name) =>
+      (super.noSuchMethod(
+            Invocation.method(#setEcuType, [name]),
+            returnValue: _i14.Future<void>.value(),
+            returnValueForMissingStub: _i14.Future<void>.value(),
+          )
+          as _i14.Future<void>);
+
+  @override
+  _i14.Future<void> setSerialPort(String? name) =>
+      (super.noSuchMethod(
+            Invocation.method(#setSerialPort, [name]),
+            returnValue: _i14.Future<void>.value(),
+            returnValueForMissingStub: _i14.Future<void>.value(),
+          )
+          as _i14.Future<void>);
+
+  @override
+  _i14.Future<void> sendCommand(String? command) =>
+      (super.noSuchMethod(
+            Invocation.method(#sendCommand, [command]),
+            returnValue: _i14.Future<void>.value(),
+            returnValueForMissingStub: _i14.Future<void>.value(),
+          )
+          as _i14.Future<void>);
+
+  @override
+  void dispose() => super.noSuchMethod(
+    Invocation.method(#dispose, []),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  void addListener(_i12.VoidCallback? listener) => super.noSuchMethod(
+    Invocation.method(#addListener, [listener]),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  void removeListener(_i12.VoidCallback? listener) => super.noSuchMethod(
+    Invocation.method(#removeListener, [listener]),
+    returnValueForMissingStub: null,
+  );
+
+  @override
+  void notifyListeners() => super.noSuchMethod(
+    Invocation.method(#notifyListeners, []),
     returnValueForMissingStub: null,
   );
 }

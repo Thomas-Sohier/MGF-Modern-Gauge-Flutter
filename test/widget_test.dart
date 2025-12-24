@@ -7,13 +7,14 @@ import 'package:modern_gauge_flutter/app.dart';
 import 'package:modern_gauge_flutter/models/settings_data.dart';
 import 'package:modern_gauge_flutter/providers/app_state_provider.dart';
 import 'package:modern_gauge_flutter/providers/dial_provider.dart';
+import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/services/mpris_listener.dart';
 import 'package:modern_gauge_flutter/services/odb_service.dart';
 
 import 'widget_test.mocks.dart';
 
-@GenerateMocks([SettingsProvider, OdbService, DialProvider, MprisListener, AppStateProvider, GoRouter])
+@GenerateMocks([SettingsProvider, OdbService, DialProvider, MprisListener, AppStateProvider, GoRouter, EcuProvider])
 void main() {
   late MockSettingsProvider mockSettingsProvider;
   late MockOdbService mockOdbService;
@@ -21,6 +22,7 @@ void main() {
   late MockMprisListener mockMprisListener;
   late MockAppStateProvider mockAppStateProvider;
   late MockGoRouter mockGoRouter;
+  late MockEcuProvider mockEcuProvider;
 
   setUp(() {
     // Initialisez les mocks avant chaque test
@@ -30,6 +32,7 @@ void main() {
     mockMprisListener = MockMprisListener();
     mockAppStateProvider = MockAppStateProvider();
     mockGoRouter = MockGoRouter();
+    mockEcuProvider = MockEcuProvider();
   });
 
   testWidgets('App should display with light theme based on mock provider', skip: true, (WidgetTester tester) async {
@@ -46,6 +49,7 @@ void main() {
         mprisListener: mockMprisListener,
         dialProvider: mockDialProvider,
         router: mockGoRouter,
+        ecuProvider: mockEcuProvider,
       ),
     );
 
@@ -68,6 +72,7 @@ void main() {
         mprisListener: mockMprisListener,
         dialProvider: mockDialProvider,
         router: mockGoRouter,
+        ecuProvider: mockEcuProvider,
       ),
     );
 
