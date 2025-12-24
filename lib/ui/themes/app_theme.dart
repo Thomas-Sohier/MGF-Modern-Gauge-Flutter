@@ -72,8 +72,7 @@ class AppTheme {
         shadowColor: Colors.black54,
       ),
       GaugeThemeBackground(
-        centerColor: Color.fromARGB(255, 39, 39, 39),
-        edgeColor: Color.fromARGB(255, 14, 14, 14),
+        backgroundColor: Color.fromARGB(255, 30, 30, 30),
         borderColor: Colors.black,
         borderWidth: 2.0,
       ),
@@ -136,12 +135,7 @@ class AppTheme {
         centerPivotRidgeColor: Colors.grey,
         shadowColor: Colors.black38,
       ),
-      GaugeThemeBackground(
-        centerColor: Color(0xFFE0E0E0),
-        edgeColor: Color(0xFFBDBDBD),
-        borderColor: Colors.black54,
-        borderWidth: 2.0,
-      ),
+      GaugeThemeBackground(backgroundColor: Color(0xFFE0E0E0), borderColor: Colors.black54, borderWidth: 2.0),
     ],
   );
 }

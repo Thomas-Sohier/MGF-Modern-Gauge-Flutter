@@ -23,7 +23,7 @@ class LogService {
   }
 
   Future<void> _init() async {
-    final directory = await getApplicationSupportDirectory();
+    final directory = await getApplicationDocumentsDirectory();
     _logDirectory = '${directory.path}/logs';
     await Directory(_logDirectory).create(recursive: true);
 

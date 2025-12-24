@@ -5,7 +5,7 @@ import 'package:modern_gauge_flutter/routes/route_names.dart';
 /// La liste ordonnée des routes du tableau de bord pour la navigation cyclique.
 final List<String> dashboardRoutes = [
   RouteNames.dashboardRoute + RouteNames.rpmRoute,
-  RouteNames.dashboardRoute + RouteNames.musicRoute,
+  // RouteNames.dashboardRoute + RouteNames.musicRoute,
   RouteNames.dashboardRoute + RouteNames.timeRoute,
 ];
 

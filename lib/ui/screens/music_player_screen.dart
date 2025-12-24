@@ -75,33 +75,14 @@ class _NoMusicPlayerUI extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            colors: [Colors.deepPurple.shade700, Colors.teal.shade400],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withAlpha(90), spreadRadius: 2, blurRadius: 10, offset: const Offset(0, 5)),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const Icon(Icons.headset_off_outlined, color: Colors.white, size: 100),
-            const SizedBox(height: 30),
-            const Text(
-              "Aucun lecteur de musique actif détecté...",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70, fontSize: 18, fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-      ),
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const Icon(Icons.headset_off_outlined, size: 100),
+        const SizedBox(height: 30),
+        const Text("Aucun lecteur de musique actif détecté...", textAlign: TextAlign.center),
+      ],
     );
   }
 }

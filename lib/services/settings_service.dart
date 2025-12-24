@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:modern_gauge_flutter/models/settings_data.dart';
 import 'package:modern_gauge_flutter/services/log_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';

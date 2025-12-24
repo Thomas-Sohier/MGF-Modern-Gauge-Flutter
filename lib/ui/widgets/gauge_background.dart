@@ -7,11 +7,8 @@ class GaugeTexturedBackground extends StatelessWidget {
   /// The widget to display on top of the textured background.
   final Widget? child;
 
-  /// The color at the center of the gradient.
-  final Color? centerColor;
-
-  /// The color at the edge of the gradient.
-  final Color? edgeColor;
+  /// The solid background color.
+  final Color? backgroundColor;
 
   /// The color of the optional outer border.
   final Color? borderColor;
@@ -19,14 +16,7 @@ class GaugeTexturedBackground extends StatelessWidget {
   /// The width of the optional outer border. Set to 0 to disable.
   final double? borderWidth;
 
-  const GaugeTexturedBackground({
-    super.key,
-    this.child,
-    this.centerColor,
-    this.edgeColor,
-    this.borderColor,
-    this.borderWidth,
-  });
+  const GaugeTexturedBackground({super.key, this.child, this.backgroundColor, this.borderColor, this.borderWidth});
 
   @override
   Widget build(BuildContext context) {
@@ -36,8 +26,7 @@ class GaugeTexturedBackground extends StatelessWidget {
       aspectRatio: 1,
       child: CustomPaint(
         painter: _TexturedBackgroundPainter(
-          centerColor: centerColor ?? gaugeThemeBackground.centerColor ?? Color(0xFFE0E0E0),
-          edgeColor: edgeColor ?? gaugeThemeBackground.edgeColor ?? Color(0xFFBDBDBD),
+          backgroundColor: backgroundColor ?? gaugeThemeBackground.backgroundColor ?? Color(0xFFE0E0E0),
           borderColor: borderColor ?? gaugeThemeBackground.borderColor ?? Colors.black54,
           borderWidth: borderWidth ?? gaugeThemeBackground.borderWidth ?? 2.0,
         ),
@@ -47,30 +36,23 @@ class GaugeTexturedBackground extends StatelessWidget {
   }
 }
 
-/// Custom painter for drawing the textured circular background.
+/// Custom painter for drawing the simplified circular background.
 class _TexturedBackgroundPainter extends CustomPainter {
-  final Color centerColor;
-  final Color edgeColor;
+  final Color backgroundColor;
   final Color borderColor;
   final double borderWidth;
 
-  _TexturedBackgroundPainter({
-    required this.centerColor,
-    required this.edgeColor,
-    required this.borderColor,
-    required this.borderWidth,
-  });
+  _TexturedBackgroundPainter({required this.backgroundColor, required this.borderColor, required this.borderWidth});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // 1. Dessine le fond avec un gradient radial pour l'effet texturé
+    // 1. Dessine le fond avec une couleur unie
     final backgroundPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [centerColor, edgeColor],
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
+      ..color = backgroundColor
+      ..style = PaintingStyle.fill;
 
     canvas.drawCircle(center, radius, backgroundPaint);
 
@@ -89,9 +71,8 @@ class _TexturedBackgroundPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_TexturedBackgroundPainter oldDelegate) {
-    // Le fond doit se redessiner si les couleurs ou la bordure changent.
-    return oldDelegate.centerColor != centerColor ||
-        oldDelegate.edgeColor != edgeColor ||
+    // Le fond doit se redessiner si la couleur ou la bordure changent.
+    return oldDelegate.backgroundColor != backgroundColor ||
         oldDelegate.borderColor != borderColor ||
         oldDelegate.borderWidth != borderWidth;
   }

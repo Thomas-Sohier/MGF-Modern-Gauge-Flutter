@@ -74,7 +74,7 @@ class _Dial extends StatelessWidget {
           gaugeBorderWidth: 0,
           segmentHeight: 40,
           numberOfSegments: 20,
-          bottomChildrenRadiusFactor: 0.7,
+          bottomChildrenRadiusFactor: 0.75,
           bottomChildren: const [_OdbIndicator(), _CoolantTempIndicator(), _OilTempIndicator(), _BatteryIndicator()],
         );
       },
@@ -153,20 +153,20 @@ class _IndicatorBase extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 60,
-      height: 60,
+      width: 90,
+      height: 90,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(icon, size: 20),
+          Icon(icon, size: 28),
           const SizedBox(height: 2),
           Text(
             label,
             maxLines: 1,
             style: Theme.of(
               context,
-            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: 14, fontFamily: 'monospace'),
+            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: 18, fontFamily: 'monospace'),
           ),
         ],
       ),

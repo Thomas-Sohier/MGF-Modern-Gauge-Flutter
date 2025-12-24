@@ -153,7 +153,7 @@ class _DigitalDialState extends State<DigitalDial> with SingleTickerProviderStat
       return Positioned(
         left: x,
         top: y,
-        child: Transform.translate(offset: const Offset(-30, -20), child: children[index]),
+        child: FractionalTranslation(translation: const Offset(-0.5, -0.5), child: children[index]),
       );
     });
   }
