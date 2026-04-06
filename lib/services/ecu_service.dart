@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:modern_gauge_flutter/models/ecu_data.dart';
@@ -10,11 +11,15 @@ class EcuService {
   final String wsUrl;
 
   WebSocketChannel? _channel;
-  final StreamController<EcuData> _dataController = StreamController<EcuData>.broadcast();
+  final StreamController<EcuData> _dataController =
+      StreamController<EcuData>.broadcast();
 
   Stream<EcuData> get dataStream => _dataController.stream;
 
-  EcuService({this.baseUrl = 'http://localhost:8080', this.wsUrl = 'ws://localhost:8080/ws'});
+  EcuService({
+    this.baseUrl = 'http://localhost:8080',
+    this.wsUrl = 'ws://localhost:8080/ws',
+  });
 
   // --- HTTP Methods ---
 
@@ -30,9 +35,17 @@ class EcuService {
 
   Future<EcuData?> fetchInitialData() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/api'));
-      if (response.statusCode == 200) {
-        return EcuData.fromJson(json.decode(response.body));
+      final url = '$baseUrl/api';
+      // Run the HTTP request in a separate isolate to avoid blocking the main thread.
+      // Only primitive types (String) can be passed between isolates.
+      final body = await Isolate.run(() async {
+        final response = await http
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 5));
+        return response.statusCode == 200 ? response.body : null;
+      });
+      if (body != null) {
+        return EcuData.fromJson(json.decode(body));
       }
     } catch (e) {
       LogService.error('EcuService: Fetch initial data failed: $e');
@@ -66,10 +79,22 @@ class EcuService {
 
   // --- WebSocket Methods ---
 
-  void connectWebSocket() {
-    _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+  Timer? _periodicTimer;
+  bool _isConnected = false;
 
-    LogService.info('EcuService: WebSocket connected to $wsUrl');
+  bool get isConnected => _isConnected;
+
+  void connectWebSocket() {
+    _closeCurrentConnection();
+
+    LogService.info('EcuService: Connecting to WebSocket at $wsUrl...');
+
+    try {
+      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+    } catch (e) {
+      LogService.error('EcuService: Failed to create WebSocket channel: $e');
+      return;
+    }
 
     _channel!.stream.listen(
       (message) {
@@ -82,37 +107,52 @@ class EcuService {
       },
       onError: (error) {
         LogService.error('EcuService: WebSocket error: $error');
-        _reconnect();
+        _isConnected = false;
+        _closeCurrentConnection();
       },
       onDone: () {
         LogService.info('EcuService: WebSocket connection closed');
-        _reconnect();
+        _isConnected = false;
+        _closeCurrentConnection();
       },
+      cancelOnError: true,
     );
 
-    // Initial request for data via WebSocket (Go agent expects "." to start session)
-    _channel!.sink.add('.');
+    // Initial request for data (Go agent expects "." to start session)
+    _safeSend('.');
+    _isConnected = true;
 
-    // Periodically send "." to keep data flowing if needed by the agent logic
-    Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (_channel != null) {
-        _channel!.sink.add('.');
-      } else {
-        timer.cancel();
-      }
+    // Periodically send "." to keep data flowing
+    _periodicTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      _safeSend('.');
     });
   }
 
-  void _reconnect() {
+  /// Manually reconnect the WebSocket. Use this for user-triggered retries.
+  void reconnectWebSocket() {
+    LogService.info('EcuService: Manual reconnect requested.');
+    connectWebSocket();
+  }
+
+  void _safeSend(String message) {
+    try {
+      _channel?.sink.add(message);
+    } catch (e) {
+      LogService.error('EcuService: Failed to send message: $e');
+    }
+  }
+
+  void _closeCurrentConnection() {
+    _periodicTimer?.cancel();
+    _periodicTimer = null;
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
     _channel = null;
-    Future.delayed(const Duration(seconds: 2), () {
-      LogService.info('EcuService: Reconnecting...');
-      connectWebSocket();
-    });
   }
 
   void dispose() {
-    _channel?.sink.close();
+    _closeCurrentConnection();
     _dataController.close();
   }
 }

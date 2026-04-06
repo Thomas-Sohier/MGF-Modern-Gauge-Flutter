@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:modern_gauge_flutter/mixins/screen_navigation_mixin.dart';
 import 'package:modern_gauge_flutter/providers/app_state_provider.dart';
 import 'package:modern_gauge_flutter/providers/dial_provider.dart';
+import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
 import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 import 'package:modern_gauge_flutter/services/odb_service.dart';
@@ -17,7 +18,8 @@ class RpmScreen extends StatefulWidget {
   State<RpmScreen> createState() => _RpmScreenState();
 }
 
-class _RpmScreenState extends State<RpmScreen> with ScreenNavigationMixin<RpmScreen> {
+class _RpmScreenState extends State<RpmScreen>
+    with ScreenNavigationMixin<RpmScreen> {
   late final OdbService _odbService;
 
   @override
@@ -75,7 +77,12 @@ class _Dial extends StatelessWidget {
           segmentHeight: 40,
           numberOfSegments: 20,
           bottomChildrenRadiusFactor: 0.75,
-          bottomChildren: const [_OdbIndicator(), _CoolantTempIndicator(), _OilTempIndicator(), _BatteryIndicator()],
+          bottomChildren: const [
+            _OdbIndicator(),
+            _CoolantTempIndicator(),
+            _OilTempIndicator(),
+            _BatteryIndicator(),
+          ],
         );
       },
     );
@@ -88,11 +95,20 @@ class _OdbIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppStateProvider>(
-      builder: (context, appState, _) {
-        final isConnected = appState.odbStatus == OdbConnectionStatus.connected;
-        return _IndicatorBase(icon: isConnected ? Icons.link : Icons.link_off, label: 'ODB');
+    return InkWell(
+      onTap: () {
+        context.read<EcuProvider>().retryInitialData();
       },
+      child: Consumer<AppStateProvider>(
+        builder: (context, appState, _) {
+          final isConnected =
+              appState.odbStatus == OdbConnectionStatus.connected;
+          return _IndicatorBase(
+            icon: isConnected ? Icons.link : Icons.link_off,
+            label: 'ODB',
+          );
+        },
+      ),
     );
   }
 }
@@ -106,7 +122,10 @@ class _CoolantTempIndicator extends StatelessWidget {
     return Selector<DialProvider, double>(
       selector: (_, dialProvider) => dialProvider.dialData.coolantTemp,
       builder: (context, temp, _) {
-        return _IndicatorBase(icon: Icons.thermostat, label: '${temp.round()}°c');
+        return _IndicatorBase(
+          icon: Icons.thermostat,
+          label: '${temp.round()}°c',
+        );
       },
     );
   }
@@ -121,7 +140,10 @@ class _BatteryIndicator extends StatelessWidget {
     return Selector<DialProvider, double>(
       selector: (_, dialProvider) => dialProvider.dialData.batteryVoltage,
       builder: (context, voltage, _) {
-        return _IndicatorBase(icon: Icons.electric_car, label: '${voltage.toStringAsFixed(1)}V');
+        return _IndicatorBase(
+          icon: Icons.electric_car,
+          label: '${voltage.toStringAsFixed(1)}V',
+        );
       },
     );
   }
@@ -137,7 +159,10 @@ class _OilTempIndicator extends StatelessWidget {
     return Selector<DialProvider, double>(
       selector: (_, dialProvider) => dialProvider.dialData.coolantTemp,
       builder: (context, coolantTemp, _) {
-        return _IndicatorBase(icon: Icons.water_drop, label: '${coolantTemp.toStringAsFixed(1)}°c');
+        return _IndicatorBase(
+          icon: Icons.water_drop,
+          label: '${coolantTemp.toStringAsFixed(1)}°c',
+        );
       },
     );
   }
@@ -164,9 +189,11 @@ class _IndicatorBase extends StatelessWidget {
           Text(
             label,
             maxLines: 1,
-            style: Theme.of(
-              context,
-            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: 18, fontFamily: 'monospace'),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              fontFamily: 'JetBrainsMono',
+            ),
           ),
         ],
       ),

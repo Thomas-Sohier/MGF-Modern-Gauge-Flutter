@@ -48,7 +48,8 @@ class DigitalDial extends StatefulWidget {
   State<DigitalDial> createState() => _DigitalDialState();
 }
 
-class _DigitalDialState extends State<DigitalDial> with SingleTickerProviderStateMixin {
+class _DigitalDialState extends State<DigitalDial>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
 
@@ -56,11 +57,13 @@ class _DigitalDialState extends State<DigitalDial> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(duration: const Duration(milliseconds: 400), vsync: this);
-    _animation = Tween<double>(
-      begin: 0,
-      end: widget.value,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic));
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    _animation = Tween<double>(begin: 0, end: widget.value).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
+    );
     _controller.forward();
   }
 
@@ -68,10 +71,10 @@ class _DigitalDialState extends State<DigitalDial> with SingleTickerProviderStat
   void didUpdateWidget(DigitalDial oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.value != oldWidget.value) {
-      _animation = Tween<double>(
-        begin: _animation.value,
-        end: widget.value,
-      ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic));
+      _animation = Tween<double>(begin: _animation.value, end: widget.value)
+          .animate(
+            CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
+          );
       _controller.reset();
       _controller.forward();
     }
@@ -87,9 +90,11 @@ class _DigitalDialState extends State<DigitalDial> with SingleTickerProviderStat
   Widget build(BuildContext context) {
     final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
     final finalActiveColor = widget.activeColor ?? gaugeTheme.activeColor!;
-    final finalInactiveColor = widget.inactiveColor ?? gaugeTheme.inactiveColor!;
+    final finalInactiveColor =
+        widget.inactiveColor ?? gaugeTheme.inactiveColor!;
     final finalDangerColor = widget.dangerColor ?? gaugeTheme.dangerColor!;
-    final finalDangerInactiveColor = widget.dangerInactiveColor ?? gaugeTheme.dangerInactiveColor!;
+    final finalDangerInactiveColor =
+        widget.dangerInactiveColor ?? gaugeTheme.dangerInactiveColor!;
     final finalBorderColor = widget.gaugeBorderColor ?? gaugeTheme.borderColor!;
 
     return LayoutBuilder(
@@ -121,12 +126,20 @@ class _DigitalDialState extends State<DigitalDial> with SingleTickerProviderStat
                       gaugeBorderWidth: widget.gaugeBorderWidth,
                       gaugeBorderSpacing: widget.gaugeBorderSpacing,
                     ),
-                    child: Center(child: widget.child ?? _buildDefaultChild(finalActiveColor, finalDangerColor)),
+                    child: Center(
+                      child:
+                          widget.child ??
+                          _buildDefaultChild(
+                            finalActiveColor,
+                            finalDangerColor,
+                          ),
+                    ),
                   );
                 },
               ),
             ),
-            if (widget.bottomChildren != null && widget.bottomChildren!.isNotEmpty)
+            if (widget.bottomChildren != null &&
+                widget.bottomChildren!.isNotEmpty)
               ..._buildBottomChildrenLayout(center, radius),
           ],
         );
@@ -153,23 +166,28 @@ class _DigitalDialState extends State<DigitalDial> with SingleTickerProviderStat
       return Positioned(
         left: x,
         top: y,
-        child: FractionalTranslation(translation: const Offset(-0.5, -0.5), child: children[index]),
+        child: FractionalTranslation(
+          translation: const Offset(-0.5, -0.5),
+          child: children[index],
+        ),
       );
     });
   }
 
   Widget _buildDefaultChild(Color activeColor, Color dangerColor) {
-    bool isDanger = widget.dangerThreshold != null && widget.value >= widget.dangerThreshold!;
+    bool isDanger =
+        widget.dangerThreshold != null &&
+        widget.value >= widget.dangerThreshold!;
     Color valueColor = isDanger ? dangerColor : activeColor;
 
     final digitalTextStyle = TextStyle(
-      fontFamily: 'monospace',
+      fontFamily: 'JetBrainsMono',
       fontSize: 45,
       color: valueColor,
       fontWeight: FontWeight.bold,
     );
     final unitTextStyle = TextStyle(
-      fontFamily: 'monospace',
+      fontFamily: 'JetBrainsMono',
       fontSize: 20,
       color: valueColor,
       fontWeight: FontWeight.w500,
@@ -246,10 +264,15 @@ class _DialPainter extends CustomPainter {
         ? numberOfSegments + 1
         : ((dangerThreshold! / maxValue) * numberOfSegments).floor();
     for (int i = 0; i < numberOfSegments; i++) {
-      final currentStartAngle = startAngle + i * (segmentRadians + gapInRadians);
+      final currentStartAngle =
+          startAngle + i * (segmentRadians + gapInRadians);
       final bool isInDangerZone = i >= dangerSegmentStart;
-      final Color currentActiveColor = isInDangerZone ? dangerColor : activeColor;
-      final Color currentInactiveColor = isInDangerZone ? dangerInactiveColor : inactiveColor;
+      final Color currentActiveColor = isInDangerZone
+          ? dangerColor
+          : activeColor;
+      final Color currentInactiveColor = isInDangerZone
+          ? dangerInactiveColor
+          : inactiveColor;
       if (i < fullSegments) {
         final segmentPaint = Paint()
           ..color = currentActiveColor

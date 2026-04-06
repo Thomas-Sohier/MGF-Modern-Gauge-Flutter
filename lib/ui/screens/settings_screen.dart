@@ -1,7 +1,5 @@
 // settings_screen.dart
 
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -21,50 +19,30 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  static const Duration _animationDuration = Duration(milliseconds: 200);
-  static const Curve _animationCurve = Curves.easeInOut;
-
-  static const double _itemHeight = 120.0;
-  static const Duration _scrollDuration = Duration(milliseconds: 300);
-  static const Curve _scrollCurve = Curves.easeInOut;
-
-  final _scrollController = ScrollController();
   final _pageFocusNode = FocusNode();
 
   late final List<FocusNode> _focusNodes;
   late final List<SettingsAbstractEntry> _entries;
-  late final List<MapEntry<int, SettingsAbstractEntry>> _selectableEntries;
 
   int _selectedIndex = 0;
-  bool _isEditing = false;
 
   @override
   void initState() {
     super.initState();
     _focusNodes = [];
     _entries = [
-      SettingSpacerEntry(height: 100),
-      SettingBrightnessEntry(focusNode: newFocusNode()),
-      SettingThemeEntry(focusNode: newFocusNode()),
-      SettingEcoEntry(focusNode: newFocusNode()),
+      SettingBrightnessEntry(focusNode: _newFocusNode()),
+      SettingThemeEntry(focusNode: _newFocusNode()),
+      SettingEcoEntry(focusNode: _newFocusNode()),
     ];
 
-    // On crée une liste filtrée des widgets qui ont un focusNode.
-    // On garde l'index original pour la logique de focus.
-    _selectableEntries = _entries.asMap().entries.where((entry) => entry.value.focusNode != null).toList();
-
-    _selectedIndex = _findNextSelectableIndex(-1);
-    if (_selectedIndex == -1) _selectedIndex = 0;
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      FocusScope.of(context).requestFocus(_pageFocusNode);
-      _scrollToCenter();
+      _pageFocusNode.requestFocus();
     });
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
     _pageFocusNode.dispose();
     for (final node in _focusNodes) {
       node.dispose();
@@ -72,106 +50,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  FocusNode newFocusNode() {
+  FocusNode _newFocusNode() {
     final node = FocusNode(skipTraversal: true);
     _focusNodes.add(node);
     return node;
   }
 
-  void _scrollToCenter() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
-      final viewportHeight = _scrollController.position.viewportDimension;
-      final offset = (_selectedIndex * _itemHeight) - (viewportHeight / 2) + (_itemHeight / 2);
-      _scrollController.animateTo(
-        offset.clamp(0.0, _scrollController.position.maxScrollExtent),
-        duration: _scrollDuration,
-        curve: _scrollCurve,
-      );
-    });
+  void _navigateUp() {
+    if (_selectedIndex > 0) {
+      setState(() => _selectedIndex--);
+    }
   }
 
-  // --- LOGIQUE DE NAVIGATION MISE À JOUR ---
-  int _findNextSelectableIndex(int currentIndex) {
-    int nextIndex = currentIndex + 1;
-    while (nextIndex < _entries.length) {
-      if (_entries[nextIndex].focusNode != null) {
-        return nextIndex;
-      }
-      nextIndex++;
+  void _navigateDown() {
+    if (_selectedIndex < _entries.length - 1) {
+      setState(() => _selectedIndex++);
     }
-    return currentIndex;
   }
 
-  int _findPreviousSelectableIndex(int currentIndex) {
-    int prevIndex = currentIndex - 1;
-    while (prevIndex >= 0) {
-      if (_entries[prevIndex].focusNode != null) {
-        return prevIndex;
-      }
-      prevIndex--;
-    }
-    return currentIndex;
+  void _goBack() {
+    _saveSettings();
+    if (Navigator.canPop(context)) Navigator.pop(context);
+    context.go(RouteNames.dashboardRoute + RouteNames.rpmRoute);
+  }
+
+  void _saveSettings() {
+    final settingsProvider = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    );
+    SettingsService().saveSettings(settingsProvider.settings);
   }
 
   void _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return;
-    if (_isEditing) {
-      _handleEditingKey(event);
-    } else {
-      _handleNavigationKey(event);
-    }
-  }
-
-  void _handleEditingKey(KeyDownEvent event) {
-    if (event.logicalKey == LogicalKeyboardKey.escape || event.logicalKey == LogicalKeyboardKey.tab) {
-      _exitEditMode();
-    }
-  }
-
-  void _handleNavigationKey(KeyDownEvent event) {
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      setState(() {
-        _selectedIndex = _findNextSelectableIndex(_selectedIndex);
-      });
-      _scrollToCenter();
+      _navigateDown();
     } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      setState(() {
-        _selectedIndex = _findPreviousSelectableIndex(_selectedIndex);
-      });
-      _scrollToCenter();
-    } else if (event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.select) {
-      _enterEditMode();
+      _navigateUp();
     } else if (event.logicalKey == LogicalKeyboardKey.escape) {
-      if (Navigator.canPop(context)) Navigator.pop(context);
-      context.go(RouteNames.dashboardRoute + RouteNames.rpmRoute);
+      _goBack();
     }
   }
 
-  void _enterEditMode() {
-    final currentEntry = _entries[_selectedIndex];
-    if (currentEntry.focusNode == null) return;
-
-    setState(() => _isEditing = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      FocusScope.of(context).requestFocus(currentEntry.focusNode);
-    });
-  }
-
-  void _exitEditMode() {
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-    setState(() => _isEditing = false);
-    _pageFocusNode.requestFocus();
-    SettingsService().saveSettings(settingsProvider.settings);
-  }
-
-  // --- RENDU MIS À JOUR ---
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: Center(
-        // On centre le cercle dans l'espace disponible
         child: ClipOval(
           child: AspectRatio(
             aspectRatio: 1,
@@ -184,73 +110,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   policy: NoTraversalPolicy(),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final List<Widget> transformedItems = [];
-                      final List<Map<String, dynamic>> calculatedItems = [];
-                      final int displaySelectedIndex = _selectableEntries.indexWhere(
-                        (entry) => entry.key == _selectedIndex,
-                      );
-                      if (displaySelectedIndex == -1) return const SizedBox.shrink();
-
-                      for (int i = 0; i < _selectableEntries.length; i++) {
-                        final entry = _selectableEntries[i].value;
-                        final int distance = i - displaySelectedIndex;
-                        final bool isSelected = distance == 0;
-
-                        final double height = constraints.maxHeight * 0.5;
-                        final double verticalOffset = distance * (height * 0.18);
-                        final double scale = isSelected ? 1.0 : 0.85;
-                        final double opacity = pow(0.6, distance.abs()).toDouble();
-                        final double zIndex = -distance.abs().toDouble();
-                        final bool isVisible = !_isEditing || isSelected;
-
-                        final transform = Matrix4.identity()
-                          ..setEntry(3, 2, 0.0015)
-                          ..translate(0.0, verticalOffset)
-                          ..scale(scale);
-
-                        calculatedItems.add({
-                          'widget': entry.buildEntry(context, isSelected, _isEditing && isSelected),
-                          'transform': transform,
-                          'opacity': isVisible ? opacity : 0.0,
-                          'zIndex': zIndex,
-                          'height': height,
-                          'width': constraints.maxWidth * (isSelected ? 0.8 : 0.7),
-                        });
-                      }
-
-                      calculatedItems.sort((a, b) => a['zIndex'].compareTo(b['zIndex']));
-
-                      transformedItems.addAll(
-                        calculatedItems.map((item) {
-                          return AnimatedContainer(
-                            duration: _animationDuration,
-                            curve: _animationCurve,
-                            transformAlignment: Alignment.center,
-                            transform: item['transform'],
-                            height: item['height'],
-                            width: item['width'],
-                            child: AnimatedOpacity(
-                              duration: _animationDuration,
-                              opacity: item['opacity'],
-                              child: item['widget'],
-                            ),
-                          );
-                        }),
-                      );
+                      final size = constraints.maxWidth;
 
                       return Stack(
                         alignment: Alignment.center,
                         children: [
-                          ...transformedItems,
+                          // ── Item central : occupe toute la zone ──
                           Positioned(
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              height: constraints.maxHeight * 0.2,
-                              color: Theme.of(context).scaffoldBackgroundColor,
-                              alignment: Alignment.center,
-                              child: _SettingsTitle(title: "Paramètres"),
+                            top: size * 0.18, // sous le header
+                            bottom: size * 0.20, // au-dessus des boutons
+                            left: size * 0.1,
+                            right: size * 0.1,
+                            child: _buildCurrentEntry(context),
+                          ),
+
+                          // ── En-tête collé en haut ────────────────
+                          Positioned(
+                            top: size * 0.07,
+                            left: size * 0.1,
+                            right: size * 0.1,
+                            child: _Header(onBack: _goBack),
+                          ),
+
+                          // ── Boutons + dots collés en bas ─────────
+                          Positioned(
+                            bottom: size * 0.03,
+                            left: size * 0.1,
+                            right: size * 0.1,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _NavButton(
+                                      icon: Icons.keyboard_arrow_up_rounded,
+                                      enabled: _selectedIndex > 0,
+                                      onTap: _navigateUp,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    _NavButton(
+                                      icon: Icons.keyboard_arrow_down_rounded,
+                                      enabled:
+                                          _selectedIndex < _entries.length - 1,
+                                      onTap: _navigateDown,
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -265,22 +172,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+
+  Widget _buildCurrentEntry(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      transitionBuilder: (child, animation) =>
+          FadeTransition(opacity: animation, child: child),
+      child: KeyedSubtree(
+        key: ValueKey(_selectedIndex),
+        child: _entries[_selectedIndex].buildEntry(context, true),
+      ),
+    );
+  }
 }
 
-class _SettingsTitle extends StatelessWidget {
-  final String title;
-  const _SettingsTitle({required this.title});
+// ── Widgets internes ─────────────────────────────────────────────────────────
+
+class _Header extends StatelessWidget {
+  final VoidCallback onBack;
+  const _Header({required this.onBack});
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      title.toUpperCase(),
-      style: TextStyle(
-        color: Theme.of(context).primaryColor,
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.2,
+    final color = Theme.of(context).primaryColor;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        GestureDetector(
+          onTap: onBack,
+          child: Icon(Icons.arrow_back_ios_new_rounded, color: color, size: 24),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'PARAMÈTRES',
+          style: TextStyle(
+            color: color,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NavButton extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _NavButton({
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).primaryColor;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: enabled ? onTap : null,
+      child: Center(
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
+          opacity: enabled ? 1.0 : 0.2,
+          child: Icon(icon, color: color, size: 42),
+        ),
       ),
+    );
+  }
+}
+
+class _PageDots extends StatelessWidget {
+  final int count;
+  final int current;
+  const _PageDots({required this.count, required this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).primaryColor;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(count, (i) {
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          width: i == current ? 10 : 6,
+          height: i == current ? 10 : 6,
+          decoration: BoxDecoration(
+            color: i == current ? color : color.withOpacity(0.3),
+            shape: BoxShape.circle,
+          ),
+        );
+      }),
     );
   }
 }

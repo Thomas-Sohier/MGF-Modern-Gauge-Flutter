@@ -3,7 +3,8 @@ part of './settings_entries.dart';
 class SettingBrightnessEntry extends SettingsAbstractEntry {
   final FocusNode _focusNode;
 
-  const SettingBrightnessEntry({super.key, required FocusNode focusNode}) : _focusNode = focusNode;
+  const SettingBrightnessEntry({super.key, required FocusNode focusNode})
+    : _focusNode = focusNode;
 
   @override
   String get title => 'Luminosité';
@@ -12,7 +13,7 @@ class SettingBrightnessEntry extends SettingsAbstractEntry {
   FocusNode get focusNode => _focusNode;
 
   @override
-  Widget buildEntry(BuildContext context, bool isFocused, bool isEditing) {
+  Widget buildEntry(BuildContext context, bool isFocused) {
     final provider = Provider.of<SettingsProvider>(context);
 
     return SettingsCardEntry(
@@ -25,7 +26,7 @@ class SettingBrightnessEntry extends SettingsAbstractEntry {
         max: 1.0,
         divisions: 9,
         label: '${(provider.settings.screenBrightness * 100).round()}%',
-        onChanged: isEditing ? (val) => provider.setScreenBrightness(val) : null,
+        onChanged: (val) => provider.setScreenBrightness(val),
         activeColor: Theme.of(context).primaryColor,
         inactiveColor: Colors.grey[600],
       ),

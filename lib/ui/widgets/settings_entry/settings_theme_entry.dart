@@ -3,7 +3,8 @@ part of './settings_entries.dart';
 class SettingThemeEntry extends SettingsAbstractEntry {
   final FocusNode _focusNode;
 
-  const SettingThemeEntry({super.key, required FocusNode focusNode}) : _focusNode = focusNode;
+  const SettingThemeEntry({super.key, required FocusNode focusNode})
+    : _focusNode = focusNode;
 
   @override
   String get title => 'Thème clair/sombre';
@@ -11,7 +12,7 @@ class SettingThemeEntry extends SettingsAbstractEntry {
   @override
   FocusNode get focusNode => _focusNode;
   @override
-  Widget buildEntry(BuildContext context, bool isFocused, bool isEditing) {
+  Widget buildEntry(BuildContext context, bool isFocused) {
     final provider = Provider.of<SettingsProvider>(context);
     final isLight = provider.settings.themeMode == ThemeMode.dark;
 
@@ -21,7 +22,8 @@ class SettingThemeEntry extends SettingsAbstractEntry {
       child: Switch.adaptive(
         focusNode: focusNode,
         value: isLight,
-        onChanged: isEditing ? (val) => provider.setThemeMode(val ? ThemeMode.dark : ThemeMode.light) : null,
+        onChanged: (val) =>
+            provider.setThemeMode(val ? ThemeMode.dark : ThemeMode.light),
         activeThumbColor: Theme.of(context).primaryColor,
       ),
     );

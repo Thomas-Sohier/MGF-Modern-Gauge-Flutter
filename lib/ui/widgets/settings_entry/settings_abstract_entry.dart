@@ -12,7 +12,7 @@ abstract class SettingsAbstractEntry extends StatelessWidget {
   FocusNode? get focusNode;
 
   /// Retourne le widget principal (slider, switch, etc.)
-  Widget buildEntry(BuildContext context, bool isFocused, bool isEditing);
+  Widget buildEntry(BuildContext context, bool isFocused);
 
   @override
   Widget build(BuildContext context) {

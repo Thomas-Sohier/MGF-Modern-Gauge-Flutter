@@ -53,14 +53,21 @@ class _DashboardShellScreenState extends State<DashboardShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return KeyboardListener(
-      focusNode: _focusNode,
-      autofocus: true,
-      onKeyEvent: _handleKeyEvent,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Center(
-          child: ClipOval(child: GaugeTexturedBackground(child: widget.child)),
+    return GestureDetector(
+      onLongPress: () {
+        context.go(RouteNames.settingsRoute);
+      },
+      child: KeyboardListener(
+        focusNode: _focusNode,
+        autofocus: true,
+        onKeyEvent: _handleKeyEvent,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Center(
+            child: ClipOval(
+              child: GaugeTexturedBackground(child: widget.child),
+            ),
+          ),
         ),
       ),
     );

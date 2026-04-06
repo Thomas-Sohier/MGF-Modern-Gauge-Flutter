@@ -11,7 +11,7 @@ class SettingSpacerEntry extends SettingsAbstractEntry {
   FocusNode? get focusNode => null;
 
   @override
-  Widget buildEntry(BuildContext context, bool isFocused, bool isEditing) {
+  Widget buildEntry(BuildContext context, bool isFocused) {
     return SizedBox(height: height);
   }
 }
