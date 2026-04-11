@@ -27,7 +27,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!appState.isAsleep) {
       if (mounted) {
-        GoRouter.of(context).go(RouteNames.dashboardRoute + RouteNames.rpmRoute);
+        GoRouter.of(
+          context,
+        ).go(RouteNames.dashboardRoute + RouteNames.rpmRoute);
       }
     }
   }
@@ -35,7 +37,10 @@ class _SplashScreenState extends State<SplashScreen> {
   // Gère la détection de l'appui pour sortir du mode veille
   void _handleScreenTap() {
     final appState = Provider.of<AppStateProvider>(context, listen: false);
-    final settings = Provider.of<SettingsProvider>(context, listen: false).settings;
+    final settings = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    ).settings;
 
     if (appState.isAsleep && settings.wakeUpMode == WakeUpMode.longPress) {
       // Pour simuler un appui long, on peut utiliser un GestureDetector avec onLongPress
@@ -60,7 +65,6 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppStateProvider>(context);
-    final settings = Provider.of<SettingsProvider>(context);
     if (!appState.isInitializing && !appState.isAsleep) {
       return const SizedBox.shrink();
     }
@@ -75,7 +79,10 @@ class _SplashScreenState extends State<SplashScreen> {
               Image.asset('assets/images/mg_logo.png'),
               const SizedBox(height: 15),
               if (appState.isAsleep)
-                const Text('Appuyez pour réveiller', style: TextStyle(color: Colors.white70, fontSize: 16)),
+                const Text(
+                  'Appuyez pour réveiller',
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                ),
             ],
           ),
         ),

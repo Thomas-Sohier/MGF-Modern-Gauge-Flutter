@@ -40,23 +40,38 @@ class SettingsButtonWidget extends StatelessWidget {
     return InkWell(
       // Use InkWell for custom tap effects on a custom shape
       onTap: onPressed,
-      borderRadius: BorderRadius.circular(100), // Makes the ripple effect circular
+      borderRadius: BorderRadius.circular(
+        100,
+      ), // Makes the ripple effect circular
       child: Container(
         width: 100, // Fixed width for the circular button
         height: 100, // Fixed height for the circular button
         decoration: BoxDecoration(
           color: backgroundColor,
           shape: BoxShape.circle, // Make it circular
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 5, offset: const Offset(0, 3))],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 5,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (icon != null) ...[Icon(icon, color: foregroundColor, size: iconSize), const SizedBox(height: 5)],
+            if (icon != null) ...[
+              Icon(icon, color: foregroundColor, size: iconSize),
+              const SizedBox(height: 5),
+            ],
             Text(
               text,
               textAlign: TextAlign.center,
-              style: TextStyle(color: foregroundColor, fontSize: textSize, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: foregroundColor,
+                fontSize: textSize,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),

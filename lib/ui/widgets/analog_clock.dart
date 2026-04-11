@@ -36,7 +36,10 @@ class _AnalogClockPainter extends CustomPainter {
     final shadowOffset = Offset(radius * 0.015, radius * 0.015);
 
     // --- 2. Dessin des marqueurs et des chiffres (utilise le thème) ---
-    final textPainter = TextPainter(textAlign: TextAlign.center, textDirection: TextDirection.ltr);
+    final textPainter = TextPainter(
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    );
     final hourTickPaint = Paint()
       ..color = theme.hourTickColor ?? Colors.black
       ..strokeWidth = 2.0;
@@ -47,15 +50,23 @@ class _AnalogClockPainter extends CustomPainter {
         final hour = (i / 5).toInt();
 
         if (hour % 3 == 0) {
-          final tickStart = Offset(centerX + cos(angle) * (radius * 0.78), centerY + sin(angle) * (radius * 0.82));
-          final tickEnd = Offset(centerX + cos(angle) * (radius * 0.92), centerY + sin(angle) * (radius * 1));
+          final tickStart = Offset(
+            centerX + cos(angle) * (radius * 0.78),
+            centerY + sin(angle) * (radius * 0.82),
+          );
+          final tickEnd = Offset(
+            centerX + cos(angle) * (radius * 0.92),
+            centerY + sin(angle) * (radius * 1),
+          );
           canvas.drawLine(tickStart, tickEnd, hourTickPaint);
 
           final numberToDisplay = hour == 0 ? '12' : '$hour';
           textPainter.text = TextSpan(
             text: numberToDisplay,
             style: TextStyle(
-              color: theme.numberColor ?? Colors.black, // Utilise la couleur du thème
+              color:
+                  theme.numberColor ??
+                  Colors.black, // Utilise la couleur du thème
               fontSize: radius * 0.18,
               fontWeight: FontWeight.w600,
             ),
@@ -67,14 +78,24 @@ class _AnalogClockPainter extends CustomPainter {
           );
           textPainter.paint(canvas, textOffset);
         } else {
-          final tickStart = Offset(centerX + cos(angle) * (radius * 0.82), centerY + sin(angle) * (radius * 0.82));
-          final tickEnd = Offset(centerX + cos(angle) * (radius * 0.92), centerY + sin(angle) * (radius * 0.92));
+          final tickStart = Offset(
+            centerX + cos(angle) * (radius * 0.82),
+            centerY + sin(angle) * (radius * 0.82),
+          );
+          final tickEnd = Offset(
+            centerX + cos(angle) * (radius * 0.92),
+            centerY + sin(angle) * (radius * 0.92),
+          );
           canvas.drawLine(tickStart, tickEnd, hourTickPaint);
         }
       } else {
         // Marqueurs de minutes (points)
-        final dotPaint = Paint()..color = theme.minuteDotColor ?? Colors.black54;
-        final dotPosition = Offset(centerX + cos(angle) * (radius * 0.87), centerY + sin(angle) * (radius * 0.87));
+        final dotPaint = Paint()
+          ..color = theme.minuteDotColor ?? Colors.black54;
+        final dotPosition = Offset(
+          centerX + cos(angle) * (radius * 0.87),
+          centerY + sin(angle) * (radius * 0.87),
+        );
         canvas.drawCircle(dotPosition, 1.0, dotPaint);
       }
     }
@@ -84,7 +105,8 @@ class _AnalogClockPainter extends CustomPainter {
       ..color = theme.handColor ?? const Color.fromARGB(255, 184, 43, 43)
       ..style = PaintingStyle.fill;
 
-    final hourAngle = ((dateTime.hour % 12 + dateTime.minute / 60) * 30 - 90) * (pi / 180);
+    final hourAngle =
+        ((dateTime.hour % 12 + dateTime.minute / 60) * 30 - 90) * (pi / 180);
     final minuteAngle = (dateTime.minute * 6 - 90) * (pi / 180);
 
     final hourHandPath = Path();
@@ -94,7 +116,10 @@ class _AnalogClockPainter extends CustomPainter {
       centerX - cos(hourAngle + pi / 2) * hourHandWidth / 2,
       centerY - sin(hourAngle + pi / 2) * hourHandWidth / 2,
     );
-    hourHandPath.lineTo(centerX + cos(hourAngle) * hourHandLength, centerY + sin(hourAngle) * hourHandLength);
+    hourHandPath.lineTo(
+      centerX + cos(hourAngle) * hourHandLength,
+      centerY + sin(hourAngle) * hourHandLength,
+    );
     hourHandPath.lineTo(
       centerX - cos(hourAngle - pi / 2) * hourHandWidth / 2,
       centerY - sin(hourAngle - pi / 2) * hourHandWidth / 2,
@@ -108,7 +133,10 @@ class _AnalogClockPainter extends CustomPainter {
       centerX - cos(minuteAngle + pi / 2) * minuteHandWidth / 2,
       centerY - sin(minuteAngle + pi / 2) * minuteHandWidth / 2,
     );
-    minuteHandPath.lineTo(centerX + cos(minuteAngle) * minuteHandLength, centerY + sin(minuteAngle) * minuteHandLength);
+    minuteHandPath.lineTo(
+      centerX + cos(minuteAngle) * minuteHandLength,
+      centerY + sin(minuteAngle) * minuteHandLength,
+    );
     minuteHandPath.lineTo(
       centerX - cos(minuteAngle - pi / 2) * minuteHandWidth / 2,
       centerY - sin(minuteAngle - pi / 2) * minuteHandWidth / 2,
@@ -121,7 +149,7 @@ class _AnalogClockPainter extends CustomPainter {
     canvas.drawPath(hourHandPath, handPaint);
     canvas.drawPath(minuteHandPath, handPaint);
 
-    // --- 4. Dessin du pivot central (utilise le thème) ---
+    // --- 5. Dessin du pivot central (utilise le thème) ---
     final pivotRadius = radius * 0.12;
     canvas.drawCircle(center, pivotRadius, Paint()..color = Colors.black);
     canvas.drawCircle(center, pivotRadius * 0.7, Paint()..color = Colors.black);

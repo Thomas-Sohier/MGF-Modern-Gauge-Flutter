@@ -7,6 +7,7 @@ import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
 import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 import 'package:modern_gauge_flutter/services/odb_service.dart';
+import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
 import 'package:modern_gauge_flutter/ui/widgets/digital_dial.dart';
 import 'package:provider/provider.dart';
 
@@ -185,15 +186,7 @@ class _IndicatorBase extends StatelessWidget {
         children: [
           Icon(icon, size: 28),
           const SizedBox(height: 2),
-          Text(
-            label,
-            maxLines: 1,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-              fontFamily: 'JetBrainsMono',
-            ),
-          ),
+          Text(label, maxLines: 1, style: AppTextStyles.label),
         ],
       ),
     );

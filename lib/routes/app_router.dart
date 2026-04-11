@@ -3,6 +3,7 @@ import 'package:flutter/material.dart'; // Nécessaire pour les Widgets et Build
 
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 import 'package:modern_gauge_flutter/ui/screens/clock_screen.dart';
+import 'package:modern_gauge_flutter/ui/screens/faults_screen.dart';
 import 'package:modern_gauge_flutter/ui/screens/rpm_screen.dart';
 import 'package:modern_gauge_flutter/ui/screens/dashboard_shell_screen.dart';
 import 'package:modern_gauge_flutter/ui/screens/music_player_screen.dart';
@@ -32,6 +33,10 @@ class AppRouter {
           GoRoute(
             path: RouteNames.dashboardRoute + RouteNames.musicRoute,
             pageBuilder: (context, state) => const NoTransitionPage(child: MusicPlayerScreen()),
+          ),
+          GoRoute(
+            path: RouteNames.dashboardRoute + RouteNames.faultsRoute,
+            pageBuilder: (context, state) => const NoTransitionPage(child: FaultsScreen()),
           ),
         ],
       ),

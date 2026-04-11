@@ -7,6 +7,7 @@ final List<String> dashboardRoutes = [
   RouteNames.dashboardRoute + RouteNames.rpmRoute,
   // RouteNames.dashboardRoute + RouteNames.musicRoute,
   RouteNames.dashboardRoute + RouteNames.timeRoute,
+  RouteNames.dashboardRoute + RouteNames.faultsRoute,
 ];
 
 /// Retourne la route suivante dans la séquence cyclique.

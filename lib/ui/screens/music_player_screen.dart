@@ -8,22 +8,17 @@ import 'package:modern_gauge_flutter/providers/mpris_provider.dart';
 import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 import 'package:modern_gauge_flutter/services/mpris_listener.dart';
+import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
 import 'package:modern_gauge_flutter/ui/widgets/music_dial.dart';
 import 'package:modern_gauge_flutter/utils/color_util.dart';
 import 'package:provider/provider.dart';
 
-// --- STYLES AJUSTÉS POUR LA NOUVELLE INTERFACE ---
 const _kInfoTitleTextStyle = TextStyle(
   color: Colors.black87,
   fontWeight: FontWeight.bold,
   fontSize: 18,
 );
-const _kInfoTimeTextStyle = TextStyle(
-  color: Colors.black,
-  fontSize: 18,
-  fontWeight: FontWeight.w500,
-  fontFamily: 'JetBrainsMono',
-);
+final _kInfoTimeTextStyle = AppTextStyles.body.copyWith(color: Colors.black);
 
 String formatDuration(Duration d) {
   if (d.inSeconds <= 0) return '00:00';

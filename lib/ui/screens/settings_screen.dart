@@ -1,15 +1,40 @@
-// settings_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
-import 'package:modern_gauge_flutter/services/settings_service.dart';
-import 'package:modern_gauge_flutter/ui/widgets/settings_entry/settings_abstract_entry.dart';
-import 'package:modern_gauge_flutter/ui/widgets/settings_entry/settings_entries.dart';
+import 'package:modern_gauge_flutter/ui/screens/settings/settings_apparence_pages.dart';
+import 'package:modern_gauge_flutter/ui/screens/settings/settings_ecu_pages.dart';
+import 'package:modern_gauge_flutter/ui/screens/settings/settings_systeme_pages.dart';
+import 'package:modern_gauge_flutter/ui/screens/settings/settings_widgets.dart';
 import 'package:modern_gauge_flutter/utils/no_traversal_policy.dart';
-import 'package:provider/provider.dart';
+
+// ── Définition des catégories ──────────────────────────────────────────────
+
+enum _Category {
+  ecu,
+  apparence,
+  systeme;
+
+  String get label => switch (this) {
+    _Category.ecu => 'ECU INFOS',
+    _Category.apparence => 'APPARENCE',
+    _Category.systeme => 'SYSTÈME',
+  };
+
+  IconData get icon => switch (this) {
+    _Category.ecu => Icons.memory_rounded,
+    _Category.apparence => Icons.palette_outlined,
+    _Category.systeme => Icons.tune_rounded,
+  };
+
+  List<Widget> get pages => switch (this) {
+    _Category.ecu => buildEcuPages(),
+    _Category.apparence => buildApparencePages(),
+    _Category.systeme => buildSystemePages(),
+  };
+}
+
+// ── Écran principal ────────────────────────────────────────────────────────
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -19,79 +44,99 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _pageFocusNode = FocusNode();
-
-  late final List<FocusNode> _focusNodes;
-  late final List<SettingsAbstractEntry> _entries;
-
-  int _selectedIndex = 0;
+  final _focusNode = FocusNode();
+  late PageController _pageController;
+  late List<Widget> _pages;
+  int _page = 0;
+  _Category? _category;
 
   @override
   void initState() {
     super.initState();
-    _focusNodes = [];
-    _entries = [
-      // SettingBrightnessEntry(focusNode: _newFocusNode()),
-      SettingThemeEntry(focusNode: _newFocusNode()),
-      SettingEcoEntry(focusNode: _newFocusNode()),
-    ];
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _pageFocusNode.requestFocus();
-    });
+    _pageController = PageController();
+    _pages = _buildRootPages();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _focusNode.requestFocus(),
+    );
   }
 
   @override
   void dispose() {
-    _pageFocusNode.dispose();
-    for (final node in _focusNodes) {
-      node.dispose();
-    }
+    _focusNode.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
-  FocusNode _newFocusNode() {
-    final node = FocusNode(skipTraversal: true);
-    _focusNodes.add(node);
-    return node;
+  // ── Navigation ─────────────────────────────────────────────────────────
+
+  List<Widget> _buildRootPages() => _Category.values
+      .map((c) => _CategoryCard(category: c, onTap: () => _enterCategory(c)))
+      .toList();
+
+  void _enterCategory(_Category category) {
+    _pageController.dispose();
+    _pageController = PageController();
+    setState(() {
+      _category = category;
+      _page = 0;
+      _pages = category.pages;
+    });
   }
 
-  void _navigateUp() {
-    if (_selectedIndex > 0) {
-      setState(() => _selectedIndex--);
+  void _backToRoot() {
+    _pageController.dispose();
+    _pageController = PageController();
+    setState(() {
+      _category = null;
+      _page = 0;
+      _pages = _buildRootPages();
+    });
+  }
+
+  void _exit() => context.go(RouteNames.dashboardRoute + RouteNames.rpmRoute);
+
+  void _handleBack() {
+    if (_category != null) {
+      _backToRoot();
+    } else {
+      _exit();
     }
   }
 
-  void _navigateDown() {
-    if (_selectedIndex < _entries.length - 1) {
-      setState(() => _selectedIndex++);
+  void _prevPage() {
+    if (_page > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      _handleBack();
     }
   }
 
-  void _goBack() {
-    _saveSettings();
-    if (Navigator.canPop(context)) Navigator.pop(context);
-    context.go(RouteNames.dashboardRoute + RouteNames.rpmRoute);
-  }
-
-  void _saveSettings() {
-    final settingsProvider = Provider.of<SettingsProvider>(
-      context,
-      listen: false,
-    );
-    SettingsService().saveSettings(settingsProvider.settings);
+  void _nextPage() {
+    if (_page < _pages.length - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   void _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return;
-    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      _navigateDown();
-    } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      _navigateUp();
-    } else if (event.logicalKey == LogicalKeyboardKey.escape) {
-      _goBack();
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.escape) {
+      _prevPage();
+    } else if (key == LogicalKeyboardKey.arrowRight) {
+      _nextPage();
     }
   }
+
+  String get _title => _category?.label ?? 'PARAMÈTRES';
+
+  // ── Build ───────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -104,60 +149,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: ColoredBox(
               color: Theme.of(context).scaffoldBackgroundColor,
               child: KeyboardListener(
-                focusNode: _pageFocusNode,
+                focusNode: _focusNode,
                 onKeyEvent: _handleKeyEvent,
                 child: FocusTraversalGroup(
                   policy: NoTraversalPolicy(),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       final size = constraints.maxWidth;
-
                       return Stack(
                         alignment: Alignment.center,
                         children: [
-                          // ── Item central : occupe toute la zone ──
                           Positioned(
-                            top: size * 0.18, // sous le header
-                            bottom: size * 0.20, // au-dessus des boutons
+                            top: size * 0.20,
+                            bottom: size * 0.08,
                             left: size * 0.1,
                             right: size * 0.1,
-                            child: _buildCurrentEntry(context),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 180),
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  ),
+                              child: KeyedSubtree(
+                                key: ValueKey(_category),
+                                child: _PagerBody(
+                                  pages: _pages,
+                                  controller: _pageController,
+                                  currentIndex: _page,
+                                  onPageChanged: (i) =>
+                                      setState(() => _page = i),
+                                  onPrev: _page > 0 ? _prevPage : null,
+                                  onNext: _page < _pages.length - 1
+                                      ? _nextPage
+                                      : null,
+                                ),
+                              ),
+                            ),
                           ),
-
-                          // ── En-tête collé en haut ────────────────
                           Positioned(
                             top: size * 0.07,
-                            left: size * 0.1,
-                            right: size * 0.1,
-                            child: _Header(onBack: _goBack),
-                          ),
-
-                          // ── Boutons + dots collés en bas ─────────
-                          Positioned(
-                            bottom: size * 0.03,
-                            left: size * 0.1,
-                            right: size * 0.1,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _NavButton(
-                                      icon: Icons.keyboard_arrow_up_rounded,
-                                      enabled: _selectedIndex > 0,
-                                      onTap: _navigateUp,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    _NavButton(
-                                      icon: Icons.keyboard_arrow_down_rounded,
-                                      enabled:
-                                          _selectedIndex < _entries.length - 1,
-                                      onTap: _navigateDown,
-                                    ),
-                                  ],
-                                ),
-                              ],
+                            left: size * 0.08,
+                            right: size * 0.08,
+                            child: SettingsHeader(
+                              title: _title,
+                              onBack: _handleBack,
                             ),
                           ),
                         ],
@@ -172,101 +208,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-
-  Widget _buildCurrentEntry(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
-      transitionBuilder: (child, animation) =>
-          FadeTransition(opacity: animation, child: child),
-      child: KeyedSubtree(
-        key: ValueKey(_selectedIndex),
-        child: _entries[_selectedIndex].buildEntry(context, true),
-      ),
-    );
-  }
 }
 
-// ── Widgets internes ─────────────────────────────────────────────────────────
+// ── Pager body ──────────────────────────────────────────────────────────────
 
-class _Header extends StatelessWidget {
-  final VoidCallback onBack;
-  const _Header({required this.onBack});
+class _PagerBody extends StatelessWidget {
+  final List<Widget> pages;
+  final PageController controller;
+  final int currentIndex;
+  final void Function(int) onPageChanged;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
+
+  const _PagerBody({
+    required this.pages,
+    required this.controller,
+    required this.currentIndex,
+    required this.onPageChanged,
+    required this.onPrev,
+    required this.onNext,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).primaryColor;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
       children: [
-        GestureDetector(
-          onTap: onBack,
-          child: Icon(Icons.arrow_back_ios_new_rounded, color: color, size: 24),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          'PARAMÈTRES',
-          style: TextStyle(
-            color: color,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.5,
+        Expanded(
+          child: PageView(
+            controller: controller,
+            onPageChanged: onPageChanged,
+            children: pages,
           ),
+        ),
+        const SizedBox(height: 8),
+        SettingsNavBar(
+          index: currentIndex,
+          total: pages.length,
+          onPrev: onPrev,
+          onNext: onNext,
         ),
       ],
     );
   }
 }
 
-class _NavButton extends StatelessWidget {
-  final IconData icon;
-  final bool enabled;
+// ── Carte de catégorie (niveau racine) ─────────────────────────────────────
+
+class _CategoryCard extends StatelessWidget {
+  final _Category category;
   final VoidCallback onTap;
 
-  const _NavButton({
-    required this.icon,
-    required this.enabled,
-    required this.onTap,
-  });
+  const _CategoryCard({required this.category, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).primaryColor;
+    final primary = Theme.of(context).primaryColor;
     return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: enabled ? onTap : null,
-      child: Center(
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 150),
-          opacity: enabled ? 1.0 : 0.2,
-          child: Icon(icon, color: color, size: 42),
+      onTap: onTap,
+      child: SettingsCardShell(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(category.icon, size: 40, color: primary),
+            const SizedBox(height: 16),
+            Text(
+              category.label,
+              style: TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: primary,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 34),
+            Icon(Icons.arrow_circle_right, size: 28, color: primary),
+          ],
         ),
       ),
-    );
-  }
-}
-
-class _PageDots extends StatelessWidget {
-  final int count;
-  final int current;
-  const _PageDots({required this.count, required this.current});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).primaryColor;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(count, (i) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.symmetric(horizontal: 3),
-          width: i == current ? 10 : 6,
-          height: i == current ? 10 : 6,
-          decoration: BoxDecoration(
-            color: i == current ? color : color.withOpacity(0.3),
-            shape: BoxShape.circle,
-          ),
-        );
-      }),
     );
   }
 }

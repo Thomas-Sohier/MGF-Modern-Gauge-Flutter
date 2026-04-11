@@ -50,6 +50,10 @@ class EcuProvider with ChangeNotifier {
     await _ecuService.sendCommand(command);
   }
 
+  Future<void> clearFaults() async {
+    await _ecuService.sendCommand('clear_faults');
+  }
+
   @override
   void dispose() {
     _ecuService.dispose();

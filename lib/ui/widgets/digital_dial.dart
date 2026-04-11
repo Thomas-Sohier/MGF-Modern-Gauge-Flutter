@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
 
 class DigitalDial extends StatefulWidget {
@@ -180,18 +181,8 @@ class _DigitalDialState extends State<DigitalDial>
         widget.value >= widget.dangerThreshold!;
     Color valueColor = isDanger ? dangerColor : activeColor;
 
-    final digitalTextStyle = TextStyle(
-      fontFamily: 'JetBrainsMono',
-      fontSize: 45,
-      color: valueColor,
-      fontWeight: FontWeight.bold,
-    );
-    final unitTextStyle = TextStyle(
-      fontFamily: 'JetBrainsMono',
-      fontSize: 20,
-      color: valueColor,
-      fontWeight: FontWeight.w500,
-    );
+    final digitalTextStyle = AppTextStyles.display(valueColor);
+    final unitTextStyle = AppTextStyles.unit(valueColor);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [

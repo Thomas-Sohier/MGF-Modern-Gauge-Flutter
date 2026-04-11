@@ -5,4 +5,5 @@ class RouteNames {
   static const String musicRoute = '/music';
   static const String timeRoute = '/time';
   static const String settingsRoute = '/settings';
+  static const String faultsRoute = '/faults';
 }
