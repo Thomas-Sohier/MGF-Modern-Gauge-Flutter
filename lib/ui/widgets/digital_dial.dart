@@ -58,7 +58,7 @@ class _DigitalDialState extends State<DigitalDial>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 200),
       vsync: this,
     );
     _animation = Tween<double>(begin: 0, end: widget.value).animate(

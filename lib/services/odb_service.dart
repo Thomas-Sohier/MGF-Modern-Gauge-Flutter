@@ -10,7 +10,7 @@ class OdbService {
   final EcuService _ecuService;
   final _controller = StreamController<DialData>.broadcast();
   final _statusController = StreamController<OdbConnectionStatus>.broadcast();
-  StreamSubscription<EcuData>? _ecuSubscription;
+  StreamSubscription<EcuInfos>? _ecuSubscription;
   bool _isServiceRunning = false;
 
   /// Le flux de données auquel les autres parties de l'app peuvent s'abonner.
@@ -24,8 +24,8 @@ class OdbService {
     _isServiceRunning = true;
 
     // Listen to raw ECU data and parse it
-    _ecuSubscription = _ecuService.dataStream.listen((ecuData) {
-      _processEcuData(ecuData);
+    _ecuSubscription = _ecuService.dataStream.listen((ecuInfos) {
+      _processEcuInfos(ecuInfos);
     });
 
     LogService.info('[OdbService] - initialized and listening to EcuService');
@@ -40,24 +40,23 @@ class OdbService {
     LogService.info('[OdbService] - stopped');
   }
 
-  void _processEcuData(EcuData ecuData) {
+  void _processEcuInfos(EcuInfos ecuInfos) {
     // Update connection status
-    _statusController.add(ecuData.connected ? OdbConnectionStatus.connected : OdbConnectionStatus.disconnected);
+    _statusController.add(ecuInfos.connected ? OdbConnectionStatus.connected : OdbConnectionStatus.disconnected);
 
-    if (ecuData.ecuData == null) return;
+    if (ecuInfos.ecuData == null) return;
 
-    final raw = ecuData.ecuData!;
+    final raw = ecuInfos.ecuData!;
 
     // Map Go agent keys to DialData fields
-    // Assuming keys based on common ECU data or previous mock values
     final data = DialData(
-      rpm: _toDouble(raw['RPM']),
-      speed: _toDouble(raw['Speed']),
-      coolantTemp: _toDouble(raw['CoolantTemp']),
-      fuelLevel: _toDouble(raw['FuelLevel']),
-      oilPressure: _toDouble(raw['OilPressure']),
-      batteryVoltage: _toDouble(raw['BatteryVoltage']),
-      odometer: _toDouble(raw['Odometer']),
+      rpm: _toDouble(raw.rpm),
+      speed: _toDouble(raw.vehicleSpeed),
+      coolantTemp: _toDouble(raw.coolantTemp),
+      fuelLevel: 0.0, // Not available in current JSON payload
+      oilPressure: 0.0, // Same
+      batteryVoltage: _toDouble(raw.batteryVoltage),
+      odometer: 0.0,
     );
 
     _controller.add(data);

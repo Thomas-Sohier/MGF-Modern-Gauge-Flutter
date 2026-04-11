@@ -4,10 +4,10 @@ import 'package:modern_gauge_flutter/services/ecu_service.dart';
 
 class EcuProvider with ChangeNotifier {
   final EcuService _ecuService;
-  EcuData _currentData = EcuData.initial();
+  EcuInfos _currentData = EcuInfos.initial();
   bool _initialDataFetched = false;
 
-  EcuData get currentData => _currentData;
+  EcuInfos get currentData => _currentData;
   bool get initialDataFetched => _initialDataFetched;
 
   EcuProvider(this._ecuService) {

@@ -11,10 +11,10 @@ class EcuService {
   final String wsUrl;
 
   WebSocketChannel? _channel;
-  final StreamController<EcuData> _dataController =
-      StreamController<EcuData>.broadcast();
+  final StreamController<EcuInfos> _dataController =
+      StreamController<EcuInfos>.broadcast();
 
-  Stream<EcuData> get dataStream => _dataController.stream;
+  Stream<EcuInfos> get dataStream => _dataController.stream;
 
   EcuService({
     this.baseUrl = 'http://localhost:8080',
@@ -33,7 +33,7 @@ class EcuService {
     }
   }
 
-  Future<EcuData?> fetchInitialData() async {
+  Future<EcuInfos?> fetchInitialData() async {
     try {
       final url = '$baseUrl/api';
       // Run the HTTP request in a separate isolate to avoid blocking the main thread.
@@ -45,7 +45,7 @@ class EcuService {
         return response.statusCode == 200 ? response.body : null;
       });
       if (body != null) {
-        return EcuData.fromJson(json.decode(body));
+        return EcuInfos.fromJson(json.decode(body));
       }
     } catch (e) {
       LogService.error('EcuService: Fetch initial data failed: $e');
@@ -99,8 +99,8 @@ class EcuService {
     _channel!.stream.listen(
       (message) {
         try {
-          final data = json.decode(message as String);
-          _dataController.add(EcuData.fromJson(data));
+          final data = json.decode(message);
+          _dataController.add(EcuInfos.fromJson(data));
         } catch (e) {
           LogService.error('EcuService: Error parsing WebSocket message: $e');
         }

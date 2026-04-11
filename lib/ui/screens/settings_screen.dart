@@ -31,7 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _focusNodes = [];
     _entries = [
-      SettingBrightnessEntry(focusNode: _newFocusNode()),
+      // SettingBrightnessEntry(focusNode: _newFocusNode()),
       SettingThemeEntry(focusNode: _newFocusNode()),
       SettingEcoEntry(focusNode: _newFocusNode()),
     ];
