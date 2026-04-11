@@ -149,19 +149,18 @@ class _BatteryIndicator extends StatelessWidget {
   }
 }
 
-/// Placeholder pour l'indicateur de température d'huile
+/// Indicateur qui écoute SEULEMENT la température d'huile.
 class _OilTempIndicator extends StatelessWidget {
   const _OilTempIndicator();
 
   @override
   Widget build(BuildContext context) {
-    // TODO Pour l'instant, valeur statique. À remplacer par un Selector quand la donnée sera disponible.
     return Selector<DialProvider, double>(
-      selector: (_, dialProvider) => dialProvider.dialData.coolantTemp,
-      builder: (context, coolantTemp, _) {
+      selector: (_, dialProvider) => dialProvider.dialData.oilTemp,
+      builder: (context, oilTemp, _) {
         return _IndicatorBase(
           icon: Icons.water_drop,
-          label: '${coolantTemp.toStringAsFixed(1)}°c',
+          label: '${oilTemp.toStringAsFixed(1)}°c',
         );
       },
     );

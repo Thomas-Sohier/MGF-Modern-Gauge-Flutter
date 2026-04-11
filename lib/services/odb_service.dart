@@ -54,7 +54,8 @@ class OdbService {
       speed: _toDouble(raw.vehicleSpeed),
       coolantTemp: _toDouble(raw.coolantTemp),
       fuelLevel: 0.0, // Not available in current JSON payload
-      oilPressure: 0.0, // Same
+      oilTemp: _toDouble(raw.oilTemp),
+      oilPressure: 0.0, // Not available in current JSON payload
       batteryVoltage: _toDouble(raw.batteryVoltage),
       odometer: 0.0,
     );

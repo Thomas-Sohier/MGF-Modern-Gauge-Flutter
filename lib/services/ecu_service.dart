@@ -80,11 +80,22 @@ class EcuService {
   // --- WebSocket Methods ---
 
   Timer? _periodicTimer;
+  Timer? _reconnectTimer;
   bool _isConnected = false;
+  bool _autoReconnect = false;
+  int _reconnectAttempts = 0;
+
+  static const _reconnectDelays = [1, 2, 4, 8, 16, 30]; // seconds
 
   bool get isConnected => _isConnected;
 
   void connectWebSocket() {
+    _autoReconnect = true;
+    _reconnectAttempts = 0;
+    _connect();
+  }
+
+  void _connect() {
     _closeCurrentConnection();
 
     LogService.info('EcuService: Connecting to WebSocket at $wsUrl...');
@@ -93,6 +104,7 @@ class EcuService {
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
     } catch (e) {
       LogService.error('EcuService: Failed to create WebSocket channel: $e');
+      _scheduleReconnect();
       return;
     }
 
@@ -101,6 +113,7 @@ class EcuService {
         try {
           final data = json.decode(message);
           _dataController.add(EcuInfos.fromJson(data));
+          _reconnectAttempts = 0; // reset backoff on successful message
         } catch (e) {
           LogService.error('EcuService: Error parsing WebSocket message: $e');
         }
@@ -109,11 +122,13 @@ class EcuService {
         LogService.error('EcuService: WebSocket error: $error');
         _isConnected = false;
         _closeCurrentConnection();
+        _scheduleReconnect();
       },
       onDone: () {
         LogService.info('EcuService: WebSocket connection closed');
         _isConnected = false;
         _closeCurrentConnection();
+        _scheduleReconnect();
       },
       cancelOnError: true,
     );
@@ -128,10 +143,24 @@ class EcuService {
     });
   }
 
-  /// Manually reconnect the WebSocket. Use this for user-triggered retries.
+  void _scheduleReconnect() {
+    if (!_autoReconnect) return;
+    final delayIndex = _reconnectAttempts.clamp(0, _reconnectDelays.length - 1);
+    final delaySecs = _reconnectDelays[delayIndex];
+    _reconnectAttempts++;
+    LogService.info(
+      'EcuService: Reconnecting in ${delaySecs}s (attempt $_reconnectAttempts)...',
+    );
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(Duration(seconds: delaySecs), _connect);
+  }
+
+  /// Manually reconnect the WebSocket. Resets backoff. Use this for user-triggered retries.
   void reconnectWebSocket() {
     LogService.info('EcuService: Manual reconnect requested.');
-    connectWebSocket();
+    _reconnectAttempts = 0;
+    _autoReconnect = true;
+    _connect();
   }
 
   void _safeSend(String message) {
@@ -152,6 +181,9 @@ class EcuService {
   }
 
   void dispose() {
+    _autoReconnect = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _closeCurrentConnection();
     _dataController.close();
   }

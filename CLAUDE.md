@@ -60,6 +60,5 @@ flutter build apk
 
 ## Known Gaps
 
-- Oil temperature in the RPM screen uses coolant temp as a placeholder (no dedicated sensor field yet)
 - Tests in `widget_test.dart` are currently skipped (`skip: true`) — mock infrastructure exists but tests need work
-- No WebSocket reconnection backoff logic in `EcuService`
+- `fuelLevel`, `oilPressure`, and `odometer` fields in `DialData` are hardcoded to `0.0` — not available in the current ECU JSON payload
