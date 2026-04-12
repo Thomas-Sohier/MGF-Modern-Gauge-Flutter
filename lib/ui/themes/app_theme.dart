@@ -3,139 +3,168 @@ import 'package:modern_gauge_flutter/ui/themes/clock_theme.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_background_theme.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
 
-/// Defines the color and typography themes for the entire application.
-class AppTheme {
-  // --- Common Colors ---
-  static const Color lightPrimaryColor = Color.fromARGB(255, 0, 66, 37);
-  static const Color darkPrimaryColor = Color.fromARGB(255, 0, 177, 100);
-  static const Color accentColor = Colors.white;
-  static const Color textColorLight = Colors.black87;
-  static const Color textColorDark = Colors.white;
+/// Palette centrale — toutes les couleurs en un seul endroit.
+class AppColors {
+  // ── Vert signature ──────────────────────────────────────────────────────
+  /// Vert vif : textes/icônes actifs sur fond sombre.
+  static const Color greenBright = Color(0xFF00C47A);
 
-  // --- Dark Theme ---
+  /// Vert profond : textes/icônes actifs sur fond clair.
+  static const Color greenDeep = Color(0xFF006B3C);
+
+  // ── Dark palette ────────────────────────────────────────────────────────
+  static const Color darkBg = Color(0xFF1C1C1E); // fond global
+  static const Color darkSurface = Color(0xFF2C2C2E); // cartes / surfaces
+  static const Color darkSurfaceVariant = Color(0xFF3A3A3C); // séparateurs
+  static const Color darkOnSurface = Color(0xFFF5F5F5); // texte principal
+  static const Color darkOnSurfaceDim = Color(0xFF8E8E93); // texte secondaire
+  static const Color darkBorder = Color(0xFF48484A); // bordures
+  static const Color darkGaugeBg = Color(0xFF242426); // fond du cercle jauge
+  static const Color darkGaugeInactive = Color(0xFF3A3A3C);
+
+  // ── Light palette ───────────────────────────────────────────────────────
+  static const Color lightBg = Color(0xFFF2F2F7); // fond global
+  static const Color lightSurface = Color(0xFFFFFFFF);
+  static const Color lightOnSurface = Color(0xFF1C1C1E); // texte principal
+  static const Color lightOnSurfaceDim = Color(0xFF6E6E73); // texte secondaire
+  static const Color lightBorder = Color(0xFFC7C7CC);
+  static const Color lightGaugeBg = Color(0xFFE5E5EA); // fond du cercle jauge
+  static const Color lightGaugeInactive = Color(0xFFD1D1D6);
+
+  // ── Commun ──────────────────────────────────────────────────────────────
+  static const Color danger = Color(0xFFFF453A);
+  static const Color dangerDim = Color(0x33FF453A);
+  static const Color clockHand = Color(0xFFB82B2B); // rouge original, identique dark/light
+}
+
+class AppTheme {
+  // ── Dark Theme ─────────────────────────────────────────────────────────
   static final ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
-    primaryColor: darkPrimaryColor,
+    primaryColor: AppColors.greenBright,
     colorScheme: const ColorScheme.dark(
-      primary: darkPrimaryColor,
-      secondary: accentColor,
-      surface: Color(0xFF1E1E1E), // Main background color
-      onPrimary: Colors.white,
-      onSecondary: Colors.white,
-      onSurface: Colors.white70,
-      error: Colors.redAccent,
-      onError: Colors.white,
+      primary: AppColors.greenBright,
+      secondary: AppColors.greenBright,
+      surface: AppColors.darkSurface,
+      onPrimary: AppColors.darkBg,
+      onSecondary: AppColors.darkBg,
+      onSurface: AppColors.darkOnSurface,
+      outline: AppColors.darkBorder,
+      error: AppColors.danger,
+      onError: AppColors.darkOnSurface,
     ),
-    scaffoldBackgroundColor: Colors.black, // Global background for Scaffolds
+    scaffoldBackgroundColor: AppColors.darkBg,
     appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.transparent, // AppBar background
-      foregroundColor: textColorDark, // AppBar icon and text color
+      backgroundColor: Colors.transparent,
+      foregroundColor: AppColors.darkOnSurface,
       elevation: 0,
       centerTitle: true,
     ),
     textTheme: const TextTheme(
-      // Define your text styles here for consistency
-      displayLarge: TextStyle(color: textColorDark, fontSize: 57),
-      displayMedium: TextStyle(color: textColorDark, fontSize: 45),
-      displaySmall: TextStyle(color: textColorDark, fontSize: 36),
-      headlineLarge: TextStyle(color: textColorDark, fontSize: 32),
-      headlineMedium: TextStyle(color: textColorDark, fontSize: 28),
-      headlineSmall: TextStyle(color: textColorDark, fontSize: 24),
-      titleLarge: TextStyle(color: textColorDark, fontSize: 22),
-      titleMedium: TextStyle(color: textColorDark, fontSize: 16),
-      titleSmall: TextStyle(color: textColorDark, fontSize: 14),
-      bodyLarge: TextStyle(color: textColorDark, fontSize: 16),
-      bodyMedium: TextStyle(color: textColorDark, fontSize: 14),
-      bodySmall: TextStyle(color: Colors.white70, fontSize: 12),
-      labelLarge: TextStyle(color: textColorDark, fontSize: 14),
-      labelMedium: TextStyle(color: Colors.white70, fontSize: 12),
-      labelSmall: TextStyle(color: Colors.white70, fontSize: 11),
+      displayLarge: TextStyle(color: AppColors.darkOnSurface, fontSize: 57),
+      displayMedium: TextStyle(color: AppColors.darkOnSurface, fontSize: 45),
+      displaySmall: TextStyle(color: AppColors.darkOnSurface, fontSize: 36),
+      headlineLarge: TextStyle(color: AppColors.darkOnSurface, fontSize: 32),
+      headlineMedium: TextStyle(color: AppColors.darkOnSurface, fontSize: 28),
+      headlineSmall: TextStyle(color: AppColors.darkOnSurface, fontSize: 24),
+      titleLarge: TextStyle(color: AppColors.darkOnSurface, fontSize: 22),
+      titleMedium: TextStyle(color: AppColors.darkOnSurface, fontSize: 16),
+      titleSmall: TextStyle(color: AppColors.darkOnSurface, fontSize: 14),
+      bodyLarge: TextStyle(color: AppColors.darkOnSurface, fontSize: 16),
+      bodyMedium: TextStyle(color: AppColors.darkOnSurface, fontSize: 14),
+      bodySmall: TextStyle(color: AppColors.darkOnSurfaceDim, fontSize: 12),
+      labelLarge: TextStyle(color: AppColors.darkOnSurface, fontSize: 14),
+      labelMedium: TextStyle(color: AppColors.darkOnSurfaceDim, fontSize: 12),
+      labelSmall: TextStyle(color: AppColors.darkOnSurfaceDim, fontSize: 11),
     ),
-    iconTheme: const IconThemeData(
-      color: textColorDark, // Default icon color
-    ),
+    iconTheme: const IconThemeData(color: AppColors.darkOnSurface),
     extensions: <ThemeExtension<dynamic>>[
       GaugeTheme(
         activeColor: Colors.white,
-        inactiveColor: Color(0xFF303030),
-        dangerColor: Colors.redAccent,
-        dangerInactiveColor: Color(0x33FF0000),
-        borderColor: Colors.white54,
+        inactiveColor: AppColors.darkGaugeInactive,
+        dangerColor: AppColors.danger,
+        dangerInactiveColor: AppColors.dangerDim,
+        borderColor: AppColors.darkBorder,
       ),
       AnalogClockTheme(
-        handColor: const Color.fromARGB(255, 184, 43, 43),
-        hourTickColor: Colors.white,
-        minuteDotColor: Colors.grey,
-        numberColor: Colors.white,
-        centerPivotColor: Colors.white,
-        centerPivotRidgeColor: Colors.grey.shade400,
+        handColor: AppColors.clockHand,
+        hourTickColor: AppColors.darkOnSurface,
+        minuteDotColor: AppColors.darkOnSurfaceDim,
+        numberColor: AppColors.darkOnSurface,
+        centerPivotColor: AppColors.darkOnSurface,
+        centerPivotRidgeColor: AppColors.darkOnSurfaceDim,
         shadowColor: Colors.black54,
       ),
       GaugeThemeBackground(
-        backgroundColor: Color.fromARGB(255, 30, 30, 30),
-        borderColor: Colors.black,
+        backgroundColor: AppColors.darkGaugeBg,
+        borderColor: AppColors.darkBg,
         borderWidth: 2.0,
       ),
     ],
   );
 
-  // --- Light Theme (Optional, but good to have a base) ---
+  // ── Light Theme ────────────────────────────────────────────────────────
   static final ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
-    primaryColor: lightPrimaryColor,
+    primaryColor: AppColors.greenDeep,
     colorScheme: const ColorScheme.light(
-      primary: lightPrimaryColor,
-      secondary: accentColor,
-      surface: Colors.white,
+      primary: AppColors.greenDeep,
+      secondary: AppColors.greenDeep,
+      surface: AppColors.lightSurface,
       onPrimary: Colors.white,
       onSecondary: Colors.white,
-      onSurface: Colors.black87,
-      error: Colors.red,
+      onSurface: AppColors.lightOnSurface,
+      outline: AppColors.lightBorder,
+      error: Color(0xFFD70015),
       onError: Colors.white,
     ),
-    scaffoldBackgroundColor: Colors.white,
+    scaffoldBackgroundColor: AppColors.lightBg,
     appBarTheme: const AppBarTheme(
-      backgroundColor: lightPrimaryColor,
-      foregroundColor: textColorLight,
-      elevation: 2,
+      backgroundColor: Colors.transparent,
+      foregroundColor: AppColors.lightOnSurface,
+      elevation: 0,
       centerTitle: true,
     ),
     textTheme: const TextTheme(
-      displayLarge: TextStyle(color: textColorLight, fontSize: 57),
-      displayMedium: TextStyle(color: textColorLight, fontSize: 45),
-      displaySmall: TextStyle(color: textColorLight, fontSize: 36),
-      headlineLarge: TextStyle(color: textColorLight, fontSize: 32),
-      headlineMedium: TextStyle(color: textColorLight, fontSize: 28),
-      headlineSmall: TextStyle(color: textColorLight, fontSize: 24),
-      titleLarge: TextStyle(color: textColorLight, fontSize: 22),
-      titleMedium: TextStyle(color: textColorLight, fontSize: 16),
-      titleSmall: TextStyle(color: textColorLight, fontSize: 14),
-      bodyLarge: TextStyle(color: textColorLight, fontSize: 16),
-      bodyMedium: TextStyle(color: textColorLight, fontSize: 14),
-      bodySmall: TextStyle(color: Colors.black54, fontSize: 12),
-      labelLarge: TextStyle(color: textColorLight, fontSize: 14),
-      labelMedium: TextStyle(color: textColorLight, fontSize: 12),
-      labelSmall: TextStyle(color: Colors.black54, fontSize: 11),
+      displayLarge: TextStyle(color: AppColors.lightOnSurface, fontSize: 57),
+      displayMedium: TextStyle(color: AppColors.lightOnSurface, fontSize: 45),
+      displaySmall: TextStyle(color: AppColors.lightOnSurface, fontSize: 36),
+      headlineLarge: TextStyle(color: AppColors.lightOnSurface, fontSize: 32),
+      headlineMedium: TextStyle(color: AppColors.lightOnSurface, fontSize: 28),
+      headlineSmall: TextStyle(color: AppColors.lightOnSurface, fontSize: 24),
+      titleLarge: TextStyle(color: AppColors.lightOnSurface, fontSize: 22),
+      titleMedium: TextStyle(color: AppColors.lightOnSurface, fontSize: 16),
+      titleSmall: TextStyle(color: AppColors.lightOnSurface, fontSize: 14),
+      bodyLarge: TextStyle(color: AppColors.lightOnSurface, fontSize: 16),
+      bodyMedium: TextStyle(color: AppColors.lightOnSurface, fontSize: 14),
+      bodySmall: TextStyle(color: AppColors.lightOnSurfaceDim, fontSize: 12),
+      labelLarge: TextStyle(color: AppColors.lightOnSurface, fontSize: 14),
+      labelMedium: TextStyle(color: AppColors.lightOnSurfaceDim, fontSize: 12),
+      labelSmall: TextStyle(color: AppColors.lightOnSurfaceDim, fontSize: 11),
     ),
-    iconTheme: const IconThemeData(color: textColorLight),
+    iconTheme: const IconThemeData(color: AppColors.lightOnSurface),
     extensions: <ThemeExtension<dynamic>>[
       GaugeTheme(
         activeColor: Colors.black,
-        inactiveColor: Colors.grey.shade400,
-        dangerColor: Colors.red.shade700,
-        dangerInactiveColor: Colors.red.withValues(alpha: 0.15),
-        borderColor: Colors.black54,
+        inactiveColor: AppColors.lightGaugeInactive,
+        dangerColor: Color(0xFFD70015),
+        dangerInactiveColor: Color(0x22D70015),
+        borderColor: AppColors.lightBorder,
       ),
       AnalogClockTheme(
-        handColor: Color.fromARGB(255, 184, 43, 43),
-        hourTickColor: Colors.black,
-        minuteDotColor: Colors.grey.shade700,
-        numberColor: Colors.black87,
-        centerPivotColor: Colors.black,
-        centerPivotRidgeColor: Colors.grey,
-        shadowColor: Colors.black38,
+        handColor: AppColors.clockHand,
+        hourTickColor: AppColors.lightOnSurface,
+        minuteDotColor: AppColors.lightOnSurfaceDim,
+        numberColor: AppColors.lightOnSurface,
+        centerPivotColor: AppColors.lightOnSurface,
+        centerPivotRidgeColor: AppColors.lightOnSurfaceDim,
+        shadowColor: Colors.black26,
       ),
-      GaugeThemeBackground(backgroundColor: Color(0xFFE0E0E0), borderColor: Colors.black54, borderWidth: 2.0),
+      GaugeThemeBackground(
+        backgroundColor: AppColors.lightGaugeBg,
+        borderColor: AppColors.lightBorder,
+        borderWidth: 2.0,
+      ),
     ],
   );
 }
