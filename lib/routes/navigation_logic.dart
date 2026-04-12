@@ -4,10 +4,10 @@ import 'package:modern_gauge_flutter/routes/route_names.dart';
 
 /// Ordre fixe de tous les écrans du tableau de bord.
 const List<String> allDashboardRoutes = [
-  RouteNames.dashboardRoute + RouteNames.rpmRoute,
   RouteNames.dashboardRoute + RouteNames.timeRoute,
-  RouteNames.dashboardRoute + RouteNames.faultsRoute,
   RouteNames.dashboardRoute + RouteNames.musicRoute,
+  RouteNames.dashboardRoute + RouteNames.rpmRoute,
+  RouteNames.dashboardRoute + RouteNames.faultsRoute,
   RouteNames.dashboardRoute + RouteNames.tempsRoute,
   RouteNames.dashboardRoute + RouteNames.injectionRoute,
   RouteNames.dashboardRoute + RouteNames.lambdaRoute,
