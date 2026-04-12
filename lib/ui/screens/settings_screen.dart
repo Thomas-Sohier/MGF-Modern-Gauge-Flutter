@@ -4,11 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_apparence_pages.dart';
+import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
 import 'package:provider/provider.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_ecu_pages.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_ecrans_pages.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_systeme_pages.dart';
-import 'package:modern_gauge_flutter/ui/screens/settings/settings_widgets.dart';
+import 'package:modern_gauge_flutter/ui/widgets/settings_widgets.dart';
 import 'package:modern_gauge_flutter/utils/no_traversal_policy.dart';
 
 // ── Définition des catégories ──────────────────────────────────────────────
@@ -103,8 +104,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _exit() {
-    final enabledScreens =
-        context.read<SettingsProvider>().settings.enabledScreens;
+    final enabledScreens = context
+        .read<SettingsProvider>()
+        .settings
+        .enabledScreens;
     context.go(buildDashboardRoutes(enabledScreens).first);
   }
 
@@ -289,13 +292,7 @@ class _CategoryCard extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 category.label,
-                style: TextStyle(
-                  fontFamily: 'JetBrainsMono',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: primary,
-                  letterSpacing: 1.2,
-                ),
+                style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 34),
               Icon(Icons.arrow_circle_right, size: 28, color: primary),

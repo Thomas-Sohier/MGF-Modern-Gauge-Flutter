@@ -16,32 +16,14 @@ class SettingsProvider with ChangeNotifier {
     SettingsService().saveSettings(_settings);
   }
 
-  void toggleSound(bool enabled) {
-    _settings = _settings.copyWith(soundEnabled: enabled);
-    notifyListeners();
-    SettingsService().saveSettings(_settings);
-  }
-
   void setBackgroundImage(String? path) {
     _settings = _settings.copyWith(backgroundImagePath: path);
     notifyListeners();
     SettingsService().saveSettings(_settings);
   }
 
-  void setScreenBrightness(double brightness) {
-    _settings = _settings.copyWith(screenBrightness: brightness);
-    notifyListeners();
-    SettingsService().saveSettings(_settings);
-  }
-
   void setThemeMode(ThemeMode mode) {
     _settings = _settings.copyWith(themeMode: mode);
-    notifyListeners();
-    SettingsService().saveSettings(_settings);
-  }
-
-  void setAutoSleepDelay(int delaySeconds) {
-    _settings = _settings.copyWith(autoSleepDelaySeconds: delaySeconds);
     notifyListeners();
     SettingsService().saveSettings(_settings);
   }
@@ -54,12 +36,6 @@ class SettingsProvider with ChangeNotifier {
       current.add(routeSegment);
     }
     _settings = _settings.copyWith(enabledScreens: current);
-    notifyListeners();
-    SettingsService().saveSettings(_settings);
-  }
-
-  void setWakeUpMode(WakeUpMode mode) {
-    _settings = _settings.copyWith(wakeUpMode: mode);
     notifyListeners();
     SettingsService().saveSettings(_settings);
   }

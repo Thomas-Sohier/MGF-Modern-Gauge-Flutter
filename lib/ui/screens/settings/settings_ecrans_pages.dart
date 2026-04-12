@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
-import 'package:modern_gauge_flutter/ui/screens/settings/settings_widgets.dart';
+import 'package:modern_gauge_flutter/ui/widgets/settings_widgets.dart';
 import 'package:provider/provider.dart';
 
 /// Retourne la liste des pages Écrans (une carte par écran).

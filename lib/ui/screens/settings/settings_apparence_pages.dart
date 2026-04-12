@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
-import 'package:modern_gauge_flutter/ui/screens/settings/settings_widgets.dart';
+import 'package:modern_gauge_flutter/ui/widgets/settings_widgets.dart';
 import 'package:provider/provider.dart';
 
 /// Retourne la liste des pages Apparence.
-List<Widget> buildApparencePages() => [const _ThemePage(), const _SoundPage()];
+List<Widget> buildApparencePages() => [const _ThemePage()];
 
 // ── Pages Apparence ─────────────────────────────────────────────────────────
 
@@ -28,24 +28,6 @@ class _ThemePage extends StatelessWidget {
             themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,
           );
         },
-      ),
-    );
-  }
-}
-
-class _SoundPage extends StatelessWidget {
-  const _SoundPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return Selector<SettingsProvider, bool>(
-      selector: (_, p) => p.settings.soundEnabled,
-      builder: (context, soundEnabled, _) => SettingsToggleCard(
-        icon: Icons.volume_up_outlined,
-        label: 'Son',
-        value: soundEnabled,
-        onToggle: () =>
-            context.read<SettingsProvider>().toggleSound(!soundEnabled),
       ),
     );
   }

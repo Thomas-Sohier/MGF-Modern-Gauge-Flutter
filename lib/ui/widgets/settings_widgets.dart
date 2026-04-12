@@ -29,15 +29,7 @@ class SettingsHeader extends StatelessWidget {
             children: [
               Icon(Icons.arrow_back_ios_new_rounded, color: color, size: 22),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                ),
-              ),
+              Text(title, style: AppTextStyles.title.copyWith(color: color)),
             ],
           ),
         ),
@@ -173,9 +165,7 @@ class SettingsCardShell extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           border: Border.symmetric(
-            horizontal: BorderSide(
-              color: theme.colorScheme.outline.withValues(alpha: 0.15),
-            ),
+            horizontal: BorderSide(color: theme.colorScheme.outline),
           ),
         ),
         child: child,
@@ -262,7 +252,7 @@ class SettingsControlCard extends StatelessWidget {
           Text(
             label,
             style: AppTextStyles.small.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              color: theme.colorScheme.onSurface,
             ),
             textAlign: TextAlign.center,
           ),
@@ -312,21 +302,13 @@ class SettingsToggleCard extends StatelessWidget {
                 const SizedBox(height: 14),
                 Text(
                   label,
-                  style: AppTextStyles.body.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
+                  style: AppTextStyles.body,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
                 AnimatedDefaultTextStyle(
                   duration: const Duration(milliseconds: 200),
-                  style: TextStyle(
-                    fontFamily: 'JetBrainsMono',
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: valueColor,
-                    letterSpacing: 2,
-                  ),
+                  style: AppTextStyles.title.copyWith(color: valueColor),
                   child: valueLabel ?? Text(value ? 'ON' : 'OFF'),
                 ),
               ],
