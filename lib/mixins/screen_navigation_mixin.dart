@@ -10,9 +10,16 @@ mixin ScreenNavigationMixin<T extends StatefulWidget> on State<T> {
 
   Widget buildNavigableScreen({required Widget child}) {
     return GestureDetector(
-      onTap: nextScreen,
+      onTapUp: (details) {
+        if (details.globalPosition.dx > MediaQuery.of(context).size.width / 2) {
+          nextScreen();
+        } else {
+          previousScreen();
+        }
+      },
       onHorizontalDragEnd: (details) {
-        if (details.primaryVelocity == null || details.primaryVelocity!.abs() < 100) {
+        if (details.primaryVelocity == null ||
+            details.primaryVelocity!.abs() < 100) {
           return;
         }
         if (details.primaryVelocity! < 0) {
