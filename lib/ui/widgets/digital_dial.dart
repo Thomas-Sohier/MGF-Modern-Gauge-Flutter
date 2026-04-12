@@ -1,13 +1,11 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
 
+/// Jauge circulaire animée avec segments.
 class DigitalDial extends StatefulWidget {
   final double value;
   final double maxValue;
-  final String? unit;
-  final Widget? child;
   final int numberOfSegments;
   final double segmentHeight;
   final double segmentSpacing;
@@ -16,33 +14,19 @@ class DigitalDial extends StatefulWidget {
   final double? dangerThreshold;
   final Color? dangerColor;
   final Color? dangerInactiveColor;
-  final bool showGaugeBorder;
-  final Color? gaugeBorderColor;
-  final double gaugeBorderWidth;
-  final double gaugeBorderSpacing;
-  final List<Widget>? bottomChildren;
-  final double bottomChildrenRadiusFactor;
 
   const DigitalDial({
     super.key,
     required this.value,
     required this.maxValue,
-    this.unit,
-    this.child,
-    this.numberOfSegments = 12,
-    this.segmentHeight = 20.0,
+    this.numberOfSegments = 20,
+    this.segmentHeight = 40.0,
     this.segmentSpacing = 3.0,
     this.activeColor,
     this.inactiveColor,
     this.dangerThreshold,
     this.dangerColor,
     this.dangerInactiveColor,
-    this.showGaugeBorder = false,
-    this.gaugeBorderColor,
-    this.gaugeBorderWidth = 1.0,
-    this.gaugeBorderSpacing = 4.0,
-    this.bottomChildren,
-    this.bottomChildrenRadiusFactor = 0.65,
   });
 
   @override
@@ -54,7 +38,6 @@ class _DigitalDialState extends State<DigitalDial>
   late AnimationController _controller;
   late Animation<double> _animation;
 
-  // ... (initState, didUpdateWidget, dispose restent identiques)
   @override
   void initState() {
     super.initState();
@@ -90,115 +73,30 @@ class _DigitalDialState extends State<DigitalDial>
   @override
   Widget build(BuildContext context) {
     final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
-    final finalActiveColor = widget.activeColor ?? gaugeTheme.activeColor!;
-    final finalInactiveColor =
-        widget.inactiveColor ?? gaugeTheme.inactiveColor!;
-    final finalDangerColor = widget.dangerColor ?? gaugeTheme.dangerColor!;
-    final finalDangerInactiveColor =
-        widget.dangerInactiveColor ?? gaugeTheme.dangerInactiveColor!;
-    final finalBorderColor = widget.gaugeBorderColor ?? gaugeTheme.borderColor!;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = constraints.biggest;
-        final center = Offset(size.width / 2, size.height / 2);
-        final radius = math.min(size.width, size.height) / 2;
-
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: AnimatedBuilder(
-                animation: _animation,
-                builder: (context, child) {
-                  return CustomPaint(
-                    painter: _DialPainter(
-                      value: _animation.value,
-                      maxValue: widget.maxValue,
-                      numberOfSegments: widget.numberOfSegments,
-                      segmentHeight: widget.segmentHeight,
-                      segmentSpacing: widget.segmentSpacing,
-                      activeColor: finalActiveColor,
-                      inactiveColor: finalInactiveColor,
-                      dangerThreshold: widget.dangerThreshold,
-                      dangerColor: finalDangerColor,
-                      dangerInactiveColor: finalDangerInactiveColor,
-                      showGaugeBorder: widget.showGaugeBorder,
-                      gaugeBorderColor: finalBorderColor,
-                      gaugeBorderWidth: widget.gaugeBorderWidth,
-                      gaugeBorderSpacing: widget.gaugeBorderSpacing,
-                    ),
-                    child: Center(
-                      child: SizedBox(
-                        width: MediaQuery.of(context).size.width * 0.5,
-                        height: MediaQuery.of(context).size.height * 0.5,
-                        child:
-                            widget.child ??
-                            _buildDefaultChild(
-                              finalActiveColor,
-                              finalDangerColor,
-                            ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            if (widget.bottomChildren != null &&
-                widget.bottomChildren!.isNotEmpty)
-              ..._buildBottomChildrenLayout(center, radius),
-          ],
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return CustomPaint(
+          painter: _DialPainter(
+            value: _animation.value,
+            maxValue: widget.maxValue,
+            numberOfSegments: widget.numberOfSegments,
+            segmentHeight: widget.segmentHeight,
+            segmentSpacing: widget.segmentSpacing,
+            activeColor: widget.activeColor ?? gaugeTheme.activeColor!,
+            inactiveColor: widget.inactiveColor ?? gaugeTheme.inactiveColor!,
+            dangerThreshold: widget.dangerThreshold,
+            dangerColor: widget.dangerColor ?? gaugeTheme.dangerColor!,
+            dangerInactiveColor:
+                widget.dangerInactiveColor ?? gaugeTheme.dangerInactiveColor!,
+          ),
         );
       },
     );
   }
-
-  List<Widget> _buildBottomChildrenLayout(Offset center, double radius) {
-    final children = widget.bottomChildren!;
-    final count = children.length;
-    const double startAngle = math.pi * 0.15;
-    const double sweepAngle = math.pi * 0.7;
-    return List.generate(count, (index) {
-      double angle;
-      if (count == 1) {
-        angle = startAngle + sweepAngle / 2;
-      } else {
-        final angleStep = sweepAngle / (count - 1);
-        angle = startAngle + index * angleStep;
-      }
-      final childRadius = radius * widget.bottomChildrenRadiusFactor;
-      final x = center.dx + childRadius * math.cos(angle);
-      final y = center.dy + childRadius * math.sin(angle);
-      return Positioned(
-        left: x,
-        top: y,
-        child: FractionalTranslation(
-          translation: const Offset(-0.5, -0.5),
-          child: children[index],
-        ),
-      );
-    });
-  }
-
-  Widget _buildDefaultChild(Color activeColor, Color dangerColor) {
-    bool isDanger =
-        widget.dangerThreshold != null &&
-        widget.value >= widget.dangerThreshold!;
-    Color valueColor = isDanger ? dangerColor : activeColor;
-
-    final digitalTextStyle = AppTextStyles.display(valueColor);
-    final unitTextStyle = AppTextStyles.unit(valueColor);
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(widget.value.round().toString(), style: digitalTextStyle),
-        const SizedBox(height: 4),
-        if (widget.unit != null) Text(widget.unit!, style: unitTextStyle),
-      ],
-    );
-  }
 }
 
-// Le _DialPainter reste identique, il reçoit juste les couleurs à utiliser.
 class _DialPainter extends CustomPainter {
   final double value;
   final double maxValue;
@@ -210,10 +108,6 @@ class _DialPainter extends CustomPainter {
   final double? dangerThreshold;
   final Color dangerColor;
   final Color dangerInactiveColor;
-  final bool showGaugeBorder;
-  final Color gaugeBorderColor;
-  final double gaugeBorderWidth;
-  final double gaugeBorderSpacing;
 
   _DialPainter({
     required this.value,
@@ -226,38 +120,29 @@ class _DialPainter extends CustomPainter {
     this.dangerThreshold,
     required this.dangerColor,
     required this.dangerInactiveColor,
-    required this.showGaugeBorder,
-    required this.gaugeBorderColor,
-    required this.gaugeBorderWidth,
-    required this.gaugeBorderSpacing,
   });
 
-  // Le code de `paint` et `shouldRepaint` reste le même.
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - segmentHeight + 10;
     const startAngle = math.pi;
     const sweepAngle = math.pi;
-    if (showGaugeBorder) {
-      final borderPaint = Paint()
-        ..color = gaugeBorderColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = gaugeBorderWidth;
-      final outerBorderRadius = radius + segmentHeight / 2 + gaugeBorderSpacing;
-      canvas.drawCircle(center, outerBorderRadius, borderPaint);
-    }
+
     final double gapInRadians = (segmentSpacing * math.pi) / 180;
     final double totalGapRadians = gapInRadians * (numberOfSegments - 1);
     final double totalSegmentRadians = sweepAngle - totalGapRadians;
     final double segmentRadians = totalSegmentRadians / numberOfSegments;
+
     final progress = (value / maxValue).clamp(0.0, 1.0);
     final continuousSegments = progress * numberOfSegments;
     final fullSegments = continuousSegments.floor();
     final partialSegmentProgress = continuousSegments - fullSegments;
+
     final int dangerSegmentStart = dangerThreshold == null
         ? numberOfSegments + 1
         : ((dangerThreshold! / maxValue) * numberOfSegments).floor();
+
     for (int i = 0; i < numberOfSegments; i++) {
       final currentStartAngle =
           startAngle + i * (segmentRadians + gapInRadians);
@@ -268,60 +153,67 @@ class _DialPainter extends CustomPainter {
       final Color currentInactiveColor = isInDangerZone
           ? dangerInactiveColor
           : inactiveColor;
+
       if (i < fullSegments) {
-        final segmentPaint = Paint()
-          ..color = currentActiveColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = segmentHeight
-          ..strokeCap = StrokeCap.butt;
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius),
+        _drawSegment(
+          canvas,
+          center,
+          radius,
           currentStartAngle,
           segmentRadians,
-          false,
-          segmentPaint,
+          currentActiveColor,
         );
       } else if (i == fullSegments) {
-        final inactivePaint = Paint()
-          ..color = currentInactiveColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = segmentHeight
-          ..strokeCap = StrokeCap.butt;
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius),
+        // Segment partiel : fond inactif + partie active
+        _drawSegment(
+          canvas,
+          center,
+          radius,
           currentStartAngle,
           segmentRadians,
-          false,
-          inactivePaint,
+          currentInactiveColor,
         );
-        final activePaint = Paint()
-          ..color = currentActiveColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = segmentHeight
-          ..strokeCap = StrokeCap.butt;
-        final partialSweepAngle = segmentRadians * partialSegmentProgress;
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius),
+        _drawSegment(
+          canvas,
+          center,
+          radius,
           currentStartAngle,
-          partialSweepAngle,
-          false,
-          activePaint,
+          segmentRadians * partialSegmentProgress,
+          currentActiveColor,
         );
       } else {
-        final segmentPaint = Paint()
-          ..color = currentInactiveColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = segmentHeight
-          ..strokeCap = StrokeCap.butt;
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius),
+        _drawSegment(
+          canvas,
+          center,
+          radius,
           currentStartAngle,
           segmentRadians,
-          false,
-          segmentPaint,
+          currentInactiveColor,
         );
       }
     }
+  }
+
+  void _drawSegment(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double startAngle,
+    double sweepAngle,
+    Color color,
+  ) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = segmentHeight
+      ..strokeCap = StrokeCap.butt;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepAngle,
+      false,
+      paint,
+    );
   }
 
   @override
@@ -333,8 +225,6 @@ class _DialPainter extends CustomPainter {
         oldDelegate.inactiveColor != inactiveColor ||
         oldDelegate.dangerThreshold != dangerThreshold ||
         oldDelegate.dangerColor != dangerColor ||
-        oldDelegate.showGaugeBorder != showGaugeBorder ||
-        oldDelegate.gaugeBorderSpacing != gaugeBorderSpacing ||
         oldDelegate.dangerInactiveColor != dangerInactiveColor;
   }
 }

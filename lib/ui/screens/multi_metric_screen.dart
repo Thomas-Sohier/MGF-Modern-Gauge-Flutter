@@ -7,7 +7,7 @@ import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
-import 'package:modern_gauge_flutter/ui/widgets/digital_dial.dart';
+import 'package:modern_gauge_flutter/ui/widgets/gauge_layout.dart';
 import 'package:provider/provider.dart';
 
 // ── Définition d'une métrique ──────────────────────────────────────────────
@@ -116,7 +116,7 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
   Widget build(BuildContext context) {
     return GestureDetector(
       // Tap gauche < 50% → précédent, droit > 50% → suivant.
-      // Le GestureDetector interne (_PrimaryDisplay) gagne l'arène pour les taps
+      // Le GestureDetector interne (MetricPrimaryDisplay) gagne l'arène pour les taps
       // sur la zone centrale, donc onTapUp ne se déclenche pas sur le centre.
       onTapUp: (d) {
         final half = MediaQuery.of(context).size.width / 2;
@@ -133,22 +133,15 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
           final primary = widget.metrics[_primaryIndex];
           final primaryValue = primary.getValue(ecuInfos);
 
-          return DigitalDial(
+          return GaugeLayout(
             value: primaryValue,
             maxValue: primary.maxValue,
-            unit: primary.unit,
             dangerThreshold: primary.dangerThreshold,
-            showGaugeBorder: false,
-            gaugeBorderSpacing: 0,
-            gaugeBorderWidth: 0,
-            segmentHeight: 40,
-            numberOfSegments: 20,
-            bottomChildrenRadiusFactor: 0.75,
             bottomChildren: widget.metrics
                 .asMap()
                 .entries
                 .map(
-                  (e) => _BottomIndicator(
+                  (e) => MetricIndicator(
                     metric: e.value,
                     data: ecuInfos,
                     value: e.value.getValue(ecuInfos),
@@ -156,7 +149,7 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
                   ),
                 )
                 .toList(),
-            child: _PrimaryDisplay(
+            child: MetricPrimaryDisplay(
               metric: primary,
               value: primaryValue,
               onCycle: _cyclePrimary,
@@ -170,12 +163,13 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
 
 // ── Affichage principal (tappable pour cycler) ─────────────────────────────
 
-class _PrimaryDisplay extends StatelessWidget {
+class MetricPrimaryDisplay extends StatelessWidget {
   final MetricDef metric;
   final double value;
   final VoidCallback onCycle;
 
-  const _PrimaryDisplay({
+  const MetricPrimaryDisplay({
+    super.key,
     required this.metric,
     required this.value,
     required this.onCycle,
@@ -221,13 +215,14 @@ class _PrimaryDisplay extends StatelessWidget {
 
 // ── Indicateur bas (toutes les métriques, primaire mis en évidence) ────────
 
-class _BottomIndicator extends StatelessWidget {
+class MetricIndicator extends StatelessWidget {
   final MetricDef metric;
   final EcuInfos? data;
   final double value;
   final bool isPrimary;
 
-  const _BottomIndicator({
+  const MetricIndicator({
+    super.key,
     required this.metric,
     required this.data,
     required this.value,

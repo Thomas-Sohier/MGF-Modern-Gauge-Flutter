@@ -16,18 +16,30 @@ class GaugeTexturedBackground extends StatelessWidget {
   /// The width of the optional outer border. Set to 0 to disable.
   final double? borderWidth;
 
-  const GaugeTexturedBackground({super.key, this.child, this.backgroundColor, this.borderColor, this.borderWidth});
+  const GaugeTexturedBackground({
+    super.key,
+    this.child,
+    this.backgroundColor,
+    this.borderColor,
+    this.borderWidth,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final gaugeThemeBackground = Theme.of(context).extension<GaugeThemeBackground>()!;
+    final gaugeThemeBackground = Theme.of(
+      context,
+    ).extension<GaugeThemeBackground>()!;
 
     return AspectRatio(
       aspectRatio: 1,
       child: CustomPaint(
         painter: _TexturedBackgroundPainter(
-          backgroundColor: backgroundColor ?? gaugeThemeBackground.backgroundColor ?? Color(0xFFE0E0E0),
-          borderColor: borderColor ?? gaugeThemeBackground.borderColor ?? Colors.black54,
+          backgroundColor:
+              backgroundColor ??
+              gaugeThemeBackground.backgroundColor ??
+              Color(0xFFE0E0E0),
+          borderColor:
+              borderColor ?? gaugeThemeBackground.borderColor ?? Colors.black54,
           borderWidth: borderWidth ?? gaugeThemeBackground.borderWidth ?? 2.0,
         ),
         child: child != null ? Center(child: child) : null,
@@ -42,7 +54,11 @@ class _TexturedBackgroundPainter extends CustomPainter {
   final Color borderColor;
   final double borderWidth;
 
-  _TexturedBackgroundPainter({required this.backgroundColor, required this.borderColor, required this.borderWidth});
+  _TexturedBackgroundPainter({
+    required this.backgroundColor,
+    required this.borderColor,
+    required this.borderWidth,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
