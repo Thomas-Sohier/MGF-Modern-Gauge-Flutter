@@ -7,12 +7,14 @@ final _metrics = [
     label: 'Lambda',
     unit: 'mV',
     maxValue: 1000,
+    icon: Icons.sensors_rounded,
     getValue: (d) => d?.lambdaMv?.toDouble() ?? 0,
   ),
   MetricDef(
     label: 'O2',
     unit: 'mV',
     maxValue: 1000,
+    icon: Icons.air_rounded,
     getValue: (d) => d?.o2Mv?.toDouble() ?? 0,
   ),
   MetricDef(
@@ -20,6 +22,7 @@ final _metrics = [
     unit: '',
     maxValue: 20,
     dangerThreshold: 17,
+    icon: Icons.local_gas_station_rounded,
     format: (v) => v.toStringAsFixed(2),
     getValue: (d) => d?.estimateAirFuel?.toDouble() ?? 0,
   ),
@@ -27,6 +30,7 @@ final _metrics = [
     label: 'Duty cycle',
     unit: '%',
     maxValue: 100,
+    icon: Icons.speed_rounded,
     getValue: (d) => d?.lambdaSensorDutyCycle?.toDouble() ?? 0,
   ),
 ];
@@ -36,7 +40,7 @@ class LambdaScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MultiMetricScreen(
-        routeSegment: RouteNames.lambdaRoute,
-        metrics: _metrics,
-      );
+    routeSegment: RouteNames.lambdaRoute,
+    metrics: _metrics,
+  );
 }

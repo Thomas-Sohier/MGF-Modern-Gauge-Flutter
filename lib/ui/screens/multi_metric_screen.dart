@@ -14,7 +14,7 @@ import 'package:provider/provider.dart';
 
 class MetricDef {
   final String label;
-  final String unit;
+  final String? unit;
   final double maxValue;
   final double? dangerThreshold;
   final double Function(EcuData?) getValue;
@@ -22,13 +22,21 @@ class MetricDef {
   /// Formatage personnalisé de la valeur. Si null, arrondi à l'entier.
   final String Function(double)? format;
 
+  /// Icône optionnelle affichée dans l'indicateur du bas.
+  final IconData? icon;
+
+  /// Action optionnelle au tap sur l'indicateur du bas.
+  final void Function(BuildContext)? onTap;
+
   const MetricDef({
     required this.label,
-    required this.unit,
     required this.maxValue,
     required this.getValue,
+    this.unit,
     this.dangerThreshold,
     this.format,
+    this.icon,
+    this.onTap,
   });
 
   String display(double v) =>
@@ -149,8 +157,8 @@ class _PrimaryDisplay extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onCycle,
         borderRadius: BorderRadius.circular(100),
+        onTap: onCycle,
         child: Column(
           mainAxisSize: MainAxisSize.max,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -165,23 +173,11 @@ class _PrimaryDisplay extends StatelessWidget {
                   style: AppTextStyles.display(color),
                 ),
                 const SizedBox(height: 4),
-                Text(metric.unit, style: AppTextStyles.small),
+                if (metric.unit != null)
+                  Text(metric.unit!, style: AppTextStyles.small),
               ],
             ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(metric.label, style: AppTextStyles.unit(color)),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.sync_rounded,
-                  size: 14,
-                  color: color.withValues(alpha: 0.45),
-                ),
-              ],
-            ),
+            Text(metric.label, style: AppTextStyles.unit(color)),
           ],
         ),
       ),
@@ -211,12 +207,16 @@ class _BottomIndicator extends StatelessWidget {
         ? gaugeTheme.activeColor!
         : cs.onSurface.withValues(alpha: 0.85);
 
-    return SizedBox(
+    final content = SizedBox(
       width: 90,
       height: 90,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          if (metric.icon != null) ...[
+            Icon(metric.icon, size: 28, color: valueColor),
+            const SizedBox(height: 2),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -225,14 +225,15 @@ class _BottomIndicator extends StatelessWidget {
                 metric.display(value),
                 style: AppTextStyles.label.copyWith(color: valueColor),
               ),
-              Text(
-                metric.unit,
-                maxLines: 1,
-                style: AppTextStyles.label.copyWith(color: valueColor),
-              ),
+              if (metric.unit != null)
+                Text(
+                  metric.unit!,
+                  maxLines: 1,
+                  style: AppTextStyles.label.copyWith(color: valueColor),
+                ),
             ],
           ),
-          const SizedBox(height: 2),
+          if (metric.icon == null) const SizedBox(height: 2),
           Text(
             metric.label,
             maxLines: 1,
@@ -245,5 +246,17 @@ class _BottomIndicator extends StatelessWidget {
         ],
       ),
     );
+
+    if (metric.onTap != null) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(50),
+          onTap: () => metric.onTap!(context),
+          child: content,
+        ),
+      );
+    }
+    return content;
   }
 }

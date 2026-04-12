@@ -6,7 +6,7 @@ import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
 class DigitalDial extends StatefulWidget {
   final double value;
   final double maxValue;
-  final String unit;
+  final String? unit;
   final Widget? child;
   final int numberOfSegments;
   final double segmentHeight;
@@ -27,7 +27,7 @@ class DigitalDial extends StatefulWidget {
     super.key,
     required this.value,
     required this.maxValue,
-    this.unit = '',
+    this.unit,
     this.child,
     this.numberOfSegments = 12,
     this.segmentHeight = 20.0,
@@ -192,7 +192,7 @@ class _DigitalDialState extends State<DigitalDial>
       children: [
         Text(widget.value.round().toString(), style: digitalTextStyle),
         const SizedBox(height: 4),
-        Text(widget.unit, style: unitTextStyle),
+        if (widget.unit != null) Text(widget.unit!, style: unitTextStyle),
       ],
     );
   }
