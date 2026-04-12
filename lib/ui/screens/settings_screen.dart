@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:modern_gauge_flutter/routes/route_names.dart';
+import 'package:modern_gauge_flutter/providers/settings_provider.dart';
+import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_apparence_pages.dart';
+import 'package:provider/provider.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_ecu_pages.dart';
+import 'package:modern_gauge_flutter/ui/screens/settings/settings_ecrans_pages.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_systeme_pages.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_widgets.dart';
 import 'package:modern_gauge_flutter/utils/no_traversal_policy.dart';
@@ -13,23 +16,27 @@ import 'package:modern_gauge_flutter/utils/no_traversal_policy.dart';
 enum _Category {
   ecu,
   apparence,
+  ecrans,
   systeme;
 
   String get label => switch (this) {
     _Category.ecu => 'ECU INFOS',
     _Category.apparence => 'APPARENCE',
+    _Category.ecrans => 'ÉCRANS',
     _Category.systeme => 'SYSTÈME',
   };
 
   IconData get icon => switch (this) {
     _Category.ecu => Icons.memory_rounded,
     _Category.apparence => Icons.palette_outlined,
+    _Category.ecrans => Icons.tv_rounded,
     _Category.systeme => Icons.tune_rounded,
   };
 
   List<Widget> get pages => switch (this) {
     _Category.ecu => buildEcuPages(),
     _Category.apparence => buildApparencePages(),
+    _Category.ecrans => buildEcransPages(),
     _Category.systeme => buildSystemePages(),
   };
 }
@@ -95,7 +102,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  void _exit() => context.go(RouteNames.dashboardRoute + RouteNames.rpmRoute);
+  void _exit() {
+    final enabledScreens =
+        context.read<SettingsProvider>().settings.enabledScreens;
+    context.go(buildDashboardRoutes(enabledScreens).first);
+  }
 
   void _handleBack() {
     if (_category != null) {

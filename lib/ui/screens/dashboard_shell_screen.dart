@@ -3,9 +3,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Pour RawKeyboardListener et LogicalKeyboardKey
 import 'package:go_router/go_router.dart';
+import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 import 'package:modern_gauge_flutter/ui/widgets/gauge_background.dart';
+import 'package:provider/provider.dart';
 
 class DashboardShellScreen extends StatefulWidget {
   final Widget child;
@@ -32,15 +34,17 @@ class _DashboardShellScreenState extends State<DashboardShellScreen> {
     // pour éviter les doubles déclenchements.
     if (event is KeyDownEvent) {
       final String currentLocation = GoRouter.of(context).state.matchedLocation;
+      final enabledScreens =
+          context.read<SettingsProvider>().settings.enabledScreens;
 
       // Flèche droite -> écran suivant
       if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-        context.go(getNextRoute(currentLocation));
+        context.go(getNextRoute(currentLocation, enabledScreens));
         return;
       }
       // Flèche gauche -> écran précédent
       else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-        context.go(getPreviousRoute(currentLocation));
+        context.go(getPreviousRoute(currentLocation, enabledScreens));
         return;
       }
       // Flèche bas -> Paramètres

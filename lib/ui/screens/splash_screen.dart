@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:modern_gauge_flutter/models/settings_data.dart'; // Pour l'enum WakeUpMode
 import 'package:modern_gauge_flutter/providers/app_state_provider.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart'; // Pour le mode de réveil
+import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 import 'package:provider/provider.dart';
 
@@ -27,9 +28,11 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!appState.isAsleep) {
       if (mounted) {
-        GoRouter.of(
-          context,
-        ).go(RouteNames.dashboardRoute + RouteNames.rpmRoute);
+        final enabledScreens =
+            Provider.of<SettingsProvider>(context, listen: false)
+                .settings
+                .enabledScreens;
+        GoRouter.of(context).go(buildDashboardRoutes(enabledScreens).first);
       }
     }
   }

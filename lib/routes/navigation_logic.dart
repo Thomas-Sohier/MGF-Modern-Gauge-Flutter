@@ -2,31 +2,39 @@
 
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 
-/// La liste ordonnée des routes du tableau de bord pour la navigation cyclique.
-final List<String> dashboardRoutes = [
+/// Ordre fixe de tous les écrans du tableau de bord.
+const List<String> allDashboardRoutes = [
   RouteNames.dashboardRoute + RouteNames.rpmRoute,
-  // RouteNames.dashboardRoute + RouteNames.musicRoute,
   RouteNames.dashboardRoute + RouteNames.timeRoute,
   RouteNames.dashboardRoute + RouteNames.faultsRoute,
+  RouteNames.dashboardRoute + RouteNames.musicRoute,
 ];
 
-/// Retourne la route suivante dans la séquence cyclique.
-String getNextRoute(String currentRoute) {
-  final currentIndex = dashboardRoutes.indexOf(currentRoute);
-  // Si la route n'est pas trouvée, on retourne à la première par sécurité.
-  if (currentIndex == -1) return dashboardRoutes.first;
+const String _clockRoute = RouteNames.dashboardRoute + RouteNames.timeRoute;
 
-  // L'opérateur modulo (%) permet de revenir au début après la dernière route.
-  final nextIndex = (currentIndex + 1) % dashboardRoutes.length;
-  return dashboardRoutes[nextIndex];
+/// Filtre la liste complète selon les segments activés (ex: {'/rpm', '/time'}).
+/// Si aucun écran n'est actif, retourne l'horloge comme fallback.
+List<String> buildDashboardRoutes(Set<String> enabledScreens) {
+  final routes = allDashboardRoutes
+      .where((r) => enabledScreens.any((seg) => r.endsWith(seg)))
+      .toList();
+  return routes.isEmpty ? [_clockRoute] : routes;
+}
+
+/// Retourne la route suivante dans la séquence cyclique.
+String getNextRoute(String currentRoute, Set<String> enabledScreens) {
+  final routes = buildDashboardRoutes(enabledScreens);
+  if (routes.isEmpty) return currentRoute;
+  final currentIndex = routes.indexOf(currentRoute);
+  if (currentIndex == -1) return routes.first;
+  return routes[(currentIndex + 1) % routes.length];
 }
 
 /// Retourne la route précédente dans la séquence cyclique.
-String getPreviousRoute(String currentRoute) {
-  final currentIndex = dashboardRoutes.indexOf(currentRoute);
-  if (currentIndex == -1) return dashboardRoutes.first;
-
-  // Une astuce avec le modulo pour gérer l'index -1.
-  final previousIndex = (currentIndex - 1 + dashboardRoutes.length) % dashboardRoutes.length;
-  return dashboardRoutes[previousIndex];
+String getPreviousRoute(String currentRoute, Set<String> enabledScreens) {
+  final routes = buildDashboardRoutes(enabledScreens);
+  if (routes.isEmpty) return currentRoute;
+  final currentIndex = routes.indexOf(currentRoute);
+  if (currentIndex == -1) return routes.first;
+  return routes[(currentIndex - 1 + routes.length) % routes.length];
 }

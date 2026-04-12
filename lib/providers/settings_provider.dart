@@ -46,6 +46,18 @@ class SettingsProvider with ChangeNotifier {
     SettingsService().saveSettings(_settings);
   }
 
+  void toggleScreen(String routeSegment) {
+    final current = Set<String>.from(_settings.enabledScreens);
+    if (current.contains(routeSegment)) {
+      current.remove(routeSegment);
+    } else {
+      current.add(routeSegment);
+    }
+    _settings = _settings.copyWith(enabledScreens: current);
+    notifyListeners();
+    SettingsService().saveSettings(_settings);
+  }
+
   void setWakeUpMode(WakeUpMode mode) {
     _settings = _settings.copyWith(wakeUpMode: mode);
     notifyListeners();
