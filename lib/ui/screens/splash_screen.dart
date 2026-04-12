@@ -21,17 +21,17 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _initializeApp() async {
     await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+
     final appState = Provider.of<AppStateProvider>(context, listen: false);
     appState.finishInitialization();
 
     if (!appState.isAsleep) {
-      if (mounted) {
-        final enabledScreens = Provider.of<SettingsProvider>(
-          context,
-          listen: false,
-        ).settings.enabledScreens;
-        GoRouter.of(context).go(buildDashboardRoutes(enabledScreens).first);
-      }
+      final enabledScreens = Provider.of<SettingsProvider>(
+        context,
+        listen: false,
+      ).settings.enabledScreens;
+      GoRouter.of(context).go(buildDashboardRoutes(enabledScreens).first);
     }
   }
 
