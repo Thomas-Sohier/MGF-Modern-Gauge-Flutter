@@ -20,7 +20,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
 
     final appState = Provider.of<AppStateProvider>(context, listen: false);
