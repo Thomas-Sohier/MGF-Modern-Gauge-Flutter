@@ -161,9 +161,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           Positioned(
                             top: size * 0.20,
-                            bottom: size * 0.08,
-                            left: size * 0.1,
-                            right: size * 0.1,
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
                             child: AnimatedSwitcher(
                               duration: const Duration(milliseconds: 180),
                               transitionBuilder: (child, animation) =>
@@ -188,12 +188,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ),
                           Positioned(
-                            top: size * 0.07,
-                            left: size * 0.08,
-                            right: size * 0.08,
+                            top: 0,
+                            left: 0,
+                            right: 0,
                             child: SettingsHeader(
                               title: _title,
                               onBack: _handleBack,
+                              height: size * 0.20,
                             ),
                           ),
                         ],
@@ -240,12 +241,12 @@ class _PagerBody extends StatelessWidget {
             children: pages,
           ),
         ),
-        const SizedBox(height: 8),
         SettingsNavBar(
           index: currentIndex,
           total: pages.length,
           onPrev: onPrev,
           onNext: onNext,
+          height: MediaQuery.of(context).size.height * 0.2,
         ),
       ],
     );
@@ -263,27 +264,30 @@ class _CategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).primaryColor;
-    return GestureDetector(
-      onTap: onTap,
-      child: SettingsCardShell(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(category.icon, size: 40, color: primary),
-            const SizedBox(height: 16),
-            Text(
-              category.label,
-              style: TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: primary,
-                letterSpacing: 1.2,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: SettingsCardShell(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(category.icon, size: 40, color: primary),
+              const SizedBox(height: 16),
+              Text(
+                category.label,
+                style: TextStyle(
+                  fontFamily: 'JetBrainsMono',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: primary,
+                  letterSpacing: 1.2,
+                ),
               ),
-            ),
-            const SizedBox(height: 34),
-            Icon(Icons.arrow_circle_right, size: 28, color: primary),
-          ],
+              const SizedBox(height: 34),
+              Icon(Icons.arrow_circle_right, size: 28, color: primary),
+            ],
+          ),
         ),
       ),
     );

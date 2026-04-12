@@ -96,19 +96,23 @@ class _OdbIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        context.read<EcuProvider>().retryInitialData();
-      },
-      child: Consumer<AppStateProvider>(
-        builder: (context, appState, _) {
-          final isConnected =
-              appState.odbStatus == OdbConnectionStatus.connected;
-          return _IndicatorBase(
-            icon: isConnected ? Icons.link : Icons.link_off,
-            label: 'ODB',
-          );
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(50),
+        onTap: () {
+          context.read<EcuProvider>().retryInitialData();
         },
+        child: Consumer<AppStateProvider>(
+          builder: (context, appState, _) {
+            final isConnected =
+                appState.odbStatus == OdbConnectionStatus.connected;
+            return _IndicatorBase(
+              icon: isConnected ? Icons.link : Icons.link_off,
+              label: 'ODB',
+            );
+          },
+        ),
       ),
     );
   }

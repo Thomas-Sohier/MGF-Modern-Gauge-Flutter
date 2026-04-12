@@ -22,8 +22,9 @@ class _EcuConnexionPage extends StatelessWidget {
     return Consumer<EcuProvider>(
       builder: (context, provider, _) {
         final connected = provider.currentData.connected;
-        final color =
-            connected ? Colors.green : Theme.of(context).colorScheme.error;
+        final color = connected
+            ? Colors.green
+            : Theme.of(context).colorScheme.error;
         return SettingsInfoCard(
           icon: connected ? Icons.link_rounded : Icons.link_off_rounded,
           label: 'Connecté',
