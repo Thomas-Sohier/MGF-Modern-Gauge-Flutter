@@ -128,12 +128,16 @@ class _DigitalDialState extends State<DigitalDial>
                       gaugeBorderSpacing: widget.gaugeBorderSpacing,
                     ),
                     child: Center(
-                      child:
-                          widget.child ??
-                          _buildDefaultChild(
-                            finalActiveColor,
-                            finalDangerColor,
-                          ),
+                      child: SizedBox(
+                        width: MediaQuery.of(context).size.width * 0.5,
+                        height: MediaQuery.of(context).size.height * 0.5,
+                        child:
+                            widget.child ??
+                            _buildDefaultChild(
+                              finalActiveColor,
+                              finalDangerColor,
+                            ),
+                      ),
                     ),
                   );
                 },

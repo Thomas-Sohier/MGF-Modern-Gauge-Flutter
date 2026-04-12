@@ -15,7 +15,10 @@ class SettingsData {
   /// Écrans activés (segments de route, ex: '/rpm', '/time')
   final Set<String> enabledScreens;
 
-  static const Set<String> allScreens = {'/rpm', '/time', '/faults', '/music'};
+  static const Set<String> allScreens = {
+    '/rpm', '/time', '/faults', '/music',
+    '/temps', '/injection', '/lambda', '/allumage', '/ralenti', '/admission',
+  };
 
   SettingsData({
     this.backgroundImagePath,

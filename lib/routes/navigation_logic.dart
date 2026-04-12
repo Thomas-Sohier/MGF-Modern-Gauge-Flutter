@@ -8,6 +8,12 @@ const List<String> allDashboardRoutes = [
   RouteNames.dashboardRoute + RouteNames.timeRoute,
   RouteNames.dashboardRoute + RouteNames.faultsRoute,
   RouteNames.dashboardRoute + RouteNames.musicRoute,
+  RouteNames.dashboardRoute + RouteNames.tempsRoute,
+  RouteNames.dashboardRoute + RouteNames.injectionRoute,
+  RouteNames.dashboardRoute + RouteNames.lambdaRoute,
+  RouteNames.dashboardRoute + RouteNames.allumageRoute,
+  RouteNames.dashboardRoute + RouteNames.ralentiRoute,
+  RouteNames.dashboardRoute + RouteNames.admissionRoute,
 ];
 
 const String _clockRoute = RouteNames.dashboardRoute + RouteNames.timeRoute;

@@ -38,6 +38,36 @@ const _kScreenDefs = [
     label: 'Musique',
     icon: Icons.music_note_rounded,
   ),
+  _ScreenDef(
+    routeSegment: '/temps',
+    label: 'Températures',
+    icon: Icons.thermostat_rounded,
+  ),
+  _ScreenDef(
+    routeSegment: '/injection',
+    label: 'Injection',
+    icon: Icons.water_drop_outlined,
+  ),
+  _ScreenDef(
+    routeSegment: '/lambda',
+    label: 'Lambda / O2',
+    icon: Icons.sensors_rounded,
+  ),
+  _ScreenDef(
+    routeSegment: '/allumage',
+    label: 'Allumage',
+    icon: Icons.bolt_rounded,
+  ),
+  _ScreenDef(
+    routeSegment: '/ralenti',
+    label: 'Ralenti',
+    icon: Icons.commit_rounded,
+  ),
+  _ScreenDef(
+    routeSegment: '/admission',
+    label: 'Admission',
+    icon: Icons.air_rounded,
+  ),
 ];
 
 // ── Page ────────────────────────────────────────────────────────────────────
