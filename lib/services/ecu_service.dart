@@ -11,6 +11,8 @@ class EcuService {
   final String wsUrl;
 
   WebSocketChannel? _channel;
+  StreamSubscription? _channelSubscription;
+
   final StreamController<EcuInfos> _dataController =
       StreamController<EcuInfos>.broadcast();
   final StreamController<bool> _connectionController =
@@ -18,7 +20,7 @@ class EcuService {
 
   Stream<EcuInfos> get dataStream => _dataController.stream;
 
-  /// Émet `true` quand la connexion WebSocket est établie, `false` à la fermeture.
+  /// Émet `true` à la réception du premier message, `false` à la fermeture.
   Stream<bool> get connectionStream => _connectionController.stream;
 
   EcuService({
@@ -41,8 +43,6 @@ class EcuService {
   Future<EcuInfos?> fetchInitialData() async {
     try {
       final url = '$baseUrl/api';
-      // Run the HTTP request in a separate isolate to avoid blocking the main thread.
-      // Only primitive types (String) can be passed between isolates.
       final body = await Isolate.run(() async {
         final response = await http
             .get(Uri.parse(url))
@@ -82,15 +82,17 @@ class EcuService {
     }
   }
 
-  // --- WebSocket Methods ---
+  // --- WebSocket ---
 
   Timer? _periodicTimer;
   Timer? _reconnectTimer;
+  Timer? _stableConnectionTimer;
+
   bool _isConnected = false;
   bool _autoReconnect = false;
   int _reconnectAttempts = 0;
 
-  static const _reconnectDelays = [1, 2, 4, 8, 16, 30]; // seconds
+  static const _reconnectDelays = [1, 2, 4, 8, 16, 30]; // secondes
 
   bool get isConnected => _isConnected;
 
@@ -113,42 +115,50 @@ class EcuService {
       return;
     }
 
-    _channel!.stream.listen(
+    _channelSubscription = _channel!.stream.listen(
       (message) {
+        // Premier message reçu → connexion réellement établie.
+        if (!_isConnected) {
+          _isConnected = true;
+          _connectionController.add(true);
+          // Le backoff ne se réinitialise qu'après 5 s de connexion stable.
+          _stableConnectionTimer = Timer(const Duration(seconds: 5), () {
+            _reconnectAttempts = 0;
+          });
+        }
         try {
-          final data = json.decode(message);
-          _dataController.add(EcuInfos.fromJson(data));
-          _reconnectAttempts = 0; // reset backoff on successful message
+          _dataController.add(EcuInfos.fromJson(json.decode(message)));
         } catch (e) {
           LogService.error('EcuService: Error parsing WebSocket message: $e');
         }
       },
       onError: (error) {
         LogService.error('EcuService: WebSocket error: $error');
-        _isConnected = false;
-        _connectionController.add(false);
-        _closeCurrentConnection();
-        _scheduleReconnect();
+        _handleDisconnect();
       },
       onDone: () {
         LogService.info('EcuService: WebSocket connection closed');
-        _isConnected = false;
-        _connectionController.add(false);
-        _closeCurrentConnection();
-        _scheduleReconnect();
+        _handleDisconnect();
       },
       cancelOnError: true,
     );
 
-    // Initial request for data (Go agent expects "." to start session)
+    // Le Go agent attend "." pour démarrer l'envoi de données.
     _safeSend('.');
-    _isConnected = true;
-    _connectionController.add(true);
-
-    // Periodically send "." to keep data flowing
     _periodicTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       _safeSend('.');
     });
+  }
+
+  void _handleDisconnect() {
+    // Guard : évite le double-appel si sink.close() re-déclenche onDone.
+    if (_channel == null) return;
+
+    final wasConnected = _isConnected;
+    _isConnected = false;
+    if (wasConnected) _connectionController.add(false);
+    _closeCurrentConnection();
+    _scheduleReconnect();
   }
 
   void _scheduleReconnect() {
@@ -163,7 +173,7 @@ class EcuService {
     _reconnectTimer = Timer(Duration(seconds: delaySecs), _connect);
   }
 
-  /// Manually reconnect the WebSocket. Resets backoff. Use this for user-triggered retries.
+  /// Reconnexion manuelle — réinitialise le backoff.
   void reconnectWebSocket() {
     LogService.info('EcuService: Manual reconnect requested.');
     _reconnectAttempts = 0;
@@ -180,12 +190,19 @@ class EcuService {
   }
 
   void _closeCurrentConnection() {
+    _stableConnectionTimer?.cancel();
+    _stableConnectionTimer = null;
+    _channelSubscription?.cancel();
+    _channelSubscription = null;
     _periodicTimer?.cancel();
     _periodicTimer = null;
-    try {
-      _channel?.sink.close();
-    } catch (_) {}
+    // _channel = null AVANT sink.close() pour que le guard dans
+    // _handleDisconnect() court-circuite tout onDone/onError résiduel.
+    final channel = _channel;
     _channel = null;
+    try {
+      channel?.sink.close();
+    } catch (_) {}
   }
 
   void dispose() {
