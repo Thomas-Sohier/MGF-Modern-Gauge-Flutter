@@ -30,14 +30,29 @@ class MetricDef {
 
   const MetricDef({
     required this.label,
+    required this.unit,
     required this.maxValue,
     required this.getValue,
-    this.unit,
     this.dangerThreshold,
     this.format,
     this.icon,
     this.onTap,
   });
+
+  /// Bouton d'action sans valeur, non sélectionnable comme métrique principale.
+  const MetricDef.action({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  }) : unit = null,
+       maxValue = 0,
+       getValue = _zeroValue,
+       dangerThreshold = null,
+       format = null;
+
+  static double _zeroValue(EcuData? _) => 0;
+
+  bool get isAction => maxValue == 0 && getValue == _zeroValue;
 
   String display(double v) =>
       format != null ? format!(v) : v.round().toString();
@@ -65,11 +80,28 @@ class MultiMetricScreen extends StatefulWidget {
 }
 
 class _MultiMetricScreenState extends State<MultiMetricScreen> {
-  int _primaryIndex = 0;
+  late int _primaryIndex;
 
-  void _cyclePrimary() => setState(
-    () => _primaryIndex = (_primaryIndex + 1) % widget.metrics.length,
-  );
+  /// Indices des métriques affichables (exclut les boutons d'action).
+  List<int> get _displayableIndices => [
+    for (int i = 0; i < widget.metrics.length; i++)
+      if (!widget.metrics[i].isAction) i,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final indices = _displayableIndices;
+    _primaryIndex = indices.isNotEmpty ? indices.first : 0;
+  }
+
+  void _cyclePrimary() {
+    final indices = _displayableIndices;
+    if (indices.length <= 1) return;
+    final currentPos = indices.indexOf(_primaryIndex);
+    final nextPos = (currentPos + 1) % indices.length;
+    setState(() => _primaryIndex = indices[nextPos]);
+  }
 
   void _navigate(bool forward) {
     final enabled = context.read<SettingsProvider>().settings.enabledScreens;
@@ -118,7 +150,7 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
                   (e) => _BottomIndicator(
                     metric: e.value,
                     value: e.value.getValue(data),
-                    isPrimary: e.key == _primaryIndex,
+                    isPrimary: !e.value.isAction && e.key == _primaryIndex,
                   ),
                 )
                 .toList(),
@@ -212,28 +244,31 @@ class _BottomIndicator extends StatelessWidget {
       height: 90,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (metric.icon != null) ...[
             Icon(metric.icon, size: 28, color: valueColor),
             const SizedBox(height: 2),
           ],
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                metric.display(value),
-                style: AppTextStyles.label.copyWith(color: valueColor),
-              ),
-              if (metric.unit != null)
+          if (!metric.isAction)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
                 Text(
-                  metric.unit!,
-                  maxLines: 1,
+                  metric.display(value),
                   style: AppTextStyles.label.copyWith(color: valueColor),
                 ),
-            ],
-          ),
-          if (metric.icon == null) const SizedBox(height: 2),
+                if (metric.unit != null)
+                  Text(
+                    metric.unit!,
+                    maxLines: 1,
+                    style: AppTextStyles.label.copyWith(color: valueColor),
+                  ),
+              ],
+            ),
+          if (metric.icon == null && !metric.isAction)
+            const SizedBox(height: 2),
           Text(
             metric.label,
             maxLines: 1,

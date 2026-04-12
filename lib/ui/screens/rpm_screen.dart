@@ -5,21 +5,20 @@ import 'package:modern_gauge_flutter/ui/screens/multi_metric_screen.dart';
 import 'package:provider/provider.dart';
 
 final _metrics = [
-  MetricDef(
-    label: 'RPM',
-    icon: Icons.speed,
-    maxValue: 8500,
-    dangerThreshold: 7000,
-    getValue: (d) => d?.rpm?.toDouble() ?? 0,
-  ),
-  MetricDef(
+  MetricDef.action(
     label: 'ODB',
     icon: Icons.link,
     onTap: (context) {
       context.read<EcuProvider>().retryInitialData();
     },
-    maxValue: 0,
-    getValue: (d) => 0,
+  ),
+  MetricDef(
+    label: 'RPM',
+    icon: Icons.speed,
+    unit: '',
+    maxValue: 8500,
+    dangerThreshold: 7000,
+    getValue: (d) => d?.rpm?.toDouble() ?? 0,
   ),
   MetricDef(
     label: 'LDR',
