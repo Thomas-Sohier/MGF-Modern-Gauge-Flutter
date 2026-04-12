@@ -273,3 +273,67 @@ class SettingsControlCard extends StatelessWidget {
     );
   }
 }
+
+// ── Carte toggle (boolean, carte entière cliquable) ────────────────────────
+
+/// Icône + libellé + valeur ON/OFF. Toute la carte est cliquable pour basculer.
+class SettingsToggleCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool value;
+  final VoidCallback onToggle;
+  final Widget? valueLabel;
+
+  const SettingsToggleCard({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onToggle,
+    this.valueLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.primaryColor;
+    final valueColor = primary;
+
+    return SettingsCardShell(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onToggle,
+          child: SizedBox.expand(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 36, color: primary),
+                const SizedBox(height: 14),
+                Text(
+                  label,
+                  style: AppTextStyles.body.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: valueColor,
+                    letterSpacing: 2,
+                  ),
+                  child: valueLabel ?? Text(value ? 'ON' : 'OFF'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
