@@ -23,14 +23,13 @@ class _EcuConnexionPage extends StatelessWidget {
       builder: (context, provider, _) {
         final connected = provider.currentData.connected;
         final color = connected
-            ? Colors.green
+            ? Theme.of(context).colorScheme.primary
             : Theme.of(context).colorScheme.error;
         return SettingsInfoCard(
           icon: connected ? Icons.link_rounded : Icons.link_off_rounded,
           label: 'Connecté',
           value: connected ? 'Oui' : 'Non',
           iconColor: color,
-          valueColor: color,
         );
       },
     );
