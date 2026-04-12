@@ -5,9 +5,6 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   static const String mgLogoAssetPath = 'assets/images/mg_logo.png';
 
-  // --- ODB Service Settings ---
-  // TODO
-
   // --- UI/Theming Constants ---
   static const double defaultPadding = 16.0;
   static const double defaultRadius = 8.0;

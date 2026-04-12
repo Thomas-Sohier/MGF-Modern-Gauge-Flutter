@@ -31,7 +31,7 @@ class _AnalogClockPainter extends CustomPainter {
 
     // --- Configuration des ombres (utilise le thème) ---
     final shadowPaint = Paint()
-      ..color = (theme.shadowColor ?? Colors.black.withOpacity(0.5))
+      ..color = (theme.shadowColor ?? Colors.black.withAlpha(128))
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
     final shadowOffset = Offset(radius * 0.015, radius * 0.015);
 

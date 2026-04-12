@@ -6,19 +6,21 @@ import 'package:mockito/mockito.dart';
 import 'package:modern_gauge_flutter/app.dart';
 import 'package:modern_gauge_flutter/models/settings_data.dart';
 import 'package:modern_gauge_flutter/providers/app_state_provider.dart';
-import 'package:modern_gauge_flutter/providers/dial_provider.dart';
 import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/services/mpris_listener.dart';
-import 'package:modern_gauge_flutter/services/odb_service.dart';
 
 import 'widget_test.mocks.dart';
 
-@GenerateMocks([SettingsProvider, OdbService, DialProvider, MprisListener, AppStateProvider, GoRouter, EcuProvider])
+@GenerateMocks([
+  SettingsProvider,
+  MprisListener,
+  AppStateProvider,
+  GoRouter,
+  EcuProvider,
+])
 void main() {
   late MockSettingsProvider mockSettingsProvider;
-  late MockOdbService mockOdbService;
-  late MockDialProvider mockDialProvider;
   late MockMprisListener mockMprisListener;
   late MockAppStateProvider mockAppStateProvider;
   late MockGoRouter mockGoRouter;
@@ -27,57 +29,59 @@ void main() {
   setUp(() {
     // Initialisez les mocks avant chaque test
     mockSettingsProvider = MockSettingsProvider();
-    mockOdbService = MockOdbService();
-    mockDialProvider = MockDialProvider();
     mockMprisListener = MockMprisListener();
     mockAppStateProvider = MockAppStateProvider();
     mockGoRouter = MockGoRouter();
     mockEcuProvider = MockEcuProvider();
   });
 
-  testWidgets('App should display with light theme based on mock provider', skip: true, (WidgetTester tester) async {
-    // Arrange
-    final mockSettings = SettingsData(themeMode: ThemeMode.light);
-    when(mockSettingsProvider.settings).thenReturn(mockSettings);
+  testWidgets(
+    'App should display with light theme based on mock provider',
+    skip: true,
+    (WidgetTester tester) async {
+      // Arrange
+      final mockSettings = SettingsData(themeMode: ThemeMode.light);
+      when(mockSettingsProvider.settings).thenReturn(mockSettings);
 
-    // Act
-    await tester.pumpWidget(
-      App(
-        settingsProvider: mockSettingsProvider,
-        odbService: mockOdbService,
-        appStateProvider: mockAppStateProvider,
-        mprisListener: mockMprisListener,
-        dialProvider: mockDialProvider,
-        router: mockGoRouter,
-        ecuProvider: mockEcuProvider,
-      ),
-    );
+      // Act
+      await tester.pumpWidget(
+        App(
+          settingsProvider: mockSettingsProvider,
+          appStateProvider: mockAppStateProvider,
+          mprisListener: mockMprisListener,
+          router: mockGoRouter,
+          ecuProvider: mockEcuProvider,
+        ),
+      );
 
-    // Assert
-    final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
-    expect(materialApp.themeMode, ThemeMode.light);
-  });
+      // Assert
+      final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
+      expect(materialApp.themeMode, ThemeMode.light);
+    },
+  );
 
-  testWidgets('App should display with dark theme based on mock provider', skip: true, (WidgetTester tester) async {
-    // Arrange
-    final mockSettings = SettingsData(themeMode: ThemeMode.dark);
-    when(mockSettingsProvider.settings).thenReturn(mockSettings);
+  testWidgets(
+    'App should display with dark theme based on mock provider',
+    skip: true,
+    (WidgetTester tester) async {
+      // Arrange
+      final mockSettings = SettingsData(themeMode: ThemeMode.dark);
+      when(mockSettingsProvider.settings).thenReturn(mockSettings);
 
-    // Act
-    await tester.pumpWidget(
-      App(
-        settingsProvider: mockSettingsProvider,
-        odbService: mockOdbService,
-        appStateProvider: mockAppStateProvider,
-        mprisListener: mockMprisListener,
-        dialProvider: mockDialProvider,
-        router: mockGoRouter,
-        ecuProvider: mockEcuProvider,
-      ),
-    );
+      // Act
+      await tester.pumpWidget(
+        App(
+          settingsProvider: mockSettingsProvider,
+          appStateProvider: mockAppStateProvider,
+          mprisListener: mockMprisListener,
+          router: mockGoRouter,
+          ecuProvider: mockEcuProvider,
+        ),
+      );
 
-    // Assert
-    final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
-    expect(materialApp.themeMode, ThemeMode.dark);
-  });
+      // Assert
+      final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
+      expect(materialApp.themeMode, ThemeMode.dark);
+    },
+  );
 }

@@ -51,7 +51,7 @@ class SettingsButtonWidget extends StatelessWidget {
           shape: BoxShape.circle, // Make it circular
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withAlpha(128),
               blurRadius: 5,
               offset: const Offset(0, 3),
             ),
