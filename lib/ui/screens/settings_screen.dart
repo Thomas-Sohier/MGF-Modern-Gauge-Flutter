@@ -48,6 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late PageController _pageController;
   late List<Widget> _pages;
   int _page = 0;
+  int _rootPage = 0; // position mémorisée de la page racine
   _Category? _category;
 
   @override
@@ -74,6 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       .toList();
 
   void _enterCategory(_Category category) {
+    _rootPage = _page; // mémorise la position avant d'entrer dans la catégorie
     _pageController.dispose();
     _pageController = PageController();
     setState(() {
@@ -85,10 +87,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _backToRoot() {
     _pageController.dispose();
-    _pageController = PageController();
+    _pageController = PageController(initialPage: _rootPage);
     setState(() {
       _category = null;
-      _page = 0;
+      _page = _rootPage;
       _pages = _buildRootPages();
     });
   }
