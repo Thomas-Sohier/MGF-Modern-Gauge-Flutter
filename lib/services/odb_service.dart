@@ -11,6 +11,7 @@ class OdbService {
   final _controller = StreamController<DialData>.broadcast();
   final _statusController = StreamController<OdbConnectionStatus>.broadcast();
   StreamSubscription<EcuInfos>? _ecuSubscription;
+  StreamSubscription<bool>? _connectionSubscription;
   bool _isServiceRunning = false;
 
   /// Le flux de données auquel les autres parties de l'app peuvent s'abonner.
@@ -28,6 +29,15 @@ class OdbService {
       _processEcuInfos(ecuInfos);
     });
 
+    // Passer en déconnecté dès que le WebSocket se ferme ou rencontre une erreur,
+    // sans attendre le prochain message de données.
+    _connectionSubscription = _ecuService.connectionStream.listen((connected) {
+      if (!connected) {
+        _controller.add(DialData());
+        _statusController.add(OdbConnectionStatus.disconnected);
+      }
+    });
+
     LogService.info('[OdbService] - initialized and listening to EcuService');
   }
 
@@ -35,6 +45,8 @@ class OdbService {
     if (!_isServiceRunning) return;
     _ecuSubscription?.cancel();
     _ecuSubscription = null;
+    _connectionSubscription?.cancel();
+    _connectionSubscription = null;
     _isServiceRunning = false;
     _statusController.add(OdbConnectionStatus.disconnected);
     LogService.info('[OdbService] - stopped');

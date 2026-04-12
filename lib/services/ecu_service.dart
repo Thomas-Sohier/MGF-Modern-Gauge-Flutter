@@ -13,8 +13,13 @@ class EcuService {
   WebSocketChannel? _channel;
   final StreamController<EcuInfos> _dataController =
       StreamController<EcuInfos>.broadcast();
+  final StreamController<bool> _connectionController =
+      StreamController<bool>.broadcast();
 
   Stream<EcuInfos> get dataStream => _dataController.stream;
+
+  /// Émet `true` quand la connexion WebSocket est établie, `false` à la fermeture.
+  Stream<bool> get connectionStream => _connectionController.stream;
 
   EcuService({
     this.baseUrl = 'http://localhost:8080',
@@ -121,12 +126,14 @@ class EcuService {
       onError: (error) {
         LogService.error('EcuService: WebSocket error: $error');
         _isConnected = false;
+        _connectionController.add(false);
         _closeCurrentConnection();
         _scheduleReconnect();
       },
       onDone: () {
         LogService.info('EcuService: WebSocket connection closed');
         _isConnected = false;
+        _connectionController.add(false);
         _closeCurrentConnection();
         _scheduleReconnect();
       },
@@ -136,6 +143,7 @@ class EcuService {
     // Initial request for data (Go agent expects "." to start session)
     _safeSend('.');
     _isConnected = true;
+    _connectionController.add(true);
 
     // Periodically send "." to keep data flowing
     _periodicTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
@@ -186,5 +194,6 @@ class EcuService {
     _reconnectTimer = null;
     _closeCurrentConnection();
     _dataController.close();
+    _connectionController.close();
   }
 }
