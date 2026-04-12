@@ -17,13 +17,14 @@ class MetricDef {
   final String? unit;
   final double maxValue;
   final double? dangerThreshold;
-  final double Function(EcuData?) getValue;
+  final double Function(EcuInfos?) getValue;
 
   /// Formatage personnalisé de la valeur. Si null, arrondi à l'entier.
   final String Function(double)? format;
 
   /// Icône optionnelle affichée dans l'indicateur du bas.
-  final IconData? icon;
+  /// Fonction pour permettre une icône dynamique selon les données ECU.
+  final IconData Function(EcuInfos?)? icon;
 
   /// Action optionnelle au tap sur l'indicateur du bas.
   final void Function(BuildContext)? onTap;
@@ -42,7 +43,7 @@ class MetricDef {
   /// Bouton d'action sans valeur, non sélectionnable comme métrique principale.
   const MetricDef.action({
     required this.label,
-    required this.icon,
+    required IconData Function(EcuInfos?) this.icon,
     required this.onTap,
   }) : unit = null,
        maxValue = 0,
@@ -50,7 +51,7 @@ class MetricDef {
        dangerThreshold = null,
        format = null;
 
-  static double _zeroValue(EcuData? _) => 0;
+  static double _zeroValue(EcuInfos? _) => 0;
 
   bool get isAction => maxValue == 0 && getValue == _zeroValue;
 
@@ -128,9 +129,9 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
       behavior: HitTestBehavior.opaque,
       child: Consumer<EcuProvider>(
         builder: (context, ecu, _) {
-          final data = ecu.currentData.ecuData;
+          final ecuInfos = ecu.currentData;
           final primary = widget.metrics[_primaryIndex];
-          final primaryValue = primary.getValue(data);
+          final primaryValue = primary.getValue(ecuInfos);
 
           return DigitalDial(
             value: primaryValue,
@@ -149,7 +150,8 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
                 .map(
                   (e) => _BottomIndicator(
                     metric: e.value,
-                    value: e.value.getValue(data),
+                    data: ecuInfos,
+                    value: e.value.getValue(ecuInfos),
                     isPrimary: !e.value.isAction && e.key == _primaryIndex,
                   ),
                 )
@@ -221,11 +223,13 @@ class _PrimaryDisplay extends StatelessWidget {
 
 class _BottomIndicator extends StatelessWidget {
   final MetricDef metric;
+  final EcuInfos? data;
   final double value;
   final bool isPrimary;
 
   const _BottomIndicator({
     required this.metric,
+    required this.data,
     required this.value,
     required this.isPrimary,
   });
@@ -239,6 +243,8 @@ class _BottomIndicator extends StatelessWidget {
         ? gaugeTheme.activeColor!
         : cs.onSurface.withValues(alpha: 0.85);
 
+    final iconData = metric.icon?.call(data);
+
     final content = SizedBox(
       width: 90,
       height: 90,
@@ -246,8 +252,8 @@ class _BottomIndicator extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (metric.icon != null) ...[
-            Icon(metric.icon, size: 28, color: valueColor),
+          if (iconData != null) ...[
+            Icon(iconData, size: 28, color: valueColor),
             const SizedBox(height: 2),
           ],
           if (!metric.isAction)
@@ -267,8 +273,7 @@ class _BottomIndicator extends StatelessWidget {
                   ),
               ],
             ),
-          if (metric.icon == null && !metric.isAction)
-            const SizedBox(height: 2),
+          if (iconData == null && !metric.isAction) const SizedBox(height: 2),
           Text(
             metric.label,
             maxLines: 1,

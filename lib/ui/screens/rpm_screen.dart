@@ -7,43 +7,43 @@ import 'package:provider/provider.dart';
 final _metrics = [
   MetricDef.action(
     label: 'ODB',
-    icon: Icons.link,
+    icon: (infos) => (infos?.connected ?? false) ? Icons.link : Icons.link_off,
     onTap: (context) {
       context.read<EcuProvider>().retryInitialData();
     },
   ),
   MetricDef(
     label: 'RPM',
-    icon: Icons.speed,
+    icon: (_) => Icons.speed,
     unit: '',
     maxValue: 8500,
     dangerThreshold: 7000,
-    getValue: (d) => d?.rpm?.toDouble() ?? 0,
+    getValue: (d) => d?.ecuData?.rpm?.toDouble() ?? 0,
   ),
   MetricDef(
     label: 'LDR',
     unit: '°C',
     dangerThreshold: 150,
     maxValue: 200,
-    icon: Icons.thermostat,
-    getValue: (d) => d?.coolantTemp?.toDouble() ?? 0,
+    icon: (_) => Icons.thermostat,
+    getValue: (d) => d?.ecuData?.coolantTemp?.toDouble() ?? 0,
   ),
   MetricDef(
     label: 'Batterie',
     unit: 'V',
     maxValue: 20,
     dangerThreshold: 16,
-    icon: Icons.electric_car,
+    icon: (_) => Icons.electric_car,
     format: (v) => v.toStringAsFixed(2),
-    getValue: (d) => d?.batteryVoltage?.toDouble() ?? 0,
+    getValue: (d) => d?.ecuData?.batteryVoltage?.toDouble() ?? 0,
   ),
   MetricDef(
     label: 'Huile',
     unit: '°C',
     dangerThreshold: 150,
     maxValue: 200,
-    icon: Icons.oil_barrel,
-    getValue: (d) => d?.oilTemp?.toDouble() ?? 0,
+    icon: (_) => Icons.oil_barrel,
+    getValue: (d) => d?.ecuData?.oilTemp?.toDouble() ?? 0,
   ),
 ];
 

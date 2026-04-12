@@ -7,33 +7,33 @@ final _metrics = [
     label: 'Avance',
     unit: '°',
     maxValue: 50,
-    getValue: (d) => d?.ignitionAdvance?.toDouble() ?? 0,
+    getValue: (d) => d?.ecuData?.ignitionAdvance?.toDouble() ?? 0,
   ),
   MetricDef(
     label: 'Offset avance',
     unit: '°',
     maxValue: 20,
-    getValue: (d) => d?.ignitionAdvanceOffset?.toDouble() ?? 0,
+    getValue: (d) => d?.ecuData?.ignitionAdvanceOffset?.toDouble() ?? 0,
   ),
   MetricDef(
     label: 'Bobine 1',
     unit: 'ms',
     maxValue: 5,
     format: (v) => v.toStringAsFixed(2),
-    getValue: (d) => d?.coil1ChargeTime?.toDouble() ?? 0,
+    getValue: (d) => d?.ecuData?.coil1ChargeTime?.toDouble() ?? 0,
   ),
   MetricDef(
     label: 'Bobine 2',
     unit: 'ms',
     maxValue: 5,
     format: (v) => v.toStringAsFixed(2),
-    getValue: (d) => d?.coil2ChargeTime?.toDouble() ?? 0,
+    getValue: (d) => d?.ecuData?.coil2ChargeTime?.toDouble() ?? 0,
   ),
   MetricDef(
     label: 'Durée bobine',
     unit: 'µs',
     maxValue: 5000,
-    getValue: (d) => d?.coilTimeMicroseconds?.toDouble() ?? 0,
+    getValue: (d) => d?.ecuData?.coilTimeMicroseconds?.toDouble() ?? 0,
   ),
 ];
 
@@ -42,7 +42,7 @@ class AllumageScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MultiMetricScreen(
-        routeSegment: RouteNames.allumageRoute,
-        metrics: _metrics,
-      );
+    routeSegment: RouteNames.allumageRoute,
+    metrics: _metrics,
+  );
 }
