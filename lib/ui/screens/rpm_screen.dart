@@ -85,6 +85,8 @@ class _RpmScreenState extends State<RpmScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final primary = _metrics[_primaryIndex];
+
     return GestureDetector(
       onTapUp: (d) {
         final half = MediaQuery.of(context).size.width / 2;
@@ -95,56 +97,52 @@ class _RpmScreenState extends State<RpmScreen> {
         _navigate(d.primaryVelocity! < 0);
       },
       behavior: HitTestBehavior.opaque,
-      child: Consumer<EcuProvider>(
-        builder: (context, ecu, _) {
-          final ecuInfos = ecu.currentData;
-          final primary = _metrics[_primaryIndex];
-          final primaryValue = primary.getValue(ecuInfos);
-          final throttle = ecuInfos.ecuData?.throttleAngle?.toDouble() ?? 0;
-
-          return Stack(
-            children: [
-              // Jauge throttle (extérieure, fine, 1 segment)
-              Positioned.fill(
-                child: Padding(
-                  padding: const EdgeInsets.all(64),
-                  child: DigitalDial(
-                    value: throttle,
-                    maxValue: 100,
-                    numberOfSegments: 1,
-                    segmentHeight: 12,
-                  ),
+      child: Stack(
+        children: [
+          // Throttle dial — rebuilds only when throttleAngle changes.
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.all(64),
+              child: Selector<EcuProvider, double>(
+                selector: (_, ecu) =>
+                    ecu.currentData.ecuData?.throttleAngle?.toDouble() ?? 0,
+                builder: (_, throttle, __) => DigitalDial(
+                  value: throttle,
+                  maxValue: 100,
+                  numberOfSegments: 1,
+                  segmentHeight: 12,
                 ),
               ),
-              // Jauge principale + layout
-              Positioned.fill(
-                child: GaugeLayout(
-                  value: primaryValue,
-                  maxValue: primary.maxValue,
-                  dangerThreshold: primary.dangerThreshold,
-                  bottomChildren: _metrics
-                      .asMap()
-                      .entries
-                      .map(
-                        (e) => MetricIndicator(
-                          metric: e.value,
-                          data: ecuInfos,
-                          value: e.value.getValue(ecuInfos),
-                          isPrimary:
-                              !e.value.isAction && e.key == _primaryIndex,
-                        ),
-                      )
-                      .toList(),
-                  child: MetricPrimaryDisplay(
-                    metric: primary,
-                    value: primaryValue,
-                    onCycle: _cyclePrimary,
-                  ),
+            ),
+          ),
+          // Main gauge — rebuilds only when the primary metric value changes.
+          // MetricIndicator and MetricPrimaryDisplay are self-subscribing.
+          Positioned.fill(
+            child: Selector<EcuProvider, double>(
+              selector: (_, ecu) => primary.getValue(ecu.currentData),
+              builder: (_, primaryValue, __) => GaugeLayout(
+                value: primaryValue,
+                maxValue: primary.maxValue,
+                dangerThreshold: primary.dangerThreshold,
+                bottomChildren: _metrics
+                    .asMap()
+                    .entries
+                    .map(
+                      (e) => MetricIndicator(
+                        metric: e.value,
+                        isPrimary:
+                            !e.value.isAction && e.key == _primaryIndex,
+                      ),
+                    )
+                    .toList(),
+                child: MetricPrimaryDisplay(
+                  metric: primary,
+                  onCycle: _cyclePrimary,
                 ),
               ),
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
