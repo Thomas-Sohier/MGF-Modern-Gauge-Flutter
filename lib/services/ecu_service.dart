@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:isolate';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:modern_gauge_flutter/models/ecu_data.dart';
@@ -42,15 +41,11 @@ class EcuService {
 
   Future<EcuInfos?> fetchInitialData() async {
     try {
-      final url = '$baseUrl/api';
-      final body = await Isolate.run(() async {
-        final response = await http
-            .get(Uri.parse(url))
-            .timeout(const Duration(seconds: 5));
-        return response.statusCode == 200 ? response.body : null;
-      });
-      if (body != null) {
-        return EcuInfos.fromJson(json.decode(body));
+      final response = await http
+          .get(Uri.parse('$baseUrl/api'))
+          .timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        return EcuInfos.fromJson(json.decode(response.body));
       }
     } catch (e) {
       LogService.error('EcuService: Fetch initial data failed: $e');

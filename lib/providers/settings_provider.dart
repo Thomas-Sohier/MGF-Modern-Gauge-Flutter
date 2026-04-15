@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/models/settings_data.dart';
 import 'package:modern_gauge_flutter/services/settings_service.dart';
-// import 'package:modern_gauge_flutter/services/settings_service.dart';
 
 class SettingsProvider with ChangeNotifier {
   SettingsData _settings = SettingsData();
@@ -10,23 +9,19 @@ class SettingsProvider with ChangeNotifier {
 
   SettingsProvider() : _settings = SettingsService().loadSettings();
 
-  void updateSettings(SettingsData newSettings) {
-    _settings = newSettings;
+  void _update(SettingsData s) {
+    _settings = s;
     notifyListeners();
-    SettingsService().saveSettings(_settings);
+    SettingsService().saveSettings(s);
   }
 
-  void setBackgroundImage(String? path) {
-    _settings = _settings.copyWith(backgroundImagePath: path);
-    notifyListeners();
-    SettingsService().saveSettings(_settings);
-  }
+  void updateSettings(SettingsData newSettings) => _update(newSettings);
 
-  void setThemeMode(ThemeMode mode) {
-    _settings = _settings.copyWith(themeMode: mode);
-    notifyListeners();
-    SettingsService().saveSettings(_settings);
-  }
+  void setBackgroundImage(String? path) =>
+      _update(_settings.copyWith(backgroundImagePath: path));
+
+  void setThemeMode(ThemeMode mode) =>
+      _update(_settings.copyWith(themeMode: mode));
 
   void toggleScreen(String routeSegment) {
     final current = Set<String>.from(_settings.enabledScreens);
@@ -35,14 +30,8 @@ class SettingsProvider with ChangeNotifier {
     } else {
       current.add(routeSegment);
     }
-    _settings = _settings.copyWith(enabledScreens: current);
-    notifyListeners();
-    SettingsService().saveSettings(_settings);
+    _update(_settings.copyWith(enabledScreens: current));
   }
 
-  void resetSettings() {
-    _settings = SettingsData();
-    notifyListeners();
-    SettingsService().saveSettings(_settings);
-  }
+  void resetSettings() => _update(SettingsData());
 }

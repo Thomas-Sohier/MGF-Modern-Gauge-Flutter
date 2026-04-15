@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dbus/dbus.dart';
@@ -18,18 +17,14 @@ class MediaInfo {
 
 enum PlaybackStatus { playing, paused, stopped }
 
-class MprisListener implements MprisListenerBase {
+class MprisListener with ChangeNotifier implements MprisListenerBase {
   static final _mprisPath = DBusObjectPath('/org/mpris/MediaPlayer2');
   static const _playerInterface = 'org.mpris.MediaPlayer2.Player';
   static const _mprisPrefix = 'org.mpris.MediaPlayer2.';
 
-  // --- NOUVELLE GESTION DE LA POSITION ---
-  // Intervalle pour le timer interne qui met à jour la position pour l'UI.
-  // Plus court pour une animation plus fluide, sans interroger D-Bus.
   static const _positionUpdateInterval = Duration(milliseconds: 100);
 
   late final DBusClient _client;
-  final ChangeNotifier _changeNotifier = ChangeNotifier();
 
   DBusRemoteObject? _playerObject;
   String? _currentPlayerName;
@@ -37,7 +32,6 @@ class MprisListener implements MprisListenerBase {
   StreamSubscription? _propertiesSubscription;
   StreamSubscription<DBusNameOwnerChangedEvent>? _nameOwnerChangedSubscription;
 
-  // Timer interne pour incrémenter la position pendant la lecture.
   Timer? _positionUpdateTimer;
 
   MediaInfo? _mediaInfo;
@@ -98,8 +92,10 @@ class MprisListener implements MprisListenerBase {
   Future<void> _scanForInitialPlayer() async {
     try {
       final names = await _client.listNames();
-      final playerOwner = names.firstWhere((name) => name.startsWith(_mprisPrefix), orElse: () => '');
-
+      final playerOwner = names.firstWhere(
+        (name) => name.startsWith(_mprisPrefix),
+        orElse: () => '',
+      );
       if (playerOwner.isNotEmpty) {
         await _connectToPlayer(playerOwner);
       }
@@ -135,12 +131,10 @@ class MprisListener implements MprisListenerBase {
 
       final statusString = properties['PlaybackStatus']?.asString() ?? 'Stopped';
       _playbackStatus = _stringToPlaybackStatus(statusString);
-      log("Initial playback status: ${_playbackStatus.name}");
+      LogService.info("[MprisListener] - Initial playback status: ${_playbackStatus.name}");
 
-      // Synchronise la position une seule fois au démarrage.
       await _syncPosition();
 
-      // Si le lecteur est déjà en cours de lecture, démarre le timer interne.
       if (isPlaying) {
         _startPositionUpdateTimer();
       }
@@ -160,34 +154,28 @@ class MprisListener implements MprisListenerBase {
         LogService.debug("[MprisListener] - propertiesChanged: $props");
         bool needsNotify = false;
 
-        // Gère les changements de métadonnées (changement de piste)
         if (props.containsKey('Metadata')) {
           _updateMetadata(props['Metadata']!.asStringVariantDict());
-          // Réinitialise la position pour la nouvelle piste.
           await _syncPosition();
           needsNotify = true;
         }
 
-        // Gère les mises à jour directes de la position (seek).
         if (props.containsKey('Position')) {
           _updatePosition(props['Position']!.asInt64());
           needsNotify = true;
         }
 
-        // Gère les changements de statut (play/pause/stop).
         final newStatusString = props['PlaybackStatus']?.asString();
         if (newStatusString != null) {
           final newStatus = _stringToPlaybackStatus(newStatusString);
           if (_playbackStatus != newStatus) {
             _playbackStatus = newStatus;
-            log("Playback status: ${_playbackStatus.name}");
+            LogService.info("[MprisListener] - Playback status: ${_playbackStatus.name}");
 
             if (isPlaying) {
-              // Si la lecture démarre, synchronise la position et lance le timer interne.
               await _syncPosition();
               _startPositionUpdateTimer();
             } else {
-              // Si la lecture s'arrête, stoppe le timer et synchronise la position finale.
               _stopPositionUpdateTimer();
               await _syncPosition();
             }
@@ -206,7 +194,6 @@ class MprisListener implements MprisListenerBase {
     );
   }
 
-  // Synchronise la position en interrogeant D-Bus. À utiliser ponctuellement.
   Future<void> _syncPosition() async {
     if (_playerObject == null) return;
     try {
@@ -217,12 +204,10 @@ class MprisListener implements MprisListenerBase {
     }
   }
 
-  // Démarre le timer interne pour incrémenter la position localement.
   void _startPositionUpdateTimer() {
-    _stopPositionUpdateTimer(); // S'assure qu'un seul timer tourne.
+    _stopPositionUpdateTimer();
     _positionUpdateTimer = Timer.periodic(_positionUpdateInterval, (_) {
       _position += _positionUpdateInterval;
-      // Empêche la position de dépasser la durée totale.
       final duration = _mediaInfo?.duration ?? Duration.zero;
       if (duration > Duration.zero && _position > duration) {
         _position = duration;
@@ -232,7 +217,6 @@ class MprisListener implements MprisListenerBase {
     });
   }
 
-  // Arrête le timer interne.
   void _stopPositionUpdateTimer() {
     _positionUpdateTimer?.cancel();
     _positionUpdateTimer = null;
@@ -251,7 +235,7 @@ class MprisListener implements MprisListenerBase {
       await _propertiesSubscription?.cancel();
       _propertiesSubscription = null;
 
-      _stopPositionUpdateTimer(); // Stoppe le timer interne.
+      _stopPositionUpdateTimer();
 
       _playerObject = null;
       _currentPlayerName = null;
@@ -275,7 +259,9 @@ class MprisListener implements MprisListenerBase {
         title: metadata['xesam:title']?.asString(),
         artist: metadata['xesam:artist']?.asStringArray().join(', '),
         album: metadata['xesam:album']?.asString(),
-        artUrl: artUrl?.startsWith('file://') ?? false ? Uri.decodeComponent(artUrl!.substring(7)) : artUrl,
+        artUrl: artUrl?.startsWith('file://') ?? false
+            ? Uri.decodeComponent(artUrl!.substring(7))
+            : artUrl,
         duration: Duration(microseconds: durationInMicroseconds),
       );
 
@@ -290,23 +276,11 @@ class MprisListener implements MprisListenerBase {
   }
 
   @override
-  void addListener(VoidCallback listener) => _changeNotifier.addListener(listener);
-
-  @override
-  void removeListener(VoidCallback listener) => _changeNotifier.removeListener(listener);
-
-  @override
-  void notifyListeners() => _changeNotifier.notifyListeners();
-
-  @override
-  bool get hasListeners => _changeNotifier.hasListeners;
-
-  @override
   Future<void> dispose() async {
     try {
       await _nameOwnerChangedSubscription?.cancel();
       await _disconnectAndReset(notify: false);
-      _changeNotifier.dispose();
+      super.dispose();
       await _client.close();
     } catch (e) {
       LogService.debug("[MprisListener] - dispose: $e");
