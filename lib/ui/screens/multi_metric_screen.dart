@@ -61,11 +61,6 @@ class MetricDef {
 
 // ── Écran générique multi-métriques ───────────────────────────────────────
 
-/// Écran avec une métrique principale affichée dans le DigitalDial.
-/// • Tap sur la valeur centrale  → cycle vers la métrique suivante.
-/// • Tap gauche / droite (hors centre) → écran précédent / suivant.
-/// • Swipe horizontal → navigation écrans.
-/// Toutes les métriques sont aussi visibles en bas, la principale est mise en évidence.
 class MultiMetricScreen extends StatefulWidget {
   final String routeSegment;
   final List<MetricDef> metrics;
@@ -83,7 +78,6 @@ class MultiMetricScreen extends StatefulWidget {
 class _MultiMetricScreenState extends State<MultiMetricScreen> {
   late int _primaryIndex;
 
-  /// Indices des métriques affichables (exclut les boutons d'action).
   List<int> get _displayableIndices => [
     for (int i = 0; i < widget.metrics.length; i++)
       if (!widget.metrics[i].isAction) i,
@@ -114,10 +108,9 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final primary = widget.metrics[_primaryIndex];
+
     return GestureDetector(
-      // Tap gauche < 50% → précédent, droit > 50% → suivant.
-      // Le GestureDetector interne (MetricPrimaryDisplay) gagne l'arène pour les taps
-      // sur la zone centrale, donc onTapUp ne se déclenche pas sur le centre.
       onTapUp: (d) {
         final half = MediaQuery.of(context).size.width / 2;
         _navigate(d.globalPosition.dx >= half);
@@ -127,12 +120,12 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
         _navigate(d.primaryVelocity! < 0);
       },
       behavior: HitTestBehavior.opaque,
-      child: Consumer<EcuProvider>(
-        builder: (context, ecu, _) {
-          final ecuInfos = ecu.currentData;
-          final primary = widget.metrics[_primaryIndex];
-          final primaryValue = primary.getValue(ecuInfos);
-
+      // Selector on primary value only — rebuilds GaugeLayout when it changes.
+      // MetricIndicator and MetricPrimaryDisplay are self-subscribing and will
+      // only rebuild when their own specific field changes.
+      child: Selector<EcuProvider, double>(
+        selector: (_, ecu) => primary.getValue(ecu.currentData),
+        builder: (context, primaryValue, _) {
           return GaugeLayout(
             value: primaryValue,
             maxValue: primary.maxValue,
@@ -143,15 +136,12 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
                 .map(
                   (e) => MetricIndicator(
                     metric: e.value,
-                    data: ecuInfos,
-                    value: e.value.getValue(ecuInfos),
                     isPrimary: !e.value.isAction && e.key == _primaryIndex,
                   ),
                 )
                 .toList(),
             child: MetricPrimaryDisplay(
               metric: primary,
-              value: primaryValue,
               onCycle: _cyclePrimary,
             ),
           );
@@ -163,135 +153,145 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
 
 // ── Affichage principal (tappable pour cycler) ─────────────────────────────
 
+/// Subscribes only to its own metric value — no rebuild on unrelated field changes.
 class MetricPrimaryDisplay extends StatelessWidget {
   final MetricDef metric;
-  final double value;
   final VoidCallback onCycle;
 
   const MetricPrimaryDisplay({
     super.key,
     required this.metric,
-    required this.value,
     required this.onCycle,
   });
 
   @override
   Widget build(BuildContext context) {
-    final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
-    final isDanger =
-        metric.dangerThreshold != null && value >= metric.dangerThreshold!;
-    final color = isDanger ? gaugeTheme.dangerColor! : gaugeTheme.activeColor!;
+    return Selector<EcuProvider, double>(
+      selector: (_, ecu) => metric.getValue(ecu.currentData),
+      builder: (context, value, _) {
+        final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
+        final isDanger =
+            metric.dangerThreshold != null && value >= metric.dangerThreshold!;
+        final color =
+            isDanger ? gaugeTheme.dangerColor! : gaugeTheme.activeColor!;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(100),
-        onTap: onCycle,
-        child: Column(
-          mainAxisSize: MainAxisSize.max,
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(100),
+            onTap: onCycle,
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
               mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  metric.display(value),
-                  style: AppTextStyles.display(color),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      metric.display(value),
+                      style: AppTextStyles.display(color),
+                    ),
+                    const SizedBox(height: 4),
+                    if (metric.unit != null)
+                      Text(metric.unit!, style: AppTextStyles.small),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                if (metric.unit != null)
-                  Text(metric.unit!, style: AppTextStyles.small),
+                Text(metric.label, style: AppTextStyles.unit(color)),
               ],
             ),
-            Text(metric.label, style: AppTextStyles.unit(color)),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
 
 // ── Indicateur bas (toutes les métriques, primaire mis en évidence) ────────
 
+/// Subscribes only to its specific metric value and icon — no rebuild on
+/// unrelated field changes.
 class MetricIndicator extends StatelessWidget {
   final MetricDef metric;
-  final EcuInfos? data;
-  final double value;
   final bool isPrimary;
 
   const MetricIndicator({
     super.key,
     required this.metric,
-    required this.data,
-    required this.value,
     required this.isPrimary,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
-
-    final valueColor = isPrimary
-        ? gaugeTheme.activeColor!
-        : cs.onSurface.withValues(alpha: 0.85);
-
-    final iconData = metric.icon?.call(data);
-
-    final content = SizedBox(
-      width: 90,
-      height: 90,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          if (iconData != null) ...[
-            Icon(iconData, size: 28, color: valueColor),
-            const SizedBox(height: 2),
-          ],
-          if (!metric.isAction)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  metric.display(value),
-                  style: AppTextStyles.label.copyWith(color: valueColor),
-                ),
-                if (metric.unit != null)
-                  Text(
-                    metric.unit!,
-                    maxLines: 1,
-                    style: AppTextStyles.label.copyWith(color: valueColor),
-                  ),
-              ],
-            ),
-          if (iconData == null && !metric.isAction) const SizedBox(height: 2),
-          Text(
-            metric.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.label.copyWith(
-              color: valueColor,
-              fontSize: 12,
-            ),
-          ),
-        ],
+    return Selector<EcuProvider, (double, IconData?)>(
+      selector: (_, ecu) => (
+        metric.getValue(ecu.currentData),
+        metric.icon?.call(ecu.currentData),
       ),
-    );
+      builder: (context, selection, _) {
+        final (value, iconData) = selection;
+        final cs = Theme.of(context).colorScheme;
+        final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
 
-    if (metric.onTap != null) {
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(50),
-          onTap: () => metric.onTap!(context),
-          child: content,
-        ),
-      );
-    }
-    return content;
+        final valueColor = isPrimary
+            ? gaugeTheme.activeColor!
+            : cs.onSurface.withValues(alpha: 0.85);
+
+        final content = SizedBox(
+          width: 90,
+          height: 90,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (iconData != null) ...[
+                Icon(iconData, size: 28, color: valueColor),
+                const SizedBox(height: 2),
+              ],
+              if (!metric.isAction)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      metric.display(value),
+                      style: AppTextStyles.label.copyWith(color: valueColor),
+                    ),
+                    if (metric.unit != null)
+                      Text(
+                        metric.unit!,
+                        maxLines: 1,
+                        style: AppTextStyles.label.copyWith(color: valueColor),
+                      ),
+                  ],
+                ),
+              if (iconData == null && !metric.isAction) const SizedBox(height: 2),
+              Text(
+                metric.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.label.copyWith(
+                  color: valueColor,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        );
+
+        if (metric.onTap != null) {
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(50),
+              onTap: () => metric.onTap!(context),
+              child: content,
+            ),
+          );
+        }
+        return content;
+      },
+    );
   }
 }
