@@ -5,7 +5,7 @@ In-car vehicle diagnostic dashboard built with Flutter. Connects to a Go backend
 ## Features
 
 - Animated segmented RPM / temperature / voltage gauges
-- Analog clock (minute-aligned, no unnecessary redraws)
+- Analog clock (minute-aligned, no seconds)
 - Music player integration via Linux MPRIS / D-Bus
 - Settings screen with per-category pages
 - Left/right arrow key navigation between screens
@@ -23,7 +23,7 @@ ECU WebSocket → EcuService → OdbService → Providers → UI
 | Providers | `DialProvider`, `AppStateProvider`, `EcuProvider`, `SettingsProvider`, `MprisProvider` |
 | UI | Screens consume providers via `Selector<>` / `Consumer<>` |
 
-Routing: `go_router` with a `ShellRoute`. Screen order: splash → rpm → clock → music → settings.
+Routing: `go_router` with a `ShellRoute`.
 
 ## Requirements
 
