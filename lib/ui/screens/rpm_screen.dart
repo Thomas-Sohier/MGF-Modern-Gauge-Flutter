@@ -92,11 +92,10 @@ class _RpmScreenState extends State<RpmScreen> {
         final half = MediaQuery.of(context).size.width / 2;
         _navigate(d.globalPosition.dx >= half);
       },
-      onHorizontalDragEnd: (d) {
-        if ((d.primaryVelocity ?? 0).abs() < 100) return;
-        _navigate(d.primaryVelocity! < 0);
-      },
-      behavior: HitTestBehavior.opaque,
+      // deferToChild: outer detector only joins the gesture arena where a child
+      // passes hit-testing. InkWell children win the arena (innermost processed
+      // first), preventing accidental navigation when tapping interactive widgets.
+      behavior: HitTestBehavior.deferToChild,
       child: Stack(
         children: [
           // Throttle dial — rebuilds only when throttleAngle changes.
