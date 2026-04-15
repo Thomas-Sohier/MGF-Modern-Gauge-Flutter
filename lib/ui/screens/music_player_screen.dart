@@ -360,15 +360,12 @@ class _DynamicColorDialState extends State<_DynamicColorDial> {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size.infinite,
-      painter: MusicDial(
-        progress: widget.progress,
-        foregroundColor: _foregroundColor,
-        backgroundColor: _containerColor.withAlpha(160),
-        sweepFactor: 0.67,
-        strokeWidth: 14,
-      ),
+    return MusicDial(
+      progress: widget.progress,
+      foregroundColor: _foregroundColor,
+      backgroundColor: _containerColor.withAlpha(160),
+      sweepFactor: 0.67,
+      strokeWidth: 14,
     );
   }
 }

@@ -1,11 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
-/// Un CustomPainter qui dessine une jauge circulaire (complète ou partielle).
-///
-/// Il est hautement configurable pour le progrès, les couleurs, l'épaisseur
-/// et l'angle total de la jauge.
-class MusicDial extends CustomPainter {
+/// Jauge circulaire (complète ou partielle) affichant une progression.
+class MusicDial extends StatelessWidget {
   /// La progression actuelle à afficher (de 0.0 à 1.0).
   final double progress;
 
@@ -22,7 +19,8 @@ class MusicDial extends CustomPainter {
   /// 1.0 pour un cercle complet (360°), 0.75 pour un arc de 270°, etc.
   final double sweepFactor;
 
-  MusicDial({
+  const MusicDial({
+    super.key,
     required this.progress,
     required this.backgroundColor,
     required this.foregroundColor,
@@ -31,18 +29,45 @@ class MusicDial extends CustomPainter {
   }) : assert(sweepFactor >= 0.0 && sweepFactor <= 1.0);
 
   @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size.infinite,
+      painter: _MusicDialPainter(
+        progress: progress,
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        strokeWidth: strokeWidth,
+        sweepFactor: sweepFactor,
+      ),
+    );
+  }
+}
+
+class _MusicDialPainter extends CustomPainter {
+  final double progress;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final double strokeWidth;
+  final double sweepFactor;
+
+  _MusicDialPainter({
+    required this.progress,
+    required this.backgroundColor,
+    required this.foregroundColor,
+    required this.strokeWidth,
+    required this.sweepFactor,
+  });
+
+  @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // --- Configuration des angles ---
     final totalSweepAngle = 2 * pi * sweepFactor;
     final gapAngle = 2 * pi * (1 - sweepFactor);
-    // On centre le "trou" en bas. On commence donc à dessiner après la moitié du trou.
-    // L'angle 0 est à droite (3h), pi/2 est en bas (6h).
+    // Centre le "trou" en bas. L'angle 0 est à droite (3h), pi/2 est en bas (6h).
     final startAngle = (pi / 2) + (gapAngle / 2);
 
-    // --- Configuration des peintures ---
     final backgroundPaint = Paint()
       ..color = backgroundColor
       ..style = PaintingStyle.stroke
@@ -55,24 +80,22 @@ class MusicDial extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    // --- Dessin sur le Canvas ---
     final rect = Rect.fromCircle(
       center: center,
       radius: radius - strokeWidth / 2,
     );
     canvas.drawArc(rect, startAngle, totalSweepAngle, false, backgroundPaint);
-    final progressSweepAngle = totalSweepAngle * progress;
     canvas.drawArc(
       rect,
       startAngle,
-      progressSweepAngle,
+      totalSweepAngle * progress,
       false,
       foregroundPaint,
     );
   }
 
   @override
-  bool shouldRepaint(covariant MusicDial oldDelegate) {
+  bool shouldRepaint(covariant _MusicDialPainter oldDelegate) {
     return progress != oldDelegate.progress ||
         backgroundColor != oldDelegate.backgroundColor ||
         foregroundColor != oldDelegate.foregroundColor ||
