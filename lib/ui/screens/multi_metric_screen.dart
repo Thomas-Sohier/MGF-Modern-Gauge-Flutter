@@ -7,6 +7,7 @@ import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
+import 'package:modern_gauge_flutter/ui/widgets/digital_dial.dart';
 import 'package:modern_gauge_flutter/ui/widgets/gauge_layout.dart';
 import 'package:provider/provider.dart';
 
@@ -119,29 +120,31 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
       // passes hit-testing. InkWell children win the arena (innermost processed
       // first), preventing accidental navigation when tapping interactive widgets.
       behavior: HitTestBehavior.deferToChild,
-      child: Selector<EcuProvider, double>(
-        selector: (_, ecu) => primary.getValue(ecu.currentData),
-        builder: (context, primaryValue, _) {
-          return GaugeLayout(
+      child: GaugeLayout(
+        // Selector isolated inside backgroundDial — GaugeLayout itself never
+        // rebuilds on value changes, only DigitalDial does.
+        backgroundDial: Selector<EcuProvider, double>(
+          selector: (_, ecu) => primary.getValue(ecu.currentData),
+          builder: (_, primaryValue, __) => DigitalDial(
             value: primaryValue,
             maxValue: primary.maxValue,
             dangerThreshold: primary.dangerThreshold,
-            bottomChildren: widget.metrics
-                .asMap()
-                .entries
-                .map(
-                  (e) => MetricIndicator(
-                    metric: e.value,
-                    isPrimary: !e.value.isAction && e.key == _primaryIndex,
-                  ),
-                )
-                .toList(),
-            child: MetricPrimaryDisplay(
-              metric: primary,
-              onCycle: _cyclePrimary,
-            ),
-          );
-        },
+          ),
+        ),
+        bottomChildren: widget.metrics
+            .asMap()
+            .entries
+            .map(
+              (e) => MetricIndicator(
+                metric: e.value,
+                isPrimary: !e.value.isAction && e.key == _primaryIndex,
+              ),
+            )
+            .toList(),
+        child: MetricPrimaryDisplay(
+          metric: primary,
+          onCycle: _cyclePrimary,
+        ),
       ),
     );
   }

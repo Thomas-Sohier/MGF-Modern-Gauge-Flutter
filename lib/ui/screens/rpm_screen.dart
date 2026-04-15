@@ -114,30 +114,31 @@ class _RpmScreenState extends State<RpmScreen> {
               ),
             ),
           ),
-          // Main gauge — rebuilds only when the primary metric value changes.
-          // MetricIndicator and MetricPrimaryDisplay are self-subscribing.
+          // Main gauge — GaugeLayout never rebuilds on value changes.
+          // Only DigitalDial (inside backgroundDial) rebuilds via its Selector.
           Positioned.fill(
-            child: Selector<EcuProvider, double>(
-              selector: (_, ecu) => primary.getValue(ecu.currentData),
-              builder: (_, primaryValue, __) => GaugeLayout(
-                value: primaryValue,
-                maxValue: primary.maxValue,
-                dangerThreshold: primary.dangerThreshold,
-                bottomChildren: _metrics
-                    .asMap()
-                    .entries
-                    .map(
-                      (e) => MetricIndicator(
-                        metric: e.value,
-                        isPrimary:
-                            !e.value.isAction && e.key == _primaryIndex,
-                      ),
-                    )
-                    .toList(),
-                child: MetricPrimaryDisplay(
-                  metric: primary,
-                  onCycle: _cyclePrimary,
+            child: GaugeLayout(
+              backgroundDial: Selector<EcuProvider, double>(
+                selector: (_, ecu) => primary.getValue(ecu.currentData),
+                builder: (_, primaryValue, __) => DigitalDial(
+                  value: primaryValue,
+                  maxValue: primary.maxValue,
+                  dangerThreshold: primary.dangerThreshold,
                 ),
+              ),
+              bottomChildren: _metrics
+                  .asMap()
+                  .entries
+                  .map(
+                    (e) => MetricIndicator(
+                      metric: e.value,
+                      isPrimary: !e.value.isAction && e.key == _primaryIndex,
+                    ),
+                  )
+                  .toList(),
+              child: MetricPrimaryDisplay(
+                metric: primary,
+                onCycle: _cyclePrimary,
               ),
             ),
           ),

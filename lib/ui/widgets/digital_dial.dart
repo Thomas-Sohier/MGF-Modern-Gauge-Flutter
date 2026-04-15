@@ -3,6 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
 
 /// Jauge circulaire animée avec segments.
+///
+/// Architecture deux couches:
+/// - [_DialBackgroundPainter] — dessine uniquement les segments inactifs.
+///   Enveloppé dans un [RepaintBoundary] : rasterisé en texture GPU et jamais
+///   repeint entre deux changements de valeur ou de thème.
+/// - [_DialActivePainter] — dessine uniquement les segments actifs/en cours.
+///   Utilise l'animation comme notifier de repaint au niveau RenderObject ;
+///   paint() est appelé à chaque tick sans rebuild de widget.
+///
+/// [build] n'est appelé qu'à 10 Hz (changement de valeur via Selector).
+/// Le [Tween] et la [CurvedAnimation] sont créés une seule fois dans initState
+/// et mutés dans didUpdateWidget — zéro allocation par tick d'animation.
 class DigitalDial extends StatefulWidget {
   final double value;
   final double maxValue;
@@ -35,8 +47,10 @@ class DigitalDial extends StatefulWidget {
 
 class _DigitalDialState extends State<DigitalDial>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
+  late final AnimationController _controller;
+  late final Tween<double> _tween;
+  late final CurvedAnimation _curvedAnimation;
+  late final Animation<double> _animation;
 
   @override
   void initState() {
@@ -45,9 +59,12 @@ class _DigitalDialState extends State<DigitalDial>
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    _animation = Tween<double>(begin: 0, end: widget.value).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
+    _tween = Tween<double>(begin: 0, end: widget.value);
+    _curvedAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutCubic,
     );
+    _animation = _tween.animate(_curvedAnimation);
     _controller.forward();
   }
 
@@ -55,17 +72,18 @@ class _DigitalDialState extends State<DigitalDial>
   void didUpdateWidget(DigitalDial oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.value != oldWidget.value) {
-      _animation = Tween<double>(begin: _animation.value, end: widget.value)
-          .animate(
-            CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
-          );
-      _controller.reset();
-      _controller.forward();
+      // Mutate the existing tween in-place — no allocation.
+      _tween.begin = _animation.value;
+      _tween.end = widget.value;
+      _controller
+        ..reset()
+        ..forward();
     }
   }
 
   @override
   void dispose() {
+    _curvedAnimation.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -74,159 +92,238 @@ class _DigitalDialState extends State<DigitalDial>
   Widget build(BuildContext context) {
     final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
 
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return CustomPaint(
-          painter: _DialPainter(
-            value: _animation.value,
+    final activeColor = widget.activeColor ?? gaugeTheme.activeColor!;
+    final inactiveColor = widget.inactiveColor ?? gaugeTheme.inactiveColor!;
+    final dangerColor = widget.dangerColor ?? gaugeTheme.dangerColor!;
+    final dangerInactiveColor =
+        widget.dangerInactiveColor ?? gaugeTheme.dangerInactiveColor!;
+
+    // Two-layer stack:
+    // 1. Background (inactive segments) wrapped in RepaintBoundary — GPU texture,
+    //    only invalidated when static config or theme changes.
+    // 2. Active segments driven by animation notifier at render layer.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        RepaintBoundary(
+          child: CustomPaint(
+            painter: _DialBackgroundPainter(
+              maxValue: widget.maxValue,
+              numberOfSegments: widget.numberOfSegments,
+              segmentHeight: widget.segmentHeight,
+              segmentSpacing: widget.segmentSpacing,
+              inactiveColor: inactiveColor,
+              dangerThreshold: widget.dangerThreshold,
+              dangerInactiveColor: dangerInactiveColor,
+            ),
+          ),
+        ),
+        CustomPaint(
+          painter: _DialActivePainter(
+            animation: _animation,
             maxValue: widget.maxValue,
             numberOfSegments: widget.numberOfSegments,
             segmentHeight: widget.segmentHeight,
             segmentSpacing: widget.segmentSpacing,
-            activeColor: widget.activeColor ?? gaugeTheme.activeColor!,
-            inactiveColor: widget.inactiveColor ?? gaugeTheme.inactiveColor!,
+            activeColor: activeColor,
             dangerThreshold: widget.dangerThreshold,
-            dangerColor: widget.dangerColor ?? gaugeTheme.dangerColor!,
-            dangerInactiveColor:
-                widget.dangerInactiveColor ?? gaugeTheme.dangerInactiveColor!,
+            dangerColor: dangerColor,
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }
 
-class _DialPainter extends CustomPainter {
-  final double value;
+// ── Shared geometry helpers ───────────────────────────────────────────────────
+
+const double _startAngle = math.pi;
+const double _sweepAngle = math.pi;
+
+double _calcGapRadians(double segmentSpacing) =>
+    (segmentSpacing * math.pi) / 180;
+
+double _calcSegmentRadians(double gapInRadians, int numberOfSegments) {
+  final totalGapRadians = gapInRadians * (numberOfSegments - 1);
+  return (_sweepAngle - totalGapRadians) / numberOfSegments;
+}
+
+int _calcDangerSegmentStart(double? dangerThreshold, double maxValue, int n) {
+  if (dangerThreshold == null) return n + 1;
+  return ((dangerThreshold / maxValue) * n).floor();
+}
+
+// ── Background painter (inactive segments only) ───────────────────────────────
+
+/// Draws all segments in their inactive color.
+/// Pre-calculates geometry and [Paint] once at construction.
+/// Wrapped in [RepaintBoundary] by the parent — rasterized as a GPU layer
+/// and never redrawn unless static configuration changes.
+class _DialBackgroundPainter extends CustomPainter {
   final double maxValue;
   final int numberOfSegments;
   final double segmentHeight;
   final double segmentSpacing;
-  final Color activeColor;
-  final Color inactiveColor;
   final double? dangerThreshold;
-  final Color dangerColor;
-  final Color dangerInactiveColor;
 
-  _DialPainter({
-    required this.value,
+  // Pre-computed geometry
+  final double _gapInRadians;
+  final double _segmentRadians;
+  final int _dangerSegmentStart;
+
+  // Pre-allocated Paint objects
+  final Paint _inactivePaint;
+  final Paint _dangerInactivePaint;
+
+  _DialBackgroundPainter({
     required this.maxValue,
     required this.numberOfSegments,
     required this.segmentHeight,
     required this.segmentSpacing,
-    required this.activeColor,
-    required this.inactiveColor,
-    this.dangerThreshold,
-    required this.dangerColor,
-    required this.dangerInactiveColor,
-  });
+    required Color inactiveColor,
+    required this.dangerThreshold,
+    required Color dangerInactiveColor,
+  }) : _gapInRadians = _calcGapRadians(segmentSpacing),
+       _segmentRadians = _calcSegmentRadians(
+         _calcGapRadians(segmentSpacing),
+         numberOfSegments,
+       ),
+       _dangerSegmentStart = _calcDangerSegmentStart(
+         dangerThreshold,
+         maxValue,
+         numberOfSegments,
+       ),
+       _inactivePaint = Paint()
+         ..color = inactiveColor
+         ..style = PaintingStyle.stroke
+         ..strokeWidth = segmentHeight
+         ..strokeCap = StrokeCap.butt,
+       _dangerInactivePaint = Paint()
+         ..color = dangerInactiveColor
+         ..style = PaintingStyle.stroke
+         ..strokeWidth = segmentHeight
+         ..strokeCap = StrokeCap.butt;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - segmentHeight + 10;
-    const startAngle = math.pi;
-    const sweepAngle = math.pi;
+    final rect = Rect.fromCircle(center: center, radius: radius);
 
-    final double gapInRadians = (segmentSpacing * math.pi) / 180;
-    final double totalGapRadians = gapInRadians * (numberOfSegments - 1);
-    final double totalSegmentRadians = sweepAngle - totalGapRadians;
-    final double segmentRadians = totalSegmentRadians / numberOfSegments;
+    for (int i = 0; i < numberOfSegments; i++) {
+      final segStart = _startAngle + i * (_segmentRadians + _gapInRadians);
+      final paint = i >= _dangerSegmentStart
+          ? _dangerInactivePaint
+          : _inactivePaint;
+      canvas.drawArc(rect, segStart, _segmentRadians, false, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DialBackgroundPainter old) =>
+      old.maxValue != maxValue ||
+      old.numberOfSegments != numberOfSegments ||
+      old.segmentHeight != segmentHeight ||
+      old.segmentSpacing != segmentSpacing ||
+      old.dangerThreshold != dangerThreshold ||
+      old._inactivePaint.color != _inactivePaint.color ||
+      old._dangerInactivePaint.color != _dangerInactivePaint.color;
+}
+
+// ── Active painter (progress segments only) ───────────────────────────────────
+
+/// Draws only the active/progress portion of the dial.
+/// [super(repaint: animation)] hooks the animation into the RenderObject:
+/// [paint] is called at each animation tick without any widget rebuild.
+/// Geometry and [Paint] objects are pre-calculated once at construction.
+class _DialActivePainter extends CustomPainter {
+  final Animation<double> animation;
+  final double maxValue;
+  final int numberOfSegments;
+  final double segmentHeight;
+  final double segmentSpacing;
+  final double? dangerThreshold;
+
+  // Pre-computed geometry
+  final double _gapInRadians;
+  final double _segmentRadians;
+  final int _dangerSegmentStart;
+
+  // Pre-allocated Paint objects
+  final Paint _activePaint;
+  final Paint _dangerActivePaint;
+
+  _DialActivePainter({
+    required this.animation,
+    required this.maxValue,
+    required this.numberOfSegments,
+    required this.segmentHeight,
+    required this.segmentSpacing,
+    required Color activeColor,
+    required this.dangerThreshold,
+    required Color dangerColor,
+  }) : _gapInRadians = _calcGapRadians(segmentSpacing),
+       _segmentRadians = _calcSegmentRadians(
+         _calcGapRadians(segmentSpacing),
+         numberOfSegments,
+       ),
+       _dangerSegmentStart = _calcDangerSegmentStart(
+         dangerThreshold,
+         maxValue,
+         numberOfSegments,
+       ),
+       _activePaint = Paint()
+         ..color = activeColor
+         ..style = PaintingStyle.stroke
+         ..strokeWidth = segmentHeight
+         ..strokeCap = StrokeCap.butt,
+       _dangerActivePaint = Paint()
+         ..color = dangerColor
+         ..style = PaintingStyle.stroke
+         ..strokeWidth = segmentHeight
+         ..strokeCap = StrokeCap.butt,
+       super(repaint: animation); // drives repaints at render layer
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Read animated value at paint time — not at build time.
+    final value = animation.value;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - segmentHeight + 10;
+    final rect = Rect.fromCircle(center: center, radius: radius);
 
     final progress = (value / maxValue).clamp(0.0, 1.0);
     final continuousSegments = progress * numberOfSegments;
     final fullSegments = continuousSegments.floor();
-    final partialSegmentProgress = continuousSegments - fullSegments;
+    final partialProgress = continuousSegments - fullSegments;
 
-    final int dangerSegmentStart = dangerThreshold == null
-        ? numberOfSegments + 1
-        : ((dangerThreshold! / maxValue) * numberOfSegments).floor();
-
-    for (int i = 0; i < numberOfSegments; i++) {
-      final currentStartAngle =
-          startAngle + i * (segmentRadians + gapInRadians);
-      final bool isInDangerZone = i >= dangerSegmentStart;
-      final Color currentActiveColor = isInDangerZone
-          ? dangerColor
-          : activeColor;
-      final Color currentInactiveColor = isInDangerZone
-          ? dangerInactiveColor
-          : inactiveColor;
+    for (int i = 0; i <= fullSegments && i < numberOfSegments; i++) {
+      final segStart = _startAngle + i * (_segmentRadians + _gapInRadians);
+      final paint = i >= _dangerSegmentStart
+          ? _dangerActivePaint
+          : _activePaint;
 
       if (i < fullSegments) {
-        _drawSegment(
-          canvas,
-          center,
-          radius,
-          currentStartAngle,
-          segmentRadians,
-          currentActiveColor,
-        );
-      } else if (i == fullSegments) {
-        // Segment partiel : fond inactif + partie active
-        _drawSegment(
-          canvas,
-          center,
-          radius,
-          currentStartAngle,
-          segmentRadians,
-          currentInactiveColor,
-        );
-        _drawSegment(
-          canvas,
-          center,
-          radius,
-          currentStartAngle,
-          segmentRadians * partialSegmentProgress,
-          currentActiveColor,
-        );
+        canvas.drawArc(rect, segStart, _segmentRadians, false, paint);
       } else {
-        _drawSegment(
-          canvas,
-          center,
-          radius,
-          currentStartAngle,
-          segmentRadians,
-          currentInactiveColor,
-        );
+        // Partial segment at the progress boundary.
+        final partial = _segmentRadians * partialProgress;
+        if (partial > 0) {
+          canvas.drawArc(rect, segStart, partial, false, paint);
+        }
       }
     }
   }
 
-  void _drawSegment(
-    Canvas canvas,
-    Offset center,
-    double radius,
-    double startAngle,
-    double sweepAngle,
-    Color color,
-  ) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = segmentHeight
-      ..strokeCap = StrokeCap.butt;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      startAngle,
-      sweepAngle,
-      false,
-      paint,
-    );
-  }
-
   @override
-  bool shouldRepaint(covariant _DialPainter oldDelegate) {
-    return oldDelegate.value != value ||
-        oldDelegate.maxValue != maxValue ||
-        oldDelegate.numberOfSegments != numberOfSegments ||
-        oldDelegate.segmentHeight != segmentHeight ||
-        oldDelegate.segmentSpacing != segmentSpacing ||
-        oldDelegate.activeColor != activeColor ||
-        oldDelegate.inactiveColor != inactiveColor ||
-        oldDelegate.dangerThreshold != dangerThreshold ||
-        oldDelegate.dangerColor != dangerColor ||
-        oldDelegate.dangerInactiveColor != dangerInactiveColor;
-  }
+  bool shouldRepaint(covariant _DialActivePainter old) =>
+      old.animation != animation ||
+      old.maxValue != maxValue ||
+      old.numberOfSegments != numberOfSegments ||
+      old.segmentHeight != segmentHeight ||
+      old.segmentSpacing != segmentSpacing ||
+      old.dangerThreshold != dangerThreshold ||
+      old._activePaint.color != _activePaint.color ||
+      old._dangerActivePaint.color != _dangerActivePaint.color;
 }
