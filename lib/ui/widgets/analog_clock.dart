@@ -151,10 +151,11 @@ class _AnalogClockPainter extends CustomPainter {
 
     // --- 5. Dessin du pivot central (utilise le thème) ---
     final pivotRadius = radius * 0.12;
-    canvas.drawCircle(center, pivotRadius, Paint()..color = Colors.black);
-    canvas.drawCircle(center, pivotRadius * 0.7, Paint()..color = Colors.black);
+    final pivotColor = theme.centerPivotColor ?? Colors.black;
+    canvas.drawCircle(center, pivotRadius, Paint()..color = pivotColor);
+    canvas.drawCircle(center, pivotRadius * 0.7, Paint()..color = pivotColor);
     final ridgesPaint = Paint()
-      ..color = Colors.grey.shade600
+      ..color = theme.centerPivotRidgeColor ?? Colors.grey.shade600
       ..style = PaintingStyle.stroke
       ..strokeWidth = pivotRadius * 0.3;
     for (int i = 0; i < 12; i++) {
@@ -173,6 +174,8 @@ class _AnalogClockPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _AnalogClockPainter oldDelegate) {
-    return dateTime != oldDelegate.dateTime || theme != oldDelegate.theme;
+    return dateTime.hour != oldDelegate.dateTime.hour ||
+        dateTime.minute != oldDelegate.dateTime.minute ||
+        theme != oldDelegate.theme;
   }
 }

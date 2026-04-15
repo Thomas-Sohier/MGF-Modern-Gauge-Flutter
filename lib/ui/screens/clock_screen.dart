@@ -13,7 +13,8 @@ class ClockScreen extends StatefulWidget {
   State<ClockScreen> createState() => _ClockScreenState();
 }
 
-class _ClockScreenState extends State<ClockScreen> with ScreenNavigationMixin<ClockScreen> {
+class _ClockScreenState extends State<ClockScreen>
+    with ScreenNavigationMixin<ClockScreen> {
   @override
   void nextScreen() {
     const currentRoute = RouteNames.dashboardRoute + RouteNames.timeRoute;
@@ -27,23 +28,42 @@ class _ClockScreenState extends State<ClockScreen> with ScreenNavigationMixin<Cl
   }
 
   late DateTime _currentTime;
-  late Timer _timer;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _currentTime = DateTime.now();
-    _timer = Timer.periodic(const Duration(minutes: 1), (timer) {
-      setState(() {
-        _currentTime = DateTime.now();
-      });
-    });
+    _currentTime = _nowTruncatedToMinute();
+    _scheduleNextMinuteTick();
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _timer?.cancel();
     super.dispose();
+  }
+
+  static DateTime _nowTruncatedToMinute() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, now.hour, now.minute);
+  }
+
+  /// Schedules the first tick to fire exactly at the next minute boundary,
+  /// then switches to a periodic 1-minute timer.
+  void _scheduleNextMinuteTick() {
+    final now = DateTime.now();
+    final msUntilNextMinute =
+        (60 - now.second) * 1000 - now.millisecond;
+
+    _timer = Timer(Duration(milliseconds: msUntilNextMinute), () {
+      _tick();
+      _timer = Timer.periodic(const Duration(minutes: 1), (_) => _tick());
+    });
+  }
+
+  void _tick() {
+    if (!mounted) return;
+    setState(() => _currentTime = _nowTruncatedToMinute());
   }
 
   @override

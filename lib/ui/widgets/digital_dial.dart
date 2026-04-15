@@ -220,7 +220,9 @@ class _DialPainter extends CustomPainter {
   bool shouldRepaint(covariant _DialPainter oldDelegate) {
     return oldDelegate.value != value ||
         oldDelegate.maxValue != maxValue ||
+        oldDelegate.numberOfSegments != numberOfSegments ||
         oldDelegate.segmentHeight != segmentHeight ||
+        oldDelegate.segmentSpacing != segmentSpacing ||
         oldDelegate.activeColor != activeColor ||
         oldDelegate.inactiveColor != inactiveColor ||
         oldDelegate.dangerThreshold != dangerThreshold ||
