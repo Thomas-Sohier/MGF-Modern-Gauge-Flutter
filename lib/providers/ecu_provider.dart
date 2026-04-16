@@ -7,6 +7,11 @@ class EcuProvider with ChangeNotifier {
   final EcuService _ecuService;
   late final StreamSubscription<EcuInfos> _dataSubscription;
 
+  /// Throttle notifyListeners() to ~6Hz max. Gauges don't need 10Hz updates —
+  /// human perception can't distinguish above ~5-6Hz for numeric displays.
+  static const _minNotifyInterval = Duration(milliseconds: 166);
+  DateTime _lastNotify = DateTime(0);
+
   EcuInfos _currentData = EcuInfos.initial();
   bool _initialDataFetched = false;
 
@@ -16,7 +21,11 @@ class EcuProvider with ChangeNotifier {
   EcuProvider(this._ecuService) {
     _dataSubscription = _ecuService.dataStream.listen((data) {
       _currentData = data;
-      notifyListeners();
+      final now = DateTime.now();
+      if (now.difference(_lastNotify) >= _minNotifyInterval) {
+        _lastNotify = now;
+        notifyListeners();
+      }
     });
     _ecuService.connectWebSocket();
     _fetchInitialData();

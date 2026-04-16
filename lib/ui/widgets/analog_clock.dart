@@ -2,6 +2,16 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/ui/themes/clock_theme.dart';
 
+/// Horloge analogique à deux couches de rendu.
+///
+/// - [_ClockFacePainter] — cadran statique (ticks, points, chiffres).
+///   Enveloppé dans [RepaintBoundary] : rasterisé une fois en texture GPU,
+///   jamais repeint sauf si le thème change.
+/// - [_ClockHandsPainter] — aiguilles, ombres et pivot central.
+///   Repeint une fois par minute (shouldRepaint compare heure + minute).
+///
+/// Tous les objets [Paint] sont créés dans les constructeurs des painters —
+/// aucune allocation dans les boucles paint().
 class AnalogClock extends StatelessWidget {
   final DateTime dateTime;
 
@@ -10,17 +20,167 @@ class AnalogClock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final clockTheme = Theme.of(context).extension<AnalogClockTheme>()!;
-    return CustomPaint(
-      painter: _AnalogClockPainter(dateTime: dateTime, theme: clockTheme),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Static face — cached as GPU texture; only redrawn on theme change.
+        RepaintBoundary(
+          child: CustomPaint(
+            painter: _ClockFacePainter(theme: clockTheme),
+          ),
+        ),
+        // Dynamic layer — hands + shadows + pivot; repaints once per minute.
+        CustomPaint(
+          painter: _ClockHandsPainter(dateTime: dateTime, theme: clockTheme),
+        ),
+      ],
     );
   }
 }
 
-class _AnalogClockPainter extends CustomPainter {
+// ── Static face painter ───────────────────────────────────────────────────────
+
+/// Draws hour ticks, minute dots, and number labels.
+///
+/// [Paint] objects and [TextPainter] are pre-allocated in the constructor.
+/// [TextSpan] is rebuilt inside [paint] because its fontSize derives from
+/// the canvas [Size] (unknown at construction time), but behind the
+/// [RepaintBoundary] this runs at most once per theme change — not per frame.
+class _ClockFacePainter extends CustomPainter {
+  final AnalogClockTheme theme;
+
+  final Paint _hourTickPaint;
+  final Paint _minuteDotPaint;
+  final TextPainter _textPainter;
+
+  _ClockFacePainter({required this.theme})
+      : _hourTickPaint = Paint()
+          ..color = theme.hourTickColor ?? Colors.black
+          ..strokeWidth = 2.0,
+        _minuteDotPaint = Paint()
+          ..color = theme.minuteDotColor ?? Colors.black54,
+        _textPainter = TextPainter(
+          textAlign: TextAlign.center,
+          textDirection: TextDirection.ltr,
+        );
+
+  static const List<String> _hourLabels = [
+    '12',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    '10',
+    '11',
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+    final radius = min(centerX, centerY);
+    final textColor = theme.numberColor ?? Colors.black;
+    final textFontSize = radius * 0.18;
+    final textStyle = TextStyle(
+      color: textColor,
+      fontSize: textFontSize,
+      fontWeight: FontWeight.w600,
+    );
+
+    for (int i = 0; i < 60; i++) {
+      final angle = (i * 6 - 90) * (pi / 180);
+
+      if (i % 5 == 0) {
+        final hour = i ~/ 5;
+
+        if (hour % 3 == 0) {
+          // Major tick + number at 12, 3, 6, 9.
+          canvas.drawLine(
+            Offset(
+              centerX + cos(angle) * (radius * 0.78),
+              centerY + sin(angle) * (radius * 0.82),
+            ),
+            Offset(
+              centerX + cos(angle) * (radius * 0.92),
+              centerY + sin(angle) * (radius * 1),
+            ),
+            _hourTickPaint,
+          );
+
+          _textPainter.text = TextSpan(text: _hourLabels[hour], style: textStyle);
+          _textPainter.layout();
+          _textPainter.paint(
+            canvas,
+            Offset(
+              centerX + cos(angle) * (radius * 0.70) - _textPainter.width / 2,
+              centerY + sin(angle) * (radius * 0.70) - _textPainter.height / 2,
+            ),
+          );
+        } else {
+          // Minor hour tick (no number).
+          canvas.drawLine(
+            Offset(
+              centerX + cos(angle) * (radius * 0.82),
+              centerY + sin(angle) * (radius * 0.82),
+            ),
+            Offset(
+              centerX + cos(angle) * (radius * 0.92),
+              centerY + sin(angle) * (radius * 0.92),
+            ),
+            _hourTickPaint,
+          );
+        }
+      } else {
+        // Minute dot.
+        canvas.drawCircle(
+          Offset(
+            centerX + cos(angle) * (radius * 0.87),
+            centerY + sin(angle) * (radius * 0.87),
+          ),
+          1.0,
+          _minuteDotPaint,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ClockFacePainter old) => theme != old.theme;
+}
+
+// ── Dynamic hands painter ─────────────────────────────────────────────────────
+
+/// Draws hour hand, minute hand, drop shadows, and center pivot.
+///
+/// The pivot is drawn last so it renders on top of both hands.
+/// All [Paint] objects are pre-allocated in the constructor.
+/// Only repaints when [dateTime.hour] or [dateTime.minute] changes.
+class _ClockHandsPainter extends CustomPainter {
   final DateTime dateTime;
   final AnalogClockTheme theme;
 
-  _AnalogClockPainter({required this.dateTime, required this.theme});
+  final Paint _handPaint;
+  final Paint _shadowPaint;
+  final Paint _pivotPaint;
+  final Paint _ridgesPaint; // strokeWidth set per paint call (size-dependent)
+
+  _ClockHandsPainter({required this.dateTime, required this.theme})
+      : _handPaint = Paint()
+          ..color = theme.handColor ?? const Color.fromARGB(255, 184, 43, 43)
+          ..style = PaintingStyle.fill,
+        _shadowPaint = Paint()
+          ..color = (theme.shadowColor ?? Colors.black.withAlpha(128))
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
+        _pivotPaint = Paint()
+          ..color = theme.centerPivotColor ?? Colors.black,
+        _ridgesPaint = Paint()
+          ..color = theme.centerPivotRidgeColor ?? Colors.grey.shade600
+          ..style = PaintingStyle.stroke;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -28,154 +188,80 @@ class _AnalogClockPainter extends CustomPainter {
     final centerY = size.height / 2;
     final center = Offset(centerX, centerY);
     final radius = min(centerX, centerY);
-
-    // --- Configuration des ombres (utilise le thème) ---
-    final shadowPaint = Paint()
-      ..color = (theme.shadowColor ?? Colors.black.withAlpha(128))
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
     final shadowOffset = Offset(radius * 0.015, radius * 0.015);
-
-    // --- 2. Dessin des marqueurs et des chiffres (utilise le thème) ---
-    final textPainter = TextPainter(
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.ltr,
-    );
-    final hourTickPaint = Paint()
-      ..color = theme.hourTickColor ?? Colors.black
-      ..strokeWidth = 2.0;
-
-    for (int i = 0; i < 60; i++) {
-      final angle = (i * 6 - 90) * (pi / 180);
-      if (i % 5 == 0) {
-        final hour = (i / 5).toInt();
-
-        if (hour % 3 == 0) {
-          final tickStart = Offset(
-            centerX + cos(angle) * (radius * 0.78),
-            centerY + sin(angle) * (radius * 0.82),
-          );
-          final tickEnd = Offset(
-            centerX + cos(angle) * (radius * 0.92),
-            centerY + sin(angle) * (radius * 1),
-          );
-          canvas.drawLine(tickStart, tickEnd, hourTickPaint);
-
-          final numberToDisplay = hour == 0 ? '12' : '$hour';
-          textPainter.text = TextSpan(
-            text: numberToDisplay,
-            style: TextStyle(
-              color:
-                  theme.numberColor ??
-                  Colors.black, // Utilise la couleur du thème
-              fontSize: radius * 0.18,
-              fontWeight: FontWeight.w600,
-            ),
-          );
-          textPainter.layout();
-          final textOffset = Offset(
-            centerX + cos(angle) * (radius * 0.70) - textPainter.width / 2,
-            centerY + sin(angle) * (radius * 0.70) - textPainter.height / 2,
-          );
-          textPainter.paint(canvas, textOffset);
-        } else {
-          final tickStart = Offset(
-            centerX + cos(angle) * (radius * 0.82),
-            centerY + sin(angle) * (radius * 0.82),
-          );
-          final tickEnd = Offset(
-            centerX + cos(angle) * (radius * 0.92),
-            centerY + sin(angle) * (radius * 0.92),
-          );
-          canvas.drawLine(tickStart, tickEnd, hourTickPaint);
-        }
-      } else {
-        // Marqueurs de minutes (points)
-        final dotPaint = Paint()
-          ..color = theme.minuteDotColor ?? Colors.black54;
-        final dotPosition = Offset(
-          centerX + cos(angle) * (radius * 0.87),
-          centerY + sin(angle) * (radius * 0.87),
-        );
-        canvas.drawCircle(dotPosition, 1.0, dotPaint);
-      }
-    }
-
-    // --- 3. Dessin des aiguilles (utilise le thème) ---
-    final handPaint = Paint()
-      ..color = theme.handColor ?? const Color.fromARGB(255, 184, 43, 43)
-      ..style = PaintingStyle.fill;
 
     final hourAngle =
         ((dateTime.hour % 12 + dateTime.minute / 60) * 30 - 90) * (pi / 180);
     final minuteAngle = (dateTime.minute * 6 - 90) * (pi / 180);
 
-    final hourHandPath = Path();
-    final hourHandLength = radius * 0.55;
-    final hourHandWidth = radius * 0.1;
-    hourHandPath.moveTo(
-      centerX - cos(hourAngle + pi / 2) * hourHandWidth / 2,
-      centerY - sin(hourAngle + pi / 2) * hourHandWidth / 2,
+    final hourHandPath = _buildHandPath(
+      centerX,
+      centerY,
+      hourAngle,
+      radius * 0.55,
+      radius * 0.1,
     );
-    hourHandPath.lineTo(
-      centerX + cos(hourAngle) * hourHandLength,
-      centerY + sin(hourAngle) * hourHandLength,
+    final minuteHandPath = _buildHandPath(
+      centerX,
+      centerY,
+      minuteAngle,
+      radius * 0.8,
+      radius * 0.1,
     );
-    hourHandPath.lineTo(
-      centerX - cos(hourAngle - pi / 2) * hourHandWidth / 2,
-      centerY - sin(hourAngle - pi / 2) * hourHandWidth / 2,
-    );
-    hourHandPath.close();
 
-    final minuteHandPath = Path();
-    final minuteHandLength = radius * 0.8;
-    final minuteHandWidth = radius * 0.1;
-    minuteHandPath.moveTo(
-      centerX - cos(minuteAngle + pi / 2) * minuteHandWidth / 2,
-      centerY - sin(minuteAngle + pi / 2) * minuteHandWidth / 2,
-    );
-    minuteHandPath.lineTo(
-      centerX + cos(minuteAngle) * minuteHandLength,
-      centerY + sin(minuteAngle) * minuteHandLength,
-    );
-    minuteHandPath.lineTo(
-      centerX - cos(minuteAngle - pi / 2) * minuteHandWidth / 2,
-      centerY - sin(minuteAngle - pi / 2) * minuteHandWidth / 2,
-    );
-    minuteHandPath.close();
+    // Shadows first (behind hands).
+    canvas.drawPath(hourHandPath.shift(shadowOffset), _shadowPaint);
+    canvas.drawPath(minuteHandPath.shift(shadowOffset), _shadowPaint);
 
-    canvas.drawPath(hourHandPath.shift(shadowOffset), shadowPaint);
-    canvas.drawPath(minuteHandPath.shift(shadowOffset), shadowPaint);
+    // Hands.
+    canvas.drawPath(hourHandPath, _handPaint);
+    canvas.drawPath(minuteHandPath, _handPaint);
 
-    canvas.drawPath(hourHandPath, handPaint);
-    canvas.drawPath(minuteHandPath, handPaint);
-
-    // --- 5. Dessin du pivot central (utilise le thème) ---
+    // Pivot — drawn last so it sits on top of both hands.
     final pivotRadius = radius * 0.12;
-    final pivotColor = theme.centerPivotColor ?? Colors.black;
-    canvas.drawCircle(center, pivotRadius, Paint()..color = pivotColor);
-    canvas.drawCircle(center, pivotRadius * 0.7, Paint()..color = pivotColor);
-    final ridgesPaint = Paint()
-      ..color = theme.centerPivotRidgeColor ?? Colors.grey.shade600
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = pivotRadius * 0.3;
+    canvas.drawCircle(center, pivotRadius, _pivotPaint);
+    canvas.drawCircle(center, pivotRadius * 0.7, _pivotPaint);
+
+    _ridgesPaint.strokeWidth = pivotRadius * 0.3; // size-derived, set here
     for (int i = 0; i < 12; i++) {
       final ridgeAngle = i * 30 * (pi / 180);
-      final ridgeStart = Offset(
-        centerX + cos(ridgeAngle) * pivotRadius * 0.75,
-        centerY + sin(ridgeAngle) * pivotRadius * 0.75,
+      canvas.drawLine(
+        Offset(
+          centerX + cos(ridgeAngle) * pivotRadius * 0.75,
+          centerY + sin(ridgeAngle) * pivotRadius * 0.75,
+        ),
+        Offset(
+          centerX + cos(ridgeAngle) * pivotRadius * 0.85,
+          centerY + sin(ridgeAngle) * pivotRadius * 0.85,
+        ),
+        _ridgesPaint,
       );
-      final ridgeEnd = Offset(
-        centerX + cos(ridgeAngle) * pivotRadius * 0.85,
-        centerY + sin(ridgeAngle) * pivotRadius * 0.85,
-      );
-      canvas.drawLine(ridgeStart, ridgeEnd, ridgesPaint);
     }
   }
 
-  @override
-  bool shouldRepaint(covariant _AnalogClockPainter oldDelegate) {
-    return dateTime.hour != oldDelegate.dateTime.hour ||
-        dateTime.minute != oldDelegate.dateTime.minute ||
-        theme != oldDelegate.theme;
+  static Path _buildHandPath(
+    double cx,
+    double cy,
+    double angle,
+    double length,
+    double width,
+  ) {
+    return Path()
+      ..moveTo(
+        cx - cos(angle + pi / 2) * width / 2,
+        cy - sin(angle + pi / 2) * width / 2,
+      )
+      ..lineTo(cx + cos(angle) * length, cy + sin(angle) * length)
+      ..lineTo(
+        cx - cos(angle - pi / 2) * width / 2,
+        cy - sin(angle - pi / 2) * width / 2,
+      )
+      ..close();
   }
+
+  @override
+  bool shouldRepaint(covariant _ClockHandsPainter old) =>
+      dateTime.hour != old.dateTime.hour ||
+      dateTime.minute != old.dateTime.minute ||
+      theme != old.theme;
 }
