@@ -30,19 +30,29 @@ class GaugeTexturedBackground extends StatelessWidget {
       context,
     ).extension<GaugeThemeBackground>()!;
 
+    // Stack separates static background from dynamic child.
+    // RepaintBoundary isolates the CustomPaint — rasterized as GPU texture,
+    // never repainted when child rebuilds.
     return AspectRatio(
       aspectRatio: 1,
-      child: CustomPaint(
-        painter: _TexturedBackgroundPainter(
-          backgroundColor:
-              backgroundColor ??
-              gaugeThemeBackground.backgroundColor ??
-              Color(0xFFE0E0E0),
-          borderColor:
-              borderColor ?? gaugeThemeBackground.borderColor ?? Colors.black54,
-          borderWidth: borderWidth ?? gaugeThemeBackground.borderWidth ?? 2.0,
-        ),
-        child: child != null ? Center(child: child) : null,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          RepaintBoundary(
+            child: CustomPaint(
+              painter: _TexturedBackgroundPainter(
+                backgroundColor:
+                    backgroundColor ??
+                    gaugeThemeBackground.backgroundColor ??
+                    const Color(0xFFE0E0E0),
+                borderColor:
+                    borderColor ?? gaugeThemeBackground.borderColor ?? Colors.black54,
+                borderWidth: borderWidth ?? gaugeThemeBackground.borderWidth ?? 2.0,
+              ),
+            ),
+          ),
+          if (child != null) Center(child: child),
+        ],
       ),
     );
   }
