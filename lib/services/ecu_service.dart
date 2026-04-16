@@ -137,12 +137,6 @@ class EcuService {
       },
       cancelOnError: true,
     );
-
-    // Le Go agent attend "." pour démarrer l'envoi de données.
-    _safeSend('.');
-    _periodicTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      _safeSend('.');
-    });
   }
 
   void _handleDisconnect() {
