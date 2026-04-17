@@ -42,55 +42,29 @@ class AnalogClock extends StatelessWidget {
 
 /// Draws hour ticks, minute dots, and number labels.
 ///
-/// [Paint] objects and [TextPainter] are pre-allocated in the constructor.
-/// [TextSpan] is rebuilt inside [paint] because its fontSize derives from
-/// the canvas [Size] (unknown at construction time), but behind the
-/// [RepaintBoundary] this runs at most once per theme change — not per frame.
+/// [Paint] objects are pre-allocated in the constructor.
+/// Hour labels (12, 3, 6, 9) are cached in [_LabelCache] keyed by size.width —
+/// layout() is only called when size changes, not on every paint.
 class _ClockFacePainter extends CustomPainter {
   final AnalogClockTheme theme;
 
   final Paint _hourTickPaint;
   final Paint _minuteDotPaint;
-  final TextPainter _textPainter;
 
   _ClockFacePainter({required this.theme})
       : _hourTickPaint = Paint()
           ..color = theme.hourTickColor ?? Colors.black
           ..strokeWidth = 2.0,
         _minuteDotPaint = Paint()
-          ..color = theme.minuteDotColor ?? Colors.black54,
-        _textPainter = TextPainter(
-          textAlign: TextAlign.center,
-          textDirection: TextDirection.ltr,
-        );
-
-  static const List<String> _hourLabels = [
-    '12',
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-    '7',
-    '8',
-    '9',
-    '10',
-    '11',
-  ];
+          ..color = theme.minuteDotColor ?? Colors.black54;
 
   @override
   void paint(Canvas canvas, Size size) {
     final centerX = size.width / 2;
     final centerY = size.height / 2;
     final radius = min(centerX, centerY);
-    final textColor = theme.numberColor ?? Colors.black;
-    final textFontSize = radius * 0.18;
-    final textStyle = TextStyle(
-      color: textColor,
-      fontSize: textFontSize,
-      fontWeight: FontWeight.w600,
-    );
+
+    final labelCache = _LabelCache.get(size.width, radius, theme);
 
     for (int i = 0; i < 60; i++) {
       final angle = (i * 6 - 90) * (pi / 180);
@@ -112,13 +86,13 @@ class _ClockFacePainter extends CustomPainter {
             _hourTickPaint,
           );
 
-          _textPainter.text = TextSpan(text: _hourLabels[hour], style: textStyle);
-          _textPainter.layout();
-          _textPainter.paint(
+          final labelIndex = hour ~/ 3; // 0=12, 1=3, 2=6, 3=9
+          final cached = labelCache.labels[labelIndex];
+          cached.painter.paint(
             canvas,
             Offset(
-              centerX + cos(angle) * (radius * 0.70) - _textPainter.width / 2,
-              centerY + sin(angle) * (radius * 0.70) - _textPainter.height / 2,
+              centerX + cos(angle) * (radius * 0.70) - cached.halfWidth,
+              centerY + sin(angle) * (radius * 0.70) - cached.halfHeight,
             ),
           );
         } else {
@@ -151,6 +125,57 @@ class _ClockFacePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _ClockFacePainter old) => theme != old.theme;
+}
+
+/// Cached pre-laid-out TextPainters for the 4 cardinal hour labels.
+class _CachedLabel {
+  final TextPainter painter;
+  final double halfWidth;
+  final double halfHeight;
+
+  _CachedLabel(this.painter)
+      : halfWidth = painter.width / 2,
+        halfHeight = painter.height / 2;
+}
+
+/// Memoized cache for hour label layouts, keyed by size.width.
+class _LabelCache {
+  static double? _cachedWidth;
+  static Color? _cachedColor;
+  static _LabelCache? _instance;
+
+  static const _cardinalLabels = ['12', '3', '6', '9'];
+
+  final List<_CachedLabel> labels;
+
+  _LabelCache._(this.labels);
+
+  static _LabelCache get(double width, double radius, AnalogClockTheme theme) {
+    final textColor = theme.numberColor ?? Colors.black;
+    if (_instance != null && _cachedWidth == width && _cachedColor == textColor) {
+      return _instance!;
+    }
+
+    final textStyle = TextStyle(
+      color: textColor,
+      fontSize: radius * 0.18,
+      fontWeight: FontWeight.w600,
+    );
+
+    final labels = _cardinalLabels.map((text) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: textStyle),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      )..layout();
+      return _CachedLabel(painter);
+    }).toList();
+
+    _cachedWidth = width;
+    _cachedColor = textColor;
+    _instance = _LabelCache._(labels);
+    return _instance!;
+  }
 }
 
 // ── Dynamic hands painter ─────────────────────────────────────────────────────
