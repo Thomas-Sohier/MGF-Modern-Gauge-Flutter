@@ -4,7 +4,7 @@ import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 import 'package:modern_gauge_flutter/ui/screens/multi_metric_screen.dart';
-import 'package:modern_gauge_flutter/ui/widgets/digital_dial.dart';
+import 'package:modern_gauge_flutter/ui/widgets/dual_arc_dial.dart';
 import 'package:modern_gauge_flutter/ui/widgets/gauge_layout.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -98,32 +98,19 @@ class _RpmScreenState extends State<RpmScreen> {
       behavior: HitTestBehavior.deferToChild,
       child: Stack(
         children: [
-          // Throttle dial — rebuilds only when throttleAngle changes.
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.all(64),
-              child: Selector<EcuProvider, double>(
-                selector: (_, ecu) =>
-                    ecu.currentData.ecuData?.throttleAngle?.toDouble() ?? 0,
-                builder: (_, throttle, __) => DigitalDial(
-                  value: throttle,
-                  maxValue: 100,
-                  numberOfSegments: 1,
-                  segmentHeight: 12,
-                ),
-              ),
-            ),
-          ),
-          // Main gauge — GaugeLayout never rebuilds on value changes.
-          // Only DigitalDial (inside backgroundDial) rebuilds via its Selector.
+          // Combined dual-arc dial — single paint pass for both throttle and primary.
           Positioned.fill(
             child: GaugeLayout(
-              backgroundDial: Selector<EcuProvider, double>(
-                selector: (_, ecu) => primary.getValue(ecu.currentData),
-                builder: (_, primaryValue, __) => DigitalDial(
-                  value: primaryValue,
-                  maxValue: primary.maxValue,
-                  dangerThreshold: primary.dangerThreshold,
+              backgroundDial: Selector<EcuProvider, (double, double)>(
+                selector: (_, ecu) => (
+                  ecu.currentData.ecuData?.throttleAngle?.toDouble() ?? 0,
+                  primary.getValue(ecu.currentData),
+                ),
+                builder: (_, values, __) => DualArcDial(
+                  throttleValue: values.$1,
+                  primaryValue: values.$2,
+                  primaryMaxValue: primary.maxValue,
+                  primaryDangerThreshold: primary.dangerThreshold,
                 ),
               ),
               bottomChildren: _metrics
