@@ -174,32 +174,29 @@ class MetricPrimaryDisplay extends StatelessWidget {
         final color =
             isDanger ? gaugeTheme.dangerColor! : gaugeTheme.activeColor!;
 
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(100),
-            onTap: onCycle,
-            child: Column(
-              mainAxisSize: MainAxisSize.max,
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      metric.display(value),
-                      style: AppTextStyles.display(color),
-                    ),
-                    const SizedBox(height: 4),
-                    if (metric.unit != null)
-                      Text(metric.unit!, style: AppTextStyles.small),
-                  ],
-                ),
-                Text(metric.label, style: AppTextStyles.unit(color)),
-              ],
-            ),
+        return GestureDetector(
+          onTap: onCycle,
+          behavior: HitTestBehavior.opaque,
+          child: Column(
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    metric.display(value),
+                    style: AppTextStyles.display(color),
+                  ),
+                  const SizedBox(height: 4),
+                  if (metric.unit != null)
+                    Text(metric.unit!, style: AppTextStyles.small),
+                ],
+              ),
+              Text(metric.label, style: AppTextStyles.unit(color)),
+            ],
           ),
         );
       },
@@ -280,13 +277,10 @@ class MetricIndicator extends StatelessWidget {
         );
 
         if (metric.onTap != null) {
-          return Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(50),
-              onTap: () => metric.onTap!(context),
-              child: content,
-            ),
+          return GestureDetector(
+            onTap: () => metric.onTap!(context),
+            behavior: HitTestBehavior.opaque,
+            child: content,
           );
         }
         return content;
