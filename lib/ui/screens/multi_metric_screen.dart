@@ -206,8 +206,9 @@ class MetricPrimaryDisplay extends StatelessWidget {
 
 // ── Indicateur bas (toutes les métriques, primaire mis en évidence) ────────
 
-/// Subscribes only to its specific metric value and icon — no rebuild on
-/// unrelated field changes.
+/// Subscribes only to its specific metric value or icon — no rebuild on
+/// unrelated field changes. Avoids Record allocation by using separate
+/// Selector types for action metrics (dynamic icon) vs regular metrics (value).
 class MetricIndicator extends StatelessWidget {
   final MetricDef metric;
   final bool isPrimary;
@@ -220,71 +221,81 @@ class MetricIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<EcuProvider, (double, IconData?)>(
-      selector: (_, ecu) => (
-        metric.getValue(ecu.currentData),
-        metric.icon?.call(ecu.currentData),
-      ),
-      builder: (context, selection, _) {
-        final (value, iconData) = selection;
-        final cs = Theme.of(context).colorScheme;
-        final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
+    // Action metrics have dynamic icons but no value to display.
+    if (metric.isAction) {
+      return Selector<EcuProvider, IconData?>(
+        selector: (_, ecu) => metric.icon?.call(ecu.currentData),
+        builder: (context, iconData, _) =>
+            _buildContent(context, 0, iconData),
+      );
+    }
 
-        final valueColor = isPrimary
-            ? gaugeTheme.activeColor!
-            : cs.onSurface.withValues(alpha: 0.85);
-
-        final content = SizedBox(
-          width: 90,
-          height: 90,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              if (iconData != null) ...[
-                Icon(iconData, size: 28, color: valueColor),
-                const SizedBox(height: 2),
-              ],
-              if (!metric.isAction)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      metric.display(value),
-                      style: AppTextStyles.label.copyWith(color: valueColor),
-                    ),
-                    if (metric.unit != null)
-                      Text(
-                        metric.unit!,
-                        maxLines: 1,
-                        style: AppTextStyles.label.copyWith(color: valueColor),
-                      ),
-                  ],
-                ),
-              if (iconData == null && !metric.isAction) const SizedBox(height: 2),
-              Text(
-                metric.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.label.copyWith(
-                  color: valueColor,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        );
-
-        if (metric.onTap != null) {
-          return GestureDetector(
-            onTap: () => metric.onTap!(context),
-            behavior: HitTestBehavior.opaque,
-            child: content,
-          );
-        }
-        return content;
-      },
+    // Regular metrics: static icon computed once, Selector for value only.
+    final staticIcon = metric.icon?.call(null);
+    return Selector<EcuProvider, double>(
+      selector: (_, ecu) => metric.getValue(ecu.currentData),
+      builder: (context, value, _) =>
+          _buildContent(context, value, staticIcon),
     );
+  }
+
+  Widget _buildContent(BuildContext context, double value, IconData? iconData) {
+    final cs = Theme.of(context).colorScheme;
+    final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
+
+    final valueColor = isPrimary
+        ? gaugeTheme.activeColor!
+        : cs.onSurface.withValues(alpha: 0.85);
+
+    final content = SizedBox(
+      width: 90,
+      height: 90,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (iconData != null) ...[
+            Icon(iconData, size: 28, color: valueColor),
+            const SizedBox(height: 2),
+          ],
+          if (!metric.isAction)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  metric.display(value),
+                  style: AppTextStyles.label.copyWith(color: valueColor),
+                ),
+                if (metric.unit != null)
+                  Text(
+                    metric.unit!,
+                    maxLines: 1,
+                    style: AppTextStyles.label.copyWith(color: valueColor),
+                  ),
+              ],
+            ),
+          if (iconData == null && !metric.isAction) const SizedBox(height: 2),
+          Text(
+            metric.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.label.copyWith(
+              color: valueColor,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (metric.onTap != null) {
+      return GestureDetector(
+        onTap: () => metric.onTap!(context),
+        behavior: HitTestBehavior.opaque,
+        child: content,
+      );
+    }
+    return content;
   }
 }
