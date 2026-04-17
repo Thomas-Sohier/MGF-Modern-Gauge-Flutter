@@ -30,14 +30,16 @@ class MusicDial extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size.infinite,
-      painter: _MusicDialPainter(
-        progress: progress,
-        backgroundColor: backgroundColor,
-        foregroundColor: foregroundColor,
-        strokeWidth: strokeWidth,
-        sweepFactor: sweepFactor,
+    return RepaintBoundary(
+      child: CustomPaint(
+        size: Size.infinite,
+        painter: _MusicDialPainter(
+          progress: progress,
+          backgroundColor: backgroundColor,
+          foregroundColor: foregroundColor,
+          strokeWidth: strokeWidth,
+          sweepFactor: sweepFactor,
+        ),
       ),
     );
   }
