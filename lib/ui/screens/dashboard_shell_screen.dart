@@ -68,9 +68,7 @@ class _DashboardShellScreenState extends State<DashboardShellScreen> {
         child: Scaffold(
           backgroundColor: Colors.transparent,
           body: Center(
-            child: ClipOval(
-              child: GaugeTexturedBackground(child: widget.child),
-            ),
+            child: GaugeTexturedBackground(child: widget.child),
           ),
         ),
       ),
