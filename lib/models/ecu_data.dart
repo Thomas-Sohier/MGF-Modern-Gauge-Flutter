@@ -55,179 +55,72 @@ class EcuInfos {
   }
 }
 
+/// ECU sensor data backed by raw JSON map.
+///
+/// Lazy getters cast on access — avoids allocating 53 fields per fromJson call
+/// at 10 Hz. Only fields actually read by the UI incur the cast cost.
 class EcuData {
-  final num? acButton;
-  final num? ambientTemp;
-  final num? batteryVoltage;
-  final num? camPercent;
-  final num? carbonCanPurgeValveDutyCycle;
-  final num? closedLoop;
-  final num? coil1ChargeTime;
-  final num? coil2ChargeTime;
-  final num? coilTimeMicroseconds;
-  final num? coolantTemp;
-  final num? crankCounter;
-  final num? estimateAirFuel;
-  final num? fan1Control;
-  final num? fan2Control;
-  final num? fuelRailTemp;
-  final num? fuellingFeedbackPercent;
-  final num? idleAdjusterRpm;
-  final num? idleBasePosition;
-  final num? idleError;
-  final num? idleSetpoint;
-  final num? idleSpeedDeviation;
-  final num? idleSwitch;
-  final num? idleTimingOffset;
-  final num? idleValvePosition;
-  final num? ignition;
-  final num? ignitionAdvance;
-  final num? ignitionAdvanceOffset;
-  final num? ignitionSwitch;
-  final num? injector14Driver;
-  final num? injector1Pw;
-  final num? injector23Driver;
-  final num? injector2Pw;
-  final num? injector3Pw;
-  final num? injector4Pw;
-  final num? intakeAirTemp;
-  final num? lambdaHeaterRelay;
-  final num? lambdaMv;
-  final num? lambdaSensorDutyCycle;
-  final num? lambdaSensorFrequency;
-  final num? lambdaSensorStatus;
-  final num? longTermTrim;
-  final num? mapSensorKpa;
-  final num? o2Mv;
-  final num? oilTemp;
-  final num? parkOrNeutralSwitch;
-  final num? primaryTriggerSync;
-  final num? rpm;
-  final num? rpmError;
-  final num? secondaryTriggerSync;
-  final num? shortTermTrimPercent;
-  final num? throttleAngle;
-  final num? throttlePotVoltage;
-  final num? throttleSwitch;
-  final num? vehicleSpeed;
+  final Map<String, dynamic> _json;
 
-  EcuData({
-    this.acButton,
-    this.ambientTemp,
-    this.batteryVoltage,
-    this.camPercent,
-    this.carbonCanPurgeValveDutyCycle,
-    this.closedLoop,
-    this.coil1ChargeTime,
-    this.coil2ChargeTime,
-    this.coilTimeMicroseconds,
-    this.coolantTemp,
-    this.crankCounter,
-    this.estimateAirFuel,
-    this.fan1Control,
-    this.fan2Control,
-    this.fuelRailTemp,
-    this.fuellingFeedbackPercent,
-    this.idleAdjusterRpm,
-    this.idleBasePosition,
-    this.idleError,
-    this.idleSetpoint,
-    this.idleSpeedDeviation,
-    this.idleSwitch,
-    this.idleTimingOffset,
-    this.idleValvePosition,
-    this.ignition,
-    this.ignitionAdvance,
-    this.ignitionAdvanceOffset,
-    this.ignitionSwitch,
-    this.injector14Driver,
-    this.injector1Pw,
-    this.injector23Driver,
-    this.injector2Pw,
-    this.injector3Pw,
-    this.injector4Pw,
-    this.intakeAirTemp,
-    this.lambdaHeaterRelay,
-    this.lambdaMv,
-    this.lambdaSensorDutyCycle,
-    this.lambdaSensorFrequency,
-    this.lambdaSensorStatus,
-    this.longTermTrim,
-    this.mapSensorKpa,
-    this.o2Mv,
-    this.oilTemp,
-    this.parkOrNeutralSwitch,
-    this.primaryTriggerSync,
-    this.rpm,
-    this.rpmError,
-    this.secondaryTriggerSync,
-    this.shortTermTrimPercent,
-    this.throttleAngle,
-    this.throttlePotVoltage,
-    this.throttleSwitch,
-    this.vehicleSpeed,
-  });
+  const EcuData._(this._json);
 
-  factory EcuData.fromJson(Map<String, dynamic> json) {
-    return EcuData(
-      acButton: json['ac_button'] as num?,
-      ambientTemp: json['ambient_temp'] as num?,
-      batteryVoltage: json['battery_voltage'] as num?,
-      camPercent: json['cam_percent'] as num?,
-      carbonCanPurgeValveDutyCycle: json['carbon_can_purge_valve_duty_cycle'] as num?,
-      closedLoop: json['closed_loop'] as num?,
-      coil1ChargeTime: json['coil_1_charge_time'] as num?,
-      coil2ChargeTime: json['coil_2_charge_time'] as num?,
-      coilTimeMicroseconds: json['coil_time_microseconds'] as num?,
-      coolantTemp: json['coolant_temp'] as num?,
-      crankCounter: json['crank_counter'] as num?,
-      estimateAirFuel: json['estimate_air_fuel'] as num?,
-      fan1Control: json['fan_1_control'] as num?,
-      fan2Control: json['fan_2_control'] as num?,
-      fuelRailTemp: json['fuel_rail_temp'] as num?,
-      fuellingFeedbackPercent: json['fuelling_feedback_percent'] as num?,
-      idleAdjusterRpm: json['idle_adjuster_rpm'] as num?,
-      idleBasePosition: json['idle_base_position'] as num?,
-      idleError: json['idle_error'] as num?,
-      idleSetpoint: json['idle_setpoint'] as num?,
-      idleSpeedDeviation: json['idle_speed_deviation'] as num?,
-      idleSwitch: json['idle_switch'] as num?,
-      idleTimingOffset: json['idle_timing_offset'] as num?,
-      idleValvePosition: json['idle_valve_position'] as num?,
-      ignition: json['ignition'] as num?,
-      ignitionAdvance: json['ignition_advance'] as num?,
-      ignitionAdvanceOffset: json['ignition_advance_offset'] as num?,
-      ignitionSwitch: json['ignition_switch'] as num?,
-      injector14Driver: json['injector_1_4_driver'] as num?,
-      injector1Pw: json['injector_1_pw'] as num?,
-      injector23Driver: json['injector_2_3_driver'] as num?,
-      injector2Pw: json['injector_2_pw'] as num?,
-      injector3Pw: json['injector_3_pw'] as num?,
-      injector4Pw: json['injector_4_pw'] as num?,
-      intakeAirTemp: json['intake_air_temp'] as num?,
-      lambdaHeaterRelay: json['lambda_heater_relay'] as num?,
-      lambdaMv: json['lambda_mv'] as num?,
-      lambdaSensorDutyCycle: json['lambda_sensor_duty_cycle'] as num?,
-      lambdaSensorFrequency: json['lambda_sensor_frequency'] as num?,
-      lambdaSensorStatus: json['lambda_sensor_status'] as num?,
-      longTermTrim: json['long_term_trim'] as num?,
-      mapSensorKpa: json['map_sensor_kpa'] as num?,
-      o2Mv: json['o2_mv'] as num?,
-      oilTemp: json['oil_temp'] as num?,
-      parkOrNeutralSwitch: json['park_or_neutral_switch'] as num?,
-      primaryTriggerSync: json['primary_trigger_sync'] as num?,
-      rpm: json['rpm'] as num?,
-      rpmError: json['rpm_error'] as num?,
-      secondaryTriggerSync: json['secondary_trigger_sync'] as num?,
-      shortTermTrimPercent: json['short_term_trim_percent'] as num?,
-      throttleAngle: json['throttle_angle'] as num?,
-      throttlePotVoltage: json['throttle_pot_voltage'] as num?,
-      throttleSwitch: json['throttle_switch'] as num?,
-      vehicleSpeed: json['vehicle_speed'] as num?,
-    );
-  }
+  factory EcuData.fromJson(Map<String, dynamic> json) => EcuData._(json);
 
-  factory EcuData.initial() {
-    return EcuData(); // all fields default to null
-  }
+  factory EcuData.initial() => const EcuData._({});
+
+  // Typed getters — cast on access
+  num? get acButton => _json['ac_button'] as num?;
+  num? get ambientTemp => _json['ambient_temp'] as num?;
+  num? get batteryVoltage => _json['battery_voltage'] as num?;
+  num? get camPercent => _json['cam_percent'] as num?;
+  num? get carbonCanPurgeValveDutyCycle => _json['carbon_can_purge_valve_duty_cycle'] as num?;
+  num? get closedLoop => _json['closed_loop'] as num?;
+  num? get coil1ChargeTime => _json['coil_1_charge_time'] as num?;
+  num? get coil2ChargeTime => _json['coil_2_charge_time'] as num?;
+  num? get coilTimeMicroseconds => _json['coil_time_microseconds'] as num?;
+  num? get coolantTemp => _json['coolant_temp'] as num?;
+  num? get crankCounter => _json['crank_counter'] as num?;
+  num? get estimateAirFuel => _json['estimate_air_fuel'] as num?;
+  num? get fan1Control => _json['fan_1_control'] as num?;
+  num? get fan2Control => _json['fan_2_control'] as num?;
+  num? get fuelRailTemp => _json['fuel_rail_temp'] as num?;
+  num? get fuellingFeedbackPercent => _json['fuelling_feedback_percent'] as num?;
+  num? get idleAdjusterRpm => _json['idle_adjuster_rpm'] as num?;
+  num? get idleBasePosition => _json['idle_base_position'] as num?;
+  num? get idleError => _json['idle_error'] as num?;
+  num? get idleSetpoint => _json['idle_setpoint'] as num?;
+  num? get idleSpeedDeviation => _json['idle_speed_deviation'] as num?;
+  num? get idleSwitch => _json['idle_switch'] as num?;
+  num? get idleTimingOffset => _json['idle_timing_offset'] as num?;
+  num? get idleValvePosition => _json['idle_valve_position'] as num?;
+  num? get ignition => _json['ignition'] as num?;
+  num? get ignitionAdvance => _json['ignition_advance'] as num?;
+  num? get ignitionAdvanceOffset => _json['ignition_advance_offset'] as num?;
+  num? get ignitionSwitch => _json['ignition_switch'] as num?;
+  num? get injector14Driver => _json['injector_1_4_driver'] as num?;
+  num? get injector1Pw => _json['injector_1_pw'] as num?;
+  num? get injector23Driver => _json['injector_2_3_driver'] as num?;
+  num? get injector2Pw => _json['injector_2_pw'] as num?;
+  num? get injector3Pw => _json['injector_3_pw'] as num?;
+  num? get injector4Pw => _json['injector_4_pw'] as num?;
+  num? get intakeAirTemp => _json['intake_air_temp'] as num?;
+  num? get lambdaHeaterRelay => _json['lambda_heater_relay'] as num?;
+  num? get lambdaMv => _json['lambda_mv'] as num?;
+  num? get lambdaSensorDutyCycle => _json['lambda_sensor_duty_cycle'] as num?;
+  num? get lambdaSensorFrequency => _json['lambda_sensor_frequency'] as num?;
+  num? get lambdaSensorStatus => _json['lambda_sensor_status'] as num?;
+  num? get longTermTrim => _json['long_term_trim'] as num?;
+  num? get mapSensorKpa => _json['map_sensor_kpa'] as num?;
+  num? get o2Mv => _json['o2_mv'] as num?;
+  num? get oilTemp => _json['oil_temp'] as num?;
+  num? get parkOrNeutralSwitch => _json['park_or_neutral_switch'] as num?;
+  num? get primaryTriggerSync => _json['primary_trigger_sync'] as num?;
+  num? get rpm => _json['rpm'] as num?;
+  num? get rpmError => _json['rpm_error'] as num?;
+  num? get secondaryTriggerSync => _json['secondary_trigger_sync'] as num?;
+  num? get shortTermTrimPercent => _json['short_term_trim_percent'] as num?;
+  num? get throttleAngle => _json['throttle_angle'] as num?;
+  num? get throttlePotVoltage => _json['throttle_pot_voltage'] as num?;
+  num? get throttleSwitch => _json['throttle_switch'] as num?;
+  num? get vehicleSpeed => _json['vehicle_speed'] as num?;
 }
