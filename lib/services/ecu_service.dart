@@ -79,7 +79,6 @@ class EcuService {
 
   // --- WebSocket ---
 
-  Timer? _periodicTimer;
   Timer? _reconnectTimer;
   Timer? _stableConnectionTimer;
 
@@ -173,21 +172,11 @@ class EcuService {
     _connect();
   }
 
-  void _safeSend(String message) {
-    try {
-      _channel?.sink.add(message);
-    } catch (e) {
-      LogService.error('EcuService: Failed to send message: $e');
-    }
-  }
-
   void _closeCurrentConnection() {
     _stableConnectionTimer?.cancel();
     _stableConnectionTimer = null;
     _channelSubscription?.cancel();
     _channelSubscription = null;
-    _periodicTimer?.cancel();
-    _periodicTimer = null;
     // _channel = null AVANT sink.close() pour que le guard dans
     // _handleDisconnect() court-circuite tout onDone/onError résiduel.
     final channel = _channel;
