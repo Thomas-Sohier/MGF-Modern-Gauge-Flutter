@@ -269,7 +269,7 @@ class _AlbumArt extends StatelessWidget {
                     width: double.infinity,
                     height: double.infinity,
                     gaplessPlayback: true,
-                    filterQuality: FilterQuality.high,
+                    filterQuality: FilterQuality.medium,
                     errorBuilder: (_, __, ___) => icon,
                   )
                 : icon,
