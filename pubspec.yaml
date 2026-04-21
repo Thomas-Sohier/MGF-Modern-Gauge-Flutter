@@ -13,7 +13,6 @@ dependencies:
     sdk: flutter
   go_router: ^16.2.4
   http: ^1.6.0
-  image: ^4.5.4
   intl: ^0.20.2
   logger: ^2.6.2
   marquee: ^2.3.0
