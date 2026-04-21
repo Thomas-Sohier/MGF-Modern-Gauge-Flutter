@@ -1,7 +1,50 @@
+import 'dart:async';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
+
+class _BufferedFileOutput extends LogOutput {
+  final File file;
+  final List<String> _buffer = [];
+  Timer? _flushTimer;
+  static const _maxBufferSize = 64;
+  static const _flushInterval = Duration(seconds: 2);
+
+  _BufferedFileOutput({required this.file});
+
+  @override
+  void output(OutputEvent event) {
+    _buffer.addAll(event.lines);
+    if (_buffer.length >= _maxBufferSize) {
+      _flush();
+    } else {
+      _scheduleFlush();
+    }
+  }
+
+  void _scheduleFlush() {
+    _flushTimer ??= Timer(_flushInterval, _flush);
+  }
+
+  void _flush() {
+    _flushTimer?.cancel();
+    _flushTimer = null;
+    if (_buffer.isEmpty) return;
+
+    final lines = _buffer.join('\n');
+    _buffer.clear();
+    file.writeAsString('$lines\n', mode: FileMode.append, flush: true);
+  }
+
+  @override
+  Future<void> destroy() async {
+    _flush();
+    await super.destroy();
+  }
+}
 
 class LogService {
   late final Logger _logger;
@@ -29,8 +72,14 @@ class LogService {
 
     final logFile = File('$_logDirectory/app_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.log');
     _level = Level.info;
+
+    final outputs = <LogOutput>[_BufferedFileOutput(file: logFile)];
+    if (kDebugMode) {
+      outputs.insert(0, ConsoleOutput());
+    }
+
     _logger = Logger(
-      output: MultiOutput([ConsoleOutput(), FileOutput(file: logFile)]),
+      output: MultiOutput(outputs),
       printer: SimplePrinter(printTime: true, colors: false),
     );
     _deleteOldLogs();
