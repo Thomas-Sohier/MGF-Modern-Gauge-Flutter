@@ -1,59 +1,63 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
 
+Future<List<int>> _quantizeAndScore(Uint32List pixels) async {
+  final quantizerResult = await QuantizerCelebi().quantize(
+    pixels,
+    128,
+    returnInputPixelToClusterPixel: true,
+  );
+
+  final Map<int, int> colorToCount = quantizerResult.colorToCount.map(
+    (key, value) => MapEntry<int, int>(_getArgbFromAbgr(key), value),
+  );
+
+  final List<int> filteredResults = Score.score(
+    colorToCount,
+    desired: 1,
+    filter: true,
+  );
+  final List<int> scoredResults = Score.score(
+    colorToCount,
+    desired: 4,
+    filter: false,
+  );
+
+  return <int>{...filteredResults, ...scoredResults}.toList();
+}
+
+int _getArgbFromAbgr(int abgr) {
+  const int exceptRMask = 0xFF00FFFF;
+  const int onlyRMask = ~exceptRMask;
+  const int exceptBMask = 0xFFFFFF00;
+  const int onlyBMask = ~exceptBMask;
+  final int r = (abgr & onlyRMask) >> 16;
+  final int b = abgr & onlyBMask;
+  return (abgr & exceptRMask & exceptBMask) | (b << 16) | r;
+}
+
 class ColorUtil {
   Future<List<Color>> getColorsFromImage(ImageProvider provider) async {
     try {
-      // Extract dominant colors from image.
-      final quantizerResult = await _extractColorsFromImageProvider(provider);
-      final Map<int, int> colorToCount = quantizerResult.colorToCount.map(
-        (key, value) => MapEntry<int, int>(_getArgbFromAbgr(key), value),
-      );
+      final ui.Image scaledImage = await _imageProviderToScaled(provider);
+      final ByteData? imageBytes = await scaledImage.toByteData();
+      if (imageBytes == null) return [];
 
-      // Score colors for color scheme suitability.
-      final List<int> filteredResults = Score.score(
-        colorToCount,
-        desired: 1,
-        filter: true,
+      final List<int> colors = await Isolate.run(
+        () => _quantizeAndScore(imageBytes.buffer.asUint32List()),
       );
-      final List<int> scoredResults = Score.score(
-        colorToCount,
-        desired: 4,
-        filter: false,
-      );
-      return <dynamic>{
-        ...filteredResults,
-        ...scoredResults,
-      }.toList().map((argb) => Color(argb)).toList();
+      return colors.map((argb) => Color(argb)).toList();
     } catch (e) {
       debugPrint('Error getting colors from image: $e');
       return [];
     }
   }
 
-  // ColorScheme.fromImageProvider() utilities.
-
-  // Extracts bytes from an [ImageProvider] and returns a [QuantizerResult]
-  // containing the most dominant colors.
-  Future<QuantizerResult> _extractColorsFromImageProvider(
-    ImageProvider imageProvider,
-  ) async {
-    final ui.Image scaledImage = await _imageProviderToScaled(imageProvider);
-    final ByteData? imageBytes = await scaledImage.toByteData();
-
-    final QuantizerResult quantizerResult = await QuantizerCelebi().quantize(
-      imageBytes!.buffer.asUint32List(),
-      128,
-      returnInputPixelToClusterPixel: true,
-    );
-    return quantizerResult;
-  }
-
-  // Scale image size down to reduce computation time of color extraction.
   Future<ui.Image> _imageProviderToScaled(ImageProvider imageProvider) async {
     const double maxDimension = 112.0;
     final ImageStream stream = imageProvider.resolve(
@@ -116,16 +120,5 @@ class ColorUtil {
     stream.addListener(listener);
     await imageCompleter.future;
     return scaledImage;
-  }
-
-  // Converts AABBGGRR color int to AARRGGBB format.
-  int _getArgbFromAbgr(int abgr) {
-    const int exceptRMask = 0xFF00FFFF;
-    const int onlyRMask = ~exceptRMask;
-    const int exceptBMask = 0xFFFFFF00;
-    const int onlyBMask = ~exceptBMask;
-    final int r = (abgr & onlyRMask) >> 16;
-    final int b = abgr & onlyBMask;
-    return (abgr & exceptRMask & exceptBMask) | (b << 16) | r;
   }
 }
