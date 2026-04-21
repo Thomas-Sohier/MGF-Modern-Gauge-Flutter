@@ -22,7 +22,7 @@ class MprisListener with ChangeNotifier implements MprisListenerBase {
   static const _playerInterface = 'org.mpris.MediaPlayer2.Player';
   static const _mprisPrefix = 'org.mpris.MediaPlayer2.';
 
-  static const _positionUpdateInterval = Duration(milliseconds: 100);
+  static const _positionUpdateInterval = Duration(milliseconds: 500);
 
   late final DBusClient _client;
 
