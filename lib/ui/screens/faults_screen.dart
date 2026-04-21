@@ -79,12 +79,12 @@ class _NoFaultsMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return const Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.check_circle_outline, size: 24),
-        const SizedBox(width: 8),
-        const Text('Aucun code erreur', style: AppTextStyles.body),
+        Icon(Icons.check_circle_outline, size: 24),
+        SizedBox(width: 8),
+        Text('Aucun code erreur', style: AppTextStyles.body),
       ],
     );
   }

@@ -61,9 +61,9 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
         selector: (_, listener) => listener.playbackStatus,
         builder: (context, status, _) {
           if (status == PlaybackStatus.stopped) {
-            return _NoMusicPlayerUI();
+            return const _NoMusicPlayerUI();
           }
-          return _MusicPlayerUI();
+          return const _MusicPlayerUI();
         },
       ),
     );
@@ -75,13 +75,13 @@ class _NoMusicPlayerUI extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return const Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Icon(Icons.headset_off_outlined, size: 100),
-        const SizedBox(height: 30),
-        const Text(
+        Icon(Icons.headset_off_outlined, size: 100),
+        SizedBox(height: 30),
+        Text(
           "Aucun lecteur de musique actif détecté...",
           textAlign: TextAlign.center,
         ),
@@ -97,9 +97,9 @@ class _MusicPlayerUI extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    return const Stack(
       alignment: Alignment.center,
-      children: const [_AlbumArt(), _ProgressDial(), _InfoPanel()],
+      children: [_AlbumArt(), _ProgressDial(), _InfoPanel()],
     );
   }
 }
@@ -129,12 +129,12 @@ class _InfoPanel extends StatelessWidget {
               top: 25,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 160),
-                child: Row(
+                child: const Row(
                   mainAxisSize: MainAxisSize.max,
                   spacing: 6,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     _CurrentPositionText(),
                     _PlaybackStatusIndicator(),
                     _TotalDurationText(),
@@ -160,7 +160,7 @@ class _TitleText extends StatelessWidget {
         blankSpace: 60,
         style: _kInfoTitleTextStyle,
         crossAxisAlignment: CrossAxisAlignment.center,
-        pauseAfterRound: Duration(seconds: 2),
+        pauseAfterRound: const Duration(seconds: 2),
         showFadingOnlyWhenScrolling: true,
         fadingEdgeStartFraction: 0.12,
         fadingEdgeEndFraction: 0.12,

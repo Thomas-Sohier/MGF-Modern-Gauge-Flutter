@@ -51,7 +51,7 @@ class ColorUtil {
       final List<int> colors = await Isolate.run(
         () => _quantizeAndScore(imageBytes.buffer.asUint32List()),
       );
-      return colors.map((argb) => Color(argb)).toList();
+      return colors.map(Color.new).toList();
     } catch (e) {
       debugPrint('Error getting colors from image: $e');
       return [];

@@ -11,10 +11,10 @@ class _EmptyPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SettingsControlCard(
+    return const SettingsControlCard(
       icon: Icons.dangerous_outlined,
       label: 'Rien ici',
-      child: const SizedBox.shrink(),
+      child: SizedBox.shrink(),
     );
   }
 }

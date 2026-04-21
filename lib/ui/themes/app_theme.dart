@@ -78,7 +78,7 @@ class AppTheme {
       labelSmall: TextStyle(color: AppColors.darkOnSurfaceDim, fontSize: 11),
     ),
     iconTheme: const IconThemeData(color: AppColors.darkOnSurface),
-    extensions: <ThemeExtension<dynamic>>[
+    extensions: const <ThemeExtension<dynamic>>[
       GaugeTheme(
         activeColor: Colors.white,
         inactiveColor: AppColors.darkGaugeInactive,
@@ -143,7 +143,7 @@ class AppTheme {
       labelSmall: TextStyle(color: AppColors.lightOnSurfaceDim, fontSize: 11),
     ),
     iconTheme: const IconThemeData(color: AppColors.lightOnSurface),
-    extensions: <ThemeExtension<dynamic>>[
+    extensions: const <ThemeExtension<dynamic>>[
       GaugeTheme(
         activeColor: Colors.black,
         inactiveColor: AppColors.lightGaugeInactive,
