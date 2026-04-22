@@ -88,9 +88,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _category = category;
       _page = 0;
       _pages = category.pages;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_pageController.hasClients) _pageController.jumpToPage(0);
+      _pageController.dispose();
+      _pageController = PageController();
     });
   }
 
@@ -99,9 +98,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _category = null;
       _page = _rootPage;
       _pages = _buildRootPages();
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_pageController.hasClients) _pageController.jumpToPage(_rootPage);
+      _pageController.dispose();
+      _pageController = PageController(initialPage: _rootPage);
     });
   }
 
