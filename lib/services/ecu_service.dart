@@ -146,7 +146,7 @@ class EcuService {
     _isConnected = false;
     if (wasConnected) {
       _connectionController.add(false);
-      _dataController.add(EcuInfos());
+      _dataController.add(EcuInfos.initial());
     }
     _closeCurrentConnection();
     _scheduleReconnect();
