@@ -24,6 +24,14 @@ class _DashboardShellScreenState extends State<DashboardShellScreen> {
   final FocusNode _focusNode = FocusNode();
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  @override
   void dispose() {
     _focusNode.dispose();
     super.dispose();
