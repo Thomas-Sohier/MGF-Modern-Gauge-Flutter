@@ -84,22 +84,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _enterCategory(_Category category) {
     _rootPage = _page; // mémorise la position avant d'entrer dans la catégorie
-    _pageController.dispose();
-    _pageController = PageController();
     setState(() {
       _category = category;
       _page = 0;
       _pages = category.pages;
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageController.hasClients) _pageController.jumpToPage(0);
+    });
   }
 
   void _backToRoot() {
-    _pageController.dispose();
-    _pageController = PageController(initialPage: _rootPage);
     setState(() {
       _category = null;
       _page = _rootPage;
       _pages = _buildRootPages();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageController.hasClients) _pageController.jumpToPage(_rootPage);
     });
   }
 
