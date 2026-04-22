@@ -18,13 +18,13 @@ class _FaultsScreenState extends State<FaultsScreen>
     with ScreenNavigationMixin<FaultsScreen> {
   @override
   void nextScreen() {
-    const currentRoute = RouteNames.dashboardRoute + RouteNames.faultsRoute;
+    const currentRoute = RouteNames.faultsFull;
     context.go(getNextRoute(currentRoute, enabledScreens));
   }
 
   @override
   void previousScreen() {
-    const currentRoute = RouteNames.dashboardRoute + RouteNames.faultsRoute;
+    const currentRoute = RouteNames.faultsFull;
     context.go(getPreviousRoute(currentRoute, enabledScreens));
   }
 

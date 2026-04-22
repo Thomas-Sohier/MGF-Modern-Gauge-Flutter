@@ -77,7 +77,7 @@ class _RpmScreenState extends State<RpmScreen> {
 
   void _navigate(bool forward) {
     final enabled = context.read<SettingsProvider>().settings.enabledScreens;
-    const route = RouteNames.dashboardRoute + RouteNames.rpmRoute;
+    const route = RouteNames.rpmFull;
     context.go(
       forward ? getNextRoute(route, enabled) : getPreviousRoute(route, enabled),
     );

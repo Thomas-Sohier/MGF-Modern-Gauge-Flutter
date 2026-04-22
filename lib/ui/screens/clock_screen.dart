@@ -17,13 +17,13 @@ class _ClockScreenState extends State<ClockScreen>
     with ScreenNavigationMixin<ClockScreen> {
   @override
   void nextScreen() {
-    const currentRoute = RouteNames.dashboardRoute + RouteNames.timeRoute;
+    const currentRoute = RouteNames.timeFull;
     context.go(getNextRoute(currentRoute, enabledScreens));
   }
 
   @override
   void previousScreen() {
-    const currentRoute = RouteNames.dashboardRoute + RouteNames.timeRoute;
+    const currentRoute = RouteNames.timeFull;
     context.go(getPreviousRoute(currentRoute, enabledScreens));
   }
 

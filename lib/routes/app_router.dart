@@ -29,43 +29,43 @@ class AppRouter {
         pageBuilder: (context, state, child) => NoTransitionPage(child: DashboardShellScreen(child: child)),
         routes: <RouteBase>[
           GoRoute(
-            path: RouteNames.dashboardRoute + RouteNames.timeRoute,
+            path: RouteNames.timeFull,
             pageBuilder: (context, state) => const NoTransitionPage(child: ClockScreen()),
           ),
           GoRoute(
-            path: RouteNames.dashboardRoute + RouteNames.rpmRoute,
+            path: RouteNames.rpmFull,
             pageBuilder: (context, state) => const NoTransitionPage(child: RpmScreen()),
           ),
           GoRoute(
-            path: RouteNames.dashboardRoute + RouteNames.musicRoute,
+            path: RouteNames.musicFull,
             pageBuilder: (context, state) => const NoTransitionPage(child: MusicPlayerScreen()),
           ),
           GoRoute(
-            path: RouteNames.dashboardRoute + RouteNames.faultsRoute,
+            path: RouteNames.faultsFull,
             pageBuilder: (context, state) => const NoTransitionPage(child: FaultsScreen()),
           ),
           GoRoute(
-            path: RouteNames.dashboardRoute + RouteNames.tempsRoute,
+            path: RouteNames.tempsFull,
             pageBuilder: (context, state) => const NoTransitionPage(child: TempsScreen()),
           ),
           GoRoute(
-            path: RouteNames.dashboardRoute + RouteNames.injectionRoute,
+            path: RouteNames.injectionFull,
             pageBuilder: (context, state) => const NoTransitionPage(child: InjectionScreen()),
           ),
           GoRoute(
-            path: RouteNames.dashboardRoute + RouteNames.lambdaRoute,
+            path: RouteNames.lambdaFull,
             pageBuilder: (context, state) => const NoTransitionPage(child: LambdaScreen()),
           ),
           GoRoute(
-            path: RouteNames.dashboardRoute + RouteNames.allumageRoute,
+            path: RouteNames.allumageFull,
             pageBuilder: (context, state) => const NoTransitionPage(child: AllumageScreen()),
           ),
           GoRoute(
-            path: RouteNames.dashboardRoute + RouteNames.ralentiRoute,
+            path: RouteNames.ralentiFull,
             pageBuilder: (context, state) => const NoTransitionPage(child: RalentiScreen()),
           ),
           GoRoute(
-            path: RouteNames.dashboardRoute + RouteNames.admissionRoute,
+            path: RouteNames.admissionFull,
             pageBuilder: (context, state) => const NoTransitionPage(child: AdmissionScreen()),
           ),
         ],

@@ -44,13 +44,13 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
     with ScreenNavigationMixin<MusicPlayerScreen> {
   @override
   void nextScreen() {
-    const currentRoute = RouteNames.dashboardRoute + RouteNames.musicRoute;
+    const currentRoute = RouteNames.musicFull;
     context.go(getNextRoute(currentRoute, enabledScreens));
   }
 
   @override
   void previousScreen() {
-    const currentRoute = RouteNames.dashboardRoute + RouteNames.musicRoute;
+    const currentRoute = RouteNames.musicFull;
     context.go(getPreviousRoute(currentRoute, enabledScreens));
   }
 

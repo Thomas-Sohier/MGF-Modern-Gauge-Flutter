@@ -4,19 +4,17 @@ import 'package:modern_gauge_flutter/routes/route_names.dart';
 
 /// Ordre fixe de tous les écrans du tableau de bord.
 const List<String> allDashboardRoutes = [
-  RouteNames.dashboardRoute + RouteNames.timeRoute,
-  RouteNames.dashboardRoute + RouteNames.musicRoute,
-  RouteNames.dashboardRoute + RouteNames.rpmRoute,
-  RouteNames.dashboardRoute + RouteNames.faultsRoute,
-  RouteNames.dashboardRoute + RouteNames.tempsRoute,
-  RouteNames.dashboardRoute + RouteNames.injectionRoute,
-  RouteNames.dashboardRoute + RouteNames.lambdaRoute,
-  RouteNames.dashboardRoute + RouteNames.allumageRoute,
-  RouteNames.dashboardRoute + RouteNames.ralentiRoute,
-  RouteNames.dashboardRoute + RouteNames.admissionRoute,
+  RouteNames.timeFull,
+  RouteNames.musicFull,
+  RouteNames.rpmFull,
+  RouteNames.faultsFull,
+  RouteNames.tempsFull,
+  RouteNames.injectionFull,
+  RouteNames.lambdaFull,
+  RouteNames.allumageFull,
+  RouteNames.ralentiFull,
+  RouteNames.admissionFull,
 ];
-
-const String _clockRoute = RouteNames.dashboardRoute + RouteNames.timeRoute;
 
 /// Filtre la liste complète selon les segments activés (ex: {'/rpm', '/time'}).
 /// Si aucun écran n'est actif, retourne l'horloge comme fallback.
@@ -24,7 +22,7 @@ List<String> buildDashboardRoutes(Set<String> enabledScreens) {
   final routes = allDashboardRoutes
       .where((r) => enabledScreens.any((seg) => r.endsWith(seg)))
       .toList();
-  return routes.isEmpty ? [_clockRoute] : routes;
+  return routes.isEmpty ? [RouteNames.timeFull] : routes;
 }
 
 /// Retourne la route suivante dans la séquence cyclique.
