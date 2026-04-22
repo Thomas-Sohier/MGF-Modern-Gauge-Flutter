@@ -45,6 +45,22 @@ flutter build apk        # build for Android
 flutter pub run build_runner build --delete-conflicting-outputs
 ```
 
+## Running on Raspberry Pi 3B+
+
+Build in release mode for optimal performance:
+
+```bash
+flutter build linux --release --tree-shake-icons --target-platform=linux-arm
+```
+
+Debug builds are 3-5× slower on the Pi's limited hardware.
+
+Runtime environment suggestion until Impeller-Linux-embedded is stable for VideoCore IV:
+
+```bash
+FLUTTER_ENGINE_SWITCH_IMPELLER=false ./build/linux/arm/release/bundle/modern_gauge_flutter
+```
+
 ## Project structure
 
 ```
