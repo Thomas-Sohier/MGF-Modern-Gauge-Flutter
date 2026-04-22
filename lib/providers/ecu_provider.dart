@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:modern_gauge_flutter/models/ecu_data.dart';
 import 'package:modern_gauge_flutter/services/ecu_service.dart';
 
@@ -7,10 +8,10 @@ class EcuProvider with ChangeNotifier {
   final EcuService _ecuService;
   late final StreamSubscription<EcuInfos> _dataSubscription;
 
-  /// Throttle notifyListeners() to ~6Hz max. Gauges don't need 10Hz updates —
-  /// human perception can't distinguish above ~5-6Hz for numeric displays.
-  static const _minNotifyInterval = Duration(milliseconds: 166);
-  DateTime _lastNotify = DateTime(0);
+  /// Frame-aligned UI updates: buffer data arrivals and notify once per frame.
+  /// Collapses multiple 10Hz data updates into one rebuild per vsync.
+  bool _frameCallbackScheduled = false;
+  bool _hasPendingData = false;
 
   EcuInfos _currentData = EcuInfos.initial();
   bool _initialDataFetched = false;
@@ -21,14 +22,23 @@ class EcuProvider with ChangeNotifier {
   EcuProvider(this._ecuService) {
     _dataSubscription = _ecuService.dataStream.listen((data) {
       _currentData = data;
-      final now = DateTime.now();
-      if (now.difference(_lastNotify) >= _minNotifyInterval) {
-        _lastNotify = now;
-        notifyListeners();
-      }
+      _hasPendingData = true;
+      _scheduleFrameCallback();
     });
     _ecuService.connectWebSocket();
     _fetchInitialData();
+  }
+
+  void _scheduleFrameCallback() {
+    if (_frameCallbackScheduled) return;
+    _frameCallbackScheduled = true;
+    SchedulerBinding.instance.scheduleFrameCallback((_) {
+      _frameCallbackScheduled = false;
+      if (_hasPendingData) {
+        _hasPendingData = false;
+        notifyListeners();
+      }
+    });
   }
 
   Future<void> _fetchInitialData() async {
