@@ -7,26 +7,26 @@ final _metrics = [
     label: 'MAP',
     unit: 'kPa',
     maxValue: 200,
-    getValue: (d) => d?.ecuData?.mapSensorKpa?.toDouble() ?? 0,
+    getValue: (d) => d?.data.mapSensorKpaValue ?? 0,
   ),
   MetricDef(
     label: 'Papillon',
     unit: '°',
     maxValue: 100,
-    getValue: (d) => d?.ecuData?.throttleAngle?.toDouble() ?? 0,
+    getValue: (d) => d?.data.throttleAngleValue ?? 0,
   ),
   MetricDef(
     label: 'TPS',
     unit: 'V',
     maxValue: 5,
     format: (v) => v.toStringAsFixed(2),
-    getValue: (d) => d?.ecuData?.throttlePotVoltage?.toDouble() ?? 0,
+    getValue: (d) => d?.data.throttlePotVoltageValue ?? 0,
   ),
   MetricDef(
     label: 'Air admis.',
     unit: '°C',
     maxValue: 80,
-    getValue: (d) => d?.ecuData?.intakeAirTemp?.toDouble() ?? 0,
+    getValue: (d) => d?.data.intakeAirTempValue ?? 0,
   ),
 ];
 

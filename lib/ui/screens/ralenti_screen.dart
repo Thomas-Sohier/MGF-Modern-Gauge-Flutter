@@ -7,31 +7,31 @@ final _metrics = [
     label: 'Consigne',
     unit: 'rpm',
     maxValue: 2000,
-    getValue: (d) => d?.ecuData?.idleSetpoint?.toDouble() ?? 0,
+    getValue: (d) => d?.data.idleSetpointValue ?? 0,
   ),
   MetricDef(
     label: 'Vanne',
     unit: '%',
     maxValue: 100,
-    getValue: (d) => d?.ecuData?.idleValvePosition?.toDouble() ?? 0,
+    getValue: (d) => d?.data.idleValvePositionValue ?? 0,
   ),
   MetricDef(
     label: 'Base',
     unit: '%',
     maxValue: 100,
-    getValue: (d) => d?.ecuData?.idleBasePosition?.toDouble() ?? 0,
+    getValue: (d) => d?.data.idleBasePositionValue ?? 0,
   ),
   MetricDef(
     label: 'Erreur',
     unit: 'rpm',
     maxValue: 300,
-    getValue: (d) => d?.ecuData?.idleError?.toDouble() ?? 0,
+    getValue: (d) => d?.data.idleErrorValue ?? 0,
   ),
   MetricDef(
     label: 'Ajusteur',
     unit: 'rpm',
     maxValue: 300,
-    getValue: (d) => d?.ecuData?.idleAdjusterRpm?.toDouble() ?? 0,
+    getValue: (d) => d?.data.idleAdjusterRpmValue ?? 0,
   ),
 ];
 

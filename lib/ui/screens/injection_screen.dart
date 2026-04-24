@@ -7,33 +7,33 @@ final _metrics = [
     label: 'Feedback',
     unit: '%',
     maxValue: 200,
-    getValue: (d) => d?.ecuData?.fuellingFeedbackPercent?.toDouble() ?? 0,
+    getValue: (d) => d?.data.fuellingFeedbackPercentValue ?? 0,
   ),
   MetricDef(
     label: 'Trim court',
     unit: '%',
     maxValue: 30,
-    getValue: (d) => d?.ecuData?.shortTermTrimPercent?.toDouble() ?? 0,
+    getValue: (d) => d?.data.shortTermTrimPercentValue ?? 0,
   ),
   MetricDef(
     label: 'Trim long',
     unit: '%',
     maxValue: 30,
-    getValue: (d) => d?.ecuData?.longTermTrim?.toDouble() ?? 0,
+    getValue: (d) => d?.data.longTermTrimValue ?? 0,
   ),
   MetricDef(
     label: 'Inj. 1',
     unit: 'ms',
     maxValue: 15,
     format: (v) => v.toStringAsFixed(2),
-    getValue: (d) => d?.ecuData?.injector1Pw?.toDouble() ?? 0,
+    getValue: (d) => d?.data.injector1PwValue ?? 0,
   ),
   MetricDef(
     label: 'Inj. 2',
     unit: 'ms',
     maxValue: 15,
     format: (v) => v.toStringAsFixed(2),
-    getValue: (d) => d?.ecuData?.injector2Pw?.toDouble() ?? 0,
+    getValue: (d) => d?.data.injector2PwValue ?? 0,
   ),
 ];
 

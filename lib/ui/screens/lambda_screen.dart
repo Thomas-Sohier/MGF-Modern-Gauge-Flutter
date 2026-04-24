@@ -8,14 +8,14 @@ final _metrics = [
     unit: 'mV',
     maxValue: 1000,
     icon: (_) => Icons.sensors_rounded,
-    getValue: (d) => d?.ecuData?.lambdaMv?.toDouble() ?? 0,
+    getValue: (d) => d?.data.lambdaMvValue ?? 0,
   ),
   MetricDef(
     label: 'O2',
     unit: 'mV',
     maxValue: 1000,
     icon: (_) => Icons.air_rounded,
-    getValue: (d) => d?.ecuData?.o2Mv?.toDouble() ?? 0,
+    getValue: (d) => d?.data.o2MvValue ?? 0,
   ),
   MetricDef(
     label: 'AFR',
@@ -24,14 +24,14 @@ final _metrics = [
     dangerThreshold: 17,
     icon: (_) => Icons.local_gas_station_rounded,
     format: (v) => v.toStringAsFixed(2),
-    getValue: (d) => d?.ecuData?.estimateAirFuel?.toDouble() ?? 0,
+    getValue: (d) => d?.data.estimateAirFuelValue ?? 0,
   ),
   MetricDef(
     label: 'Duty cycle',
     unit: '%',
     maxValue: 100,
     icon: (_) => Icons.speed_rounded,
-    getValue: (d) => d?.ecuData?.lambdaSensorDutyCycle?.toDouble() ?? 0,
+    getValue: (d) => d?.data.lambdaSensorDutyCycleValue ?? 0,
   ),
 ];
 

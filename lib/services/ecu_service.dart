@@ -81,6 +81,7 @@ class EcuService {
 
   Timer? _reconnectTimer;
   Timer? _stableConnectionTimer;
+  Timer? _heartbeatTimer;
 
   bool _isConnected = false;
   bool _autoReconnect = false;
@@ -136,6 +137,12 @@ class EcuService {
       },
       cancelOnError: true,
     );
+
+    // Le Go agent attend "." pour démarrer l'envoi de données.
+    _safeSend('.');
+    _heartbeatTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      _safeSend('.');
+    });
   }
 
   void _handleDisconnect() {
@@ -172,6 +179,14 @@ class EcuService {
     _connect();
   }
 
+  void _safeSend(String message) {
+    try {
+      _channel?.sink.add(message);
+    } catch (e) {
+      LogService.error('EcuService: Failed to send message: $e');
+    }
+  }
+
   void _closeCurrentConnection() {
     _stableConnectionTimer?.cancel();
     _stableConnectionTimer = null;
@@ -190,6 +205,8 @@ class EcuService {
     _autoReconnect = false;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     _closeCurrentConnection();
     _dataController.close();
     _connectionController.close();

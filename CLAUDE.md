@@ -1,61 +1,125 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## What This App Does
-
-Modern Gauge Flutter is a vehicle diagnostic dashboard app that displays real-time engine telemetry through gauge visualizations. It connects to a Go backend agent via WebSocket on `localhost:8080` that reads from an ECU (Engine Control Unit). Designed as an in-car display with music player integration (Linux MPRIS/D-Bus).
+Vehicle diagnostic dashboard displaying real-time ECU telemetry via gauges. Connects to Go backend (WebSocket `localhost:8080`). Linux MPRIS/D-Bus music player integration.
 
 ## Commands
 
 ```bash
-# Install dependencies
-flutter pub get
-
-# Run the app
-flutter run
-
-# Analyze code
-flutter analyze
-
-# Run tests
-flutter test
-flutter test test/widget_test.dart
-
-# Regenerate Mockito mocks after changing @GenerateMocks annotations
-flutter pub run build_runner build --delete-conflicting-outputs
-
-# Build
-flutter build linux
-flutter build apk
+flutter pub get                                              # Install deps
+flutter run                                                  # Run app
+flutter analyze                                              # Lint check
+flutter test                                                 # Run tests
+flutter pub run build_runner build --delete-conflicting-outputs  # Regen mocks
+flutter build linux                                          # Build Linux
 ```
 
-## Architecture
+## Structure
 
-**Data flow:**
-1. `EcuService` — WebSocket client to Go backend (`ws://localhost:8080/ws`); emits `Stream<EcuInfos>` containing `EcuData` with 40+ sensor fields
-2. `EcuProvider` — Subscribes to `EcuService.dataStream`, holds current `EcuInfos`, throttles `notifyListeners()` to ~6Hz
-3. **Other Providers** — Listen to service streams and call `notifyListeners()` for UI rebuilds:
-   - `AppStateProvider` — Sleep mode, connection status, global alerts
-   - `SettingsProvider` — User preferences synced with `SettingsService` (SharedPreferences)
-   - `MprisListener` — Concrete class (in `lib/services/mpris_listener.dart`) for Linux D-Bus media player state; extends `MprisListenerBase` abstract class (in `lib/providers/mpris_provider.dart`)
-4. **UI** — Screens use `Selector<EcuProvider, T>` to extract specific fields from `EcuInfos.ecuData` for fine-grained rebuilds
+```
+lib/
+├── main.dart                 # Entry point, DI setup
+├── app.dart                  # MaterialApp + Router
+├── models/                   # Data classes (EcuData, SettingsData)
+├── services/                 # Business logic, external APIs
+│   ├── ecu_service.dart      # WebSocket client → Stream<EcuInfos>
+│   ├── settings_service.dart # SharedPreferences persistence
+│   ├── log_service.dart      # Structured logging
+│   └── mpris_listener.dart   # Linux D-Bus media player
+├── providers/                # ChangeNotifiers (ViewModels)
+│   ├── ecu_provider.dart     # Holds EcuInfos, throttles to ~6Hz
+│   ├── settings_provider.dart
+│   ├── app_state_provider.dart
+│   └── mpris_provider.dart
+├── routes/                   # go_router config
+├── ui/
+│   ├── screens/              # Full-page views
+│   ├── widgets/              # Reusable components
+│   └── themes/               # ThemeData, text styles
+├── mixins/                   # Shared widget behavior
+└── utils/                    # Constants, helpers
+```
 
-**Routing:** `go_router` with a `ShellRoute` wrapping the dashboard screens (rpm, clock, music, settings). Navigation between screens uses left/right arrow keys handled in `DashboardShellScreen`.
+## MVVM Architecture
 
-**Screen order for keyboard navigation:** splash → rpm → clock → music → settings (defined in `navigation_logic.dart`)
+```
+┌─────────────┐    Stream     ┌─────────────┐  notifyListeners  ┌─────────────┐
+│   Service   │ ───────────► │  Provider   │ ─────────────────► │    View     │
+│  (Model)    │              │ (ViewModel) │                    │  (Screen)   │
+└─────────────┘              └─────────────┘                    └─────────────┘
+```
 
-**Services are singletons** (`LogService`, `SettingsService`). Initialization order in `main.dart` matters: LogService → SettingsService → EcuService → providers → router → MprisListener.
+- **Model**: Services + data classes. `EcuService` emits `Stream<EcuInfos>`, `SettingsService` persists to SharedPreferences
+- **ViewModel**: Providers extend `ChangeNotifier`. Subscribe to service streams, expose state, call `notifyListeners()`
+- **View**: Screens use `Selector<Provider, T>` for fine-grained rebuilds
 
-**Platform notes:** MPRIS/D-Bus integration (music player) only works on Linux. The `MprisListener` is skipped silently on other platforms. Logs are stored in the OS app support directory (e.g., `~/.local/share/modern_gauge_flutter/logs/` on Linux).
+**Init order** (main.dart): LogService → SettingsService → EcuService → Providers → Router → MprisListener
+
+## Data Flow
+
+1. `EcuService` receives JSON via WebSocket → parses to `EcuData` (40+ sensor fields)
+2. `EcuProvider` subscribes, holds current state, throttles UI updates to ~6Hz
+3. Screens use `Selector<EcuProvider, double>` to extract single fields (rpm, temp, etc.)
+4. Only affected widgets rebuild
 
 ## Key Conventions
 
-- Models use `copyWith()` pattern (`EcuInfos`, `EcuData`, `SettingsData`)
-- Widgets prefer `Selector<>` over `Consumer<>` for fine-grained rebuilds
-- `LogService` is used throughout for logging (not `print`)
-- French comments appear in some files — this is intentional
+### Dart/Flutter (Official Rules)
 
-## Known Gaps
+- **Naming**: `PascalCase` classes, `camelCase` members, `snake_case` files
+- **Line length**: 80 chars max
+- **Functions**: <20 lines, single purpose, arrow syntax for one-liners
+- **Null safety**: Avoid `!` unless guaranteed non-null
+- **Async**: `Future` + `async/await` for single ops, `Stream` for sequences
+- **Widgets**: Immutable, use `const` constructors, prefer composition over inheritance
+- **State**: `Selector<>` over `Consumer<>` for targeted rebuilds
+- **Lists**: Use `ListView.builder` for long lists
+- **Docs**: `///` dartdoc, first sentence is summary, document public APIs only
 
-- Tests in `widget_test.dart` are currently skipped (`skip: true`) — mock infrastructure exists but tests need work
+### Project-Specific
+
+- Models use `copyWith()` pattern
+- `LogService` for logging (never `print`)
+- French comments are intentional
+- Singletons: `LogService`, `SettingsService`
+- Platform: MPRIS works only on Linux, skipped elsewhere
+
+## Routing
+
+`go_router` with `ShellRoute` wrapping dashboard screens.
+
+**Screen order** (keyboard nav): splash → rpm → clock → music → settings
+
+Arrow keys handled in `DashboardShellScreen`, logic in `navigation_logic.dart`.
+
+## Testing
+
+```bash
+flutter test                           # Unit + widget tests
+flutter test test/widget_test.dart     # Specific file
+```
+
+- Use `package:flutter_test` for widgets
+- Prefer fakes/stubs over mocks
+- Arrange-Act-Assert pattern
+- Regenerate mocks after `@GenerateMocks` changes
+
+## Theming
+
+- Centralized in `ui/themes/`
+- `AppTheme` defines `ThemeData`
+- Component themes: `GaugeTheme`, `ClockTheme`
+- Access via `Theme.of(context)`
+
+## Error Handling
+
+- Services handle WebSocket reconnection
+- Providers catch stream errors
+- `LogService` logs with severity levels
+- Never let errors fail silently
+
+## Performance
+
+- `EcuProvider` throttles to ~6Hz via `SchedulerBinding`
+- Widgets extract single values via `Selector<>`
+- `const` widgets where possible
+- Avoid expensive ops in `build()`

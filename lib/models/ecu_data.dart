@@ -53,6 +53,9 @@ class EcuInfos {
   factory EcuInfos.initial() {
     return EcuInfos(connected: false, ecuData: EcuData.initial());
   }
+
+  /// Non-null accessor for UI binding — returns initial() if ecuData is null.
+  EcuData get data => ecuData ?? EcuData.initial();
 }
 
 /// ECU sensor data backed by raw JSON map.
@@ -123,4 +126,35 @@ class EcuData {
   num? get throttlePotVoltage => _json['throttle_pot_voltage'] as num?;
   num? get throttleSwitch => _json['throttle_switch'] as num?;
   num? get vehicleSpeed => _json['vehicle_speed'] as num?;
+
+  // ── Presentation getters (null-safe doubles for UI consumption) ──
+  double get rpmValue => rpm?.toDouble() ?? 0;
+  double get throttleAngleValue => throttleAngle?.toDouble() ?? 0;
+  double get throttlePotVoltageValue => throttlePotVoltage?.toDouble() ?? 0;
+  double get coolantTempValue => coolantTemp?.toDouble() ?? 0;
+  double get oilTempValue => oilTemp?.toDouble() ?? 0;
+  double get batteryVoltageValue => batteryVoltage?.toDouble() ?? 0;
+  double get ambientTempValue => ambientTemp?.toDouble() ?? 0;
+  double get intakeAirTempValue => intakeAirTemp?.toDouble() ?? 0;
+  double get fuelRailTempValue => fuelRailTemp?.toDouble() ?? 0;
+  double get mapSensorKpaValue => mapSensorKpa?.toDouble() ?? 0;
+  double get ignitionAdvanceValue => ignitionAdvance?.toDouble() ?? 0;
+  double get ignitionAdvanceOffsetValue => ignitionAdvanceOffset?.toDouble() ?? 0;
+  double get coilTimeMicrosecondsValue => coilTimeMicroseconds?.toDouble() ?? 0;
+  double get coil1ChargeTimeValue => coil1ChargeTime?.toDouble() ?? 0;
+  double get coil2ChargeTimeValue => coil2ChargeTime?.toDouble() ?? 0;
+  double get injector1PwValue => injector1Pw?.toDouble() ?? 0;
+  double get injector2PwValue => injector2Pw?.toDouble() ?? 0;
+  double get lambdaMvValue => lambdaMv?.toDouble() ?? 0;
+  double get lambdaSensorDutyCycleValue => lambdaSensorDutyCycle?.toDouble() ?? 0;
+  double get o2MvValue => o2Mv?.toDouble() ?? 0;
+  double get shortTermTrimPercentValue => shortTermTrimPercent?.toDouble() ?? 0;
+  double get longTermTrimValue => longTermTrim?.toDouble() ?? 0;
+  double get fuellingFeedbackPercentValue => fuellingFeedbackPercent?.toDouble() ?? 0;
+  double get estimateAirFuelValue => estimateAirFuel?.toDouble() ?? 0;
+  double get idleSetpointValue => idleSetpoint?.toDouble() ?? 0;
+  double get idleAdjusterRpmValue => idleAdjusterRpm?.toDouble() ?? 0;
+  double get idleErrorValue => idleError?.toDouble() ?? 0;
+  double get idleValvePositionValue => idleValvePosition?.toDouble() ?? 0;
+  double get idleBasePositionValue => idleBasePosition?.toDouble() ?? 0;
 }

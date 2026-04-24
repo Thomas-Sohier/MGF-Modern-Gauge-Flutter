@@ -12,7 +12,7 @@ import 'package:provider/provider.dart';
 final _metrics = [
   MetricDef.action(
     label: 'ODB',
-    icon: (infos) => (infos?.connected ?? false) ? Icons.link : Icons.link_off,
+    icon: (d) => (d?.connected ?? false) ? Icons.link : Icons.link_off,
     onTap: (context) {
       context.read<EcuProvider>().retryInitialData();
     },
@@ -23,7 +23,7 @@ final _metrics = [
     unit: '',
     maxValue: 8500,
     dangerThreshold: 7000,
-    getValue: (d) => d?.ecuData?.rpm?.toDouble() ?? 0,
+    getValue: (d) => d?.data.rpmValue ?? 0,
   ),
   MetricDef(
     label: 'LDR',
@@ -31,7 +31,7 @@ final _metrics = [
     dangerThreshold: 150,
     maxValue: 200,
     icon: (_) => Icons.thermostat,
-    getValue: (d) => d?.ecuData?.coolantTemp?.toDouble() ?? 0,
+    getValue: (d) => d?.data.coolantTempValue ?? 0,
   ),
   MetricDef(
     label: 'Batterie',
@@ -40,7 +40,7 @@ final _metrics = [
     dangerThreshold: 16,
     icon: (_) => Icons.electric_car,
     format: (v) => v.toStringAsFixed(2),
-    getValue: (d) => d?.ecuData?.batteryVoltage?.toDouble() ?? 0,
+    getValue: (d) => d?.data.batteryVoltageValue ?? 0,
   ),
   MetricDef(
     label: 'Huile',
@@ -48,7 +48,7 @@ final _metrics = [
     dangerThreshold: 150,
     maxValue: 200,
     icon: (_) => Icons.oil_barrel,
-    getValue: (d) => d?.ecuData?.oilTemp?.toDouble() ?? 0,
+    getValue: (d) => d?.data.oilTempValue ?? 0,
   ),
 ];
 
@@ -103,7 +103,7 @@ class _RpmScreenState extends State<RpmScreen> {
             child: GaugeLayout(
               backgroundDial: Selector<EcuProvider, (double, double)>(
                 selector: (_, ecu) => (
-                  ecu.currentData.ecuData?.throttleAngle?.toDouble() ?? 0,
+                  ecu.currentData.data.throttleAngleValue,
                   primary.getValue(ecu.currentData),
                 ),
                 builder: (_, values, __) => DualArcDial(
