@@ -106,15 +106,18 @@ class _DualArcDialState extends State<DualArcDial>
             ),
           ),
         ),
-        CustomPaint(
-          painter: _DualArcActivePainter(
-            throttleAnimation: _throttleAnimation,
-            primaryAnimation: _primaryAnimation,
-            throttleMaxValue: widget.throttleMaxValue,
-            primaryMaxValue: widget.primaryMaxValue,
-            primaryDangerThreshold: widget.primaryDangerThreshold,
-            activeColor: activeColor,
-            dangerColor: dangerColor,
+        RepaintBoundary(
+          child: CustomPaint(
+            painter: _DualArcActivePainter(
+              repaint: _curvedAnimation,
+              throttleAnimation: _throttleAnimation,
+              primaryAnimation: _primaryAnimation,
+              throttleMaxValue: widget.throttleMaxValue,
+              primaryMaxValue: widget.primaryMaxValue,
+              primaryDangerThreshold: widget.primaryDangerThreshold,
+              activeColor: activeColor,
+              dangerColor: dangerColor,
+            ),
           ),
         ),
       ],
@@ -167,31 +170,31 @@ class _DualArcBackgroundPainter extends CustomPainter {
     required this.primaryDangerThreshold,
     required Color inactiveColor,
     required Color dangerInactiveColor,
-  })  : _primaryGapRadians = _calcGapRadians(_primarySegmentSpacing),
-        _primarySegmentRadians = _calcSegmentRadians(
-          _calcGapRadians(_primarySegmentSpacing),
-          _primarySegments,
-        ),
-        _primaryDangerStart = _calcDangerStart(
-          primaryDangerThreshold,
-          primaryMaxValue,
-          _primarySegments,
-        ),
-        _inactivePaint = Paint()
-          ..color = inactiveColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = _primarySegmentHeight
-          ..strokeCap = StrokeCap.butt,
-        _dangerInactivePaint = Paint()
-          ..color = dangerInactiveColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = _primarySegmentHeight
-          ..strokeCap = StrokeCap.butt,
-        _throttleInactivePaint = Paint()
-          ..color = inactiveColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = _throttleSegmentHeight
-          ..strokeCap = StrokeCap.butt;
+  }) : _primaryGapRadians = _calcGapRadians(_primarySegmentSpacing),
+       _primarySegmentRadians = _calcSegmentRadians(
+         _calcGapRadians(_primarySegmentSpacing),
+         _primarySegments,
+       ),
+       _primaryDangerStart = _calcDangerStart(
+         primaryDangerThreshold,
+         primaryMaxValue,
+         _primarySegments,
+       ),
+       _inactivePaint = Paint()
+         ..color = inactiveColor
+         ..style = PaintingStyle.stroke
+         ..strokeWidth = _primarySegmentHeight
+         ..strokeCap = StrokeCap.butt,
+       _dangerInactivePaint = Paint()
+         ..color = dangerInactiveColor
+         ..style = PaintingStyle.stroke
+         ..strokeWidth = _primarySegmentHeight
+         ..strokeCap = StrokeCap.butt,
+       _throttleInactivePaint = Paint()
+         ..color = inactiveColor
+         ..style = PaintingStyle.stroke
+         ..strokeWidth = _throttleSegmentHeight
+         ..strokeCap = StrokeCap.butt;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -202,15 +205,34 @@ class _DualArcBackgroundPainter extends CustomPainter {
     final primaryRadius = baseRadius - _primarySegmentHeight + 10;
     final primaryRect = Rect.fromCircle(center: center, radius: primaryRadius);
     for (int i = 0; i < _primarySegments; i++) {
-      final segStart = _startAngle + i * (_primarySegmentRadians + _primaryGapRadians);
-      final paint = i >= _primaryDangerStart ? _dangerInactivePaint : _inactivePaint;
-      canvas.drawArc(primaryRect, segStart, _primarySegmentRadians, false, paint);
+      final segStart =
+          _startAngle + i * (_primarySegmentRadians + _primaryGapRadians);
+      final paint = i >= _primaryDangerStart
+          ? _dangerInactivePaint
+          : _inactivePaint;
+      canvas.drawArc(
+        primaryRect,
+        segStart,
+        _primarySegmentRadians,
+        false,
+        paint,
+      );
     }
 
     // Inner throttle arc (1 segment)
-    final throttleRadius = (baseRadius - _primarySegmentHeight) * _throttleRadiusFactor;
-    final throttleRect = Rect.fromCircle(center: center, radius: throttleRadius);
-    canvas.drawArc(throttleRect, _startAngle, _sweepAngle, false, _throttleInactivePaint);
+    final throttleRadius =
+        (baseRadius - _primarySegmentHeight) * _throttleRadiusFactor;
+    final throttleRect = Rect.fromCircle(
+      center: center,
+      radius: throttleRadius,
+    );
+    canvas.drawArc(
+      throttleRect,
+      _startAngle,
+      _sweepAngle,
+      false,
+      _throttleInactivePaint,
+    );
   }
 
   @override
@@ -239,6 +261,7 @@ class _DualArcActivePainter extends CustomPainter {
   final Paint _throttleActivePaint;
 
   _DualArcActivePainter({
+    required Listenable repaint,
     required this.throttleAnimation,
     required this.primaryAnimation,
     required this.throttleMaxValue,
@@ -246,32 +269,32 @@ class _DualArcActivePainter extends CustomPainter {
     required this.primaryDangerThreshold,
     required Color activeColor,
     required Color dangerColor,
-  })  : _primaryGapRadians = _calcGapRadians(_primarySegmentSpacing),
-        _primarySegmentRadians = _calcSegmentRadians(
-          _calcGapRadians(_primarySegmentSpacing),
-          _primarySegments,
-        ),
-        _primaryDangerStart = _calcDangerStart(
-          primaryDangerThreshold,
-          primaryMaxValue,
-          _primarySegments,
-        ),
-        _activePaint = Paint()
-          ..color = activeColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = _primarySegmentHeight
-          ..strokeCap = StrokeCap.butt,
-        _dangerActivePaint = Paint()
-          ..color = dangerColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = _primarySegmentHeight
-          ..strokeCap = StrokeCap.butt,
-        _throttleActivePaint = Paint()
-          ..color = activeColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = _throttleSegmentHeight
-          ..strokeCap = StrokeCap.butt,
-        super(repaint: Listenable.merge([throttleAnimation, primaryAnimation]));
+  }) : _primaryGapRadians = _calcGapRadians(_primarySegmentSpacing),
+       _primarySegmentRadians = _calcSegmentRadians(
+         _calcGapRadians(_primarySegmentSpacing),
+         _primarySegments,
+       ),
+       _primaryDangerStart = _calcDangerStart(
+         primaryDangerThreshold,
+         primaryMaxValue,
+         _primarySegments,
+       ),
+       _activePaint = Paint()
+         ..color = activeColor
+         ..style = PaintingStyle.stroke
+         ..strokeWidth = _primarySegmentHeight
+         ..strokeCap = StrokeCap.butt,
+       _dangerActivePaint = Paint()
+         ..color = dangerColor
+         ..style = PaintingStyle.stroke
+         ..strokeWidth = _primarySegmentHeight
+         ..strokeCap = StrokeCap.butt,
+       _throttleActivePaint = Paint()
+         ..color = activeColor
+         ..style = PaintingStyle.stroke
+         ..strokeWidth = _throttleSegmentHeight
+         ..strokeCap = StrokeCap.butt,
+       super(repaint: repaint);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -288,11 +311,20 @@ class _DualArcActivePainter extends CustomPainter {
     final partialProgress = continuousSegments - fullSegments;
 
     for (int i = 0; i <= fullSegments && i < _primarySegments; i++) {
-      final segStart = _startAngle + i * (_primarySegmentRadians + _primaryGapRadians);
-      final paint = i >= _primaryDangerStart ? _dangerActivePaint : _activePaint;
+      final segStart =
+          _startAngle + i * (_primarySegmentRadians + _primaryGapRadians);
+      final paint = i >= _primaryDangerStart
+          ? _dangerActivePaint
+          : _activePaint;
 
       if (i < fullSegments) {
-        canvas.drawArc(primaryRect, segStart, _primarySegmentRadians, false, paint);
+        canvas.drawArc(
+          primaryRect,
+          segStart,
+          _primarySegmentRadians,
+          false,
+          paint,
+        );
       } else {
         final partial = _primarySegmentRadians * partialProgress;
         if (partial > 0) {
@@ -303,12 +335,22 @@ class _DualArcActivePainter extends CustomPainter {
 
     // Inner throttle arc
     final throttleValue = throttleAnimation.value;
-    final throttleRadius = (baseRadius - _primarySegmentHeight) * _throttleRadiusFactor;
-    final throttleRect = Rect.fromCircle(center: center, radius: throttleRadius);
+    final throttleRadius =
+        (baseRadius - _primarySegmentHeight) * _throttleRadiusFactor;
+    final throttleRect = Rect.fromCircle(
+      center: center,
+      radius: throttleRadius,
+    );
     final throttleProgress = (throttleValue / throttleMaxValue).clamp(0.0, 1.0);
     final throttleSweep = _sweepAngle * throttleProgress;
     if (throttleSweep > 0) {
-      canvas.drawArc(throttleRect, _startAngle, throttleSweep, false, _throttleActivePaint);
+      canvas.drawArc(
+        throttleRect,
+        _startAngle,
+        throttleSweep,
+        false,
+        _throttleActivePaint,
+      );
     }
   }
 

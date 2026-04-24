@@ -140,7 +140,7 @@ class EcuService {
 
     // Le Go agent attend "." pour démarrer l'envoi de données.
     _safeSend('.');
-    _heartbeatTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+    _heartbeatTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
       _safeSend('.');
     });
   }

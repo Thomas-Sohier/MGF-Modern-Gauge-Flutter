@@ -104,8 +104,13 @@ class _RpmScreenState extends State<RpmScreen> {
               backgroundDial: Selector<EcuProvider, (double, double)>(
                 selector: (_, ecu) => (
                   ecu.currentData.data.throttleAngleValue,
-                  primary.getValue(ecu.currentData),
+                  primary.getValue(ecu.currentData).toDouble(), // ensure double
                 ),
+                shouldRebuild: (prev, next) {
+                  final throttleChanged = (prev.$1 - next.$1).abs() > 0.5;
+                  final primaryChanged = (prev.$2 - next.$2).abs() > 0.5;
+                  return throttleChanged || primaryChanged;
+                },
                 builder: (_, values, __) => DualArcDial(
                   throttleValue: values.$1,
                   primaryValue: values.$2,
