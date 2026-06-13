@@ -15,6 +15,9 @@ class SettingsData {
   /// Écrans activés (segments de route, ex: '/rpm', '/time')
   final Set<String> enabledScreens;
 
+  /// WiFi activé (piloté côté appareil via le serveur Go / rfkill)
+  final bool wifiEnabled;
+
   static const Set<String> allScreens = {
     '/rpm', '/time', '/faults', '/music',
     '/temps', '/injection', '/lambda', '/allumage', '/ralenti', '/admission',
@@ -24,17 +27,20 @@ class SettingsData {
     this.backgroundImagePath,
     this.themeMode = ThemeMode.dark,
     this.enabledScreens = allScreens,
+    this.wifiEnabled = true,
   });
 
   SettingsData copyWith({
     String? backgroundImagePath,
     ThemeMode? themeMode,
     Set<String>? enabledScreens,
+    bool? wifiEnabled,
   }) {
     return SettingsData(
       backgroundImagePath: backgroundImagePath ?? this.backgroundImagePath,
       themeMode: themeMode ?? this.themeMode,
       enabledScreens: enabledScreens ?? this.enabledScreens,
+      wifiEnabled: wifiEnabled ?? this.wifiEnabled,
     );
   }
 
@@ -49,6 +55,7 @@ class SettingsData {
               ?.map((e) => e as String)
               .toSet() ??
           allScreens,
+      wifiEnabled: json['wifiEnabled'] as bool? ?? true,
     );
   }
 
@@ -58,11 +65,12 @@ class SettingsData {
       'backgroundImagePath': backgroundImagePath,
       'themeMode': themeMode.index,
       'enabledScreens': enabledScreens.toList(),
+      'wifiEnabled': wifiEnabled,
     };
   }
 
   @override
   String toString() {
-    return 'SettingsData(backgroundImagePath: $backgroundImagePath, themeMode: $themeMode, enabledScreens: $enabledScreens)';
+    return 'SettingsData(backgroundImagePath: $backgroundImagePath, themeMode: $themeMode, enabledScreens: $enabledScreens, wifiEnabled: $wifiEnabled)';
   }
 }

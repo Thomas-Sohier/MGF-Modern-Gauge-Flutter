@@ -77,6 +77,19 @@ class EcuService {
     }
   }
 
+  /// Enables/disables WiFi on the device via the Go server (rfkill).
+  /// Returns true on HTTP 200. The /wifi/* routes are POST.
+  Future<bool> setWifiEnabled(bool enabled) async {
+    final action = enabled ? 'enable' : 'disable';
+    try {
+      final response = await http.post(Uri.parse('$baseUrl/wifi/$action'));
+      return response.statusCode == 200;
+    } catch (e) {
+      LogService.error('EcuService: Set WiFi $action failed: $e');
+      return false;
+    }
+  }
+
   // --- WebSocket ---
 
   Timer? _reconnectTimer;

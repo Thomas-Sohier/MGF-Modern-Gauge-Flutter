@@ -193,6 +193,14 @@ class FakeEcuService implements EcuService {
     lastCommand = command;
   }
 
+  bool? lastWifiEnabled;
+
+  @override
+  Future<bool> setWifiEnabled(bool enabled) async {
+    lastWifiEnabled = enabled;
+    return true;
+  }
+
   @override
   void dispose() {
     disposed = true;
