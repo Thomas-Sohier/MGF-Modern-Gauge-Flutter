@@ -192,6 +192,8 @@ class EcuService {
     _stableConnectionTimer = null;
     _channelSubscription?.cancel();
     _channelSubscription = null;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     // _channel = null AVANT sink.close() pour que le guard dans
     // _handleDisconnect() court-circuite tout onDone/onError résiduel.
     final channel = _channel;

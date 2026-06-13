@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:modern_gauge_flutter/app.dart';
 import 'package:modern_gauge_flutter/providers/app_state_provider.dart';
 import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
@@ -21,6 +24,14 @@ void main() async {
   final router = AppRouter.router;
 
   LogService.info("Application startup.");
+  SchedulerBinding.instance.addPostFrameCallback((_) async {
+    if (!Platform.isLinux) return;
+    try {
+      await Process.run('psplash-write', const ['QUIT']);
+    } catch (_) {
+      // psplash not running / not present — ignore
+    }
+  });
   runApp(
     App(
       settingsProvider: settingsProvider,
