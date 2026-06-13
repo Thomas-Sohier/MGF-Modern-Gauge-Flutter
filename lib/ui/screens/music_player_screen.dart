@@ -7,7 +7,7 @@ import 'package:modern_gauge_flutter/mixins/screen_navigation_mixin.dart';
 import 'package:modern_gauge_flutter/providers/mpris_provider.dart';
 import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
-import 'package:modern_gauge_flutter/services/mpris_listener.dart';
+import 'package:modern_gauge_flutter/models/media_info.dart';
 import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
 import 'package:modern_gauge_flutter/ui/widgets/music_dial.dart';
 import 'package:modern_gauge_flutter/utils/color_util.dart';
@@ -230,7 +230,11 @@ class _ColorExtractorService {
     }
 
     try {
-      final imageProvider = FileImage(File(artUrl));
+      final isNetwork =
+          artUrl.startsWith('http://') || artUrl.startsWith('https://');
+      final ImageProvider imageProvider = isNetwork
+          ? NetworkImage(artUrl)
+          : FileImage(File(artUrl));
       final palette = await ColorUtil().getColorsFromImage(imageProvider);
 
       final colorScheme = ColorScheme.fromSeed(seedColor: palette[0]);
@@ -255,25 +259,41 @@ class _AlbumArt extends StatelessWidget {
       selector: (_, listener) => listener.mediaInfo?.artUrl,
       builder: (_, artUrl, __) {
         const icon = Icon(Icons.music_note, size: 150, color: Colors.grey);
+        const decoration = BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFFE0E5E8),
+        );
+        const clip = BorderRadius.all(Radius.circular(1000));
+
+        if (artUrl == null) {
+          return Container(decoration: decoration, child: icon);
+        }
+
+        final isNetwork =
+            artUrl.startsWith('http://') || artUrl.startsWith('https://');
+        final imageWidget = isNetwork
+            ? Image.network(
+                artUrl,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                filterQuality: FilterQuality.medium,
+                gaplessPlayback: true,
+                errorBuilder: (_, __, ___) => icon,
+              )
+            : Image.file(
+                File(artUrl),
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                gaplessPlayback: true,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (_, __, ___) => icon,
+              );
+
         return Container(
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Color(0xFFE0E5E8),
-          ),
-          child: ClipRRect(
-            borderRadius: const BorderRadius.all(Radius.circular(1000)),
-            child: artUrl != null
-                ? Image.file(
-                    File(artUrl),
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    gaplessPlayback: true,
-                    filterQuality: FilterQuality.medium,
-                    errorBuilder: (_, __, ___) => icon,
-                  )
-                : icon,
-          ),
+          decoration: decoration,
+          child: ClipRRect(borderRadius: clip, child: imageWidget),
         );
       },
     );

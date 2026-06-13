@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:modern_gauge_flutter/services/mpris_listener.dart';
+import 'package:modern_gauge_flutter/models/media_info.dart';
 
 abstract class MprisListenerBase with ChangeNotifier {
   MediaInfo? get mediaInfo;

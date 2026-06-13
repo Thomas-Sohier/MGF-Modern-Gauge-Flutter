@@ -9,7 +9,7 @@ import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/routes/app_router.dart';
 import 'package:modern_gauge_flutter/services/ecu_service.dart';
 import 'package:modern_gauge_flutter/services/log_service.dart';
-import 'package:modern_gauge_flutter/services/mpris_listener.dart';
+import 'package:modern_gauge_flutter/services/now_playing_server_listener.dart';
 import 'package:modern_gauge_flutter/services/settings_service.dart';
 
 void main() async {
@@ -18,7 +18,7 @@ void main() async {
   await SettingsService().init();
   final ecuService = EcuService();
   final settingsProvider = SettingsProvider();
-  final mprisListener = MprisListener();
+  final mprisListener = NowPlayingServerListener();
   final appStateProvider = AppStateProvider();
   final ecuProvider = EcuProvider(ecuService);
   final router = AppRouter.router;
