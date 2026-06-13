@@ -55,7 +55,7 @@ class EcuService {
 
   Future<void> setEcuType(String name) async {
     try {
-      await http.get(Uri.parse('$baseUrl/ecu/$name'));
+      await http.post(Uri.parse('$baseUrl/ecu/$name'));
     } catch (e) {
       LogService.error('EcuService: Set ECU type failed: $e');
     }
@@ -63,7 +63,7 @@ class EcuService {
 
   Future<void> setSerialPort(String name) async {
     try {
-      await http.get(Uri.parse('$baseUrl/serialPort/$name'));
+      await http.post(Uri.parse('$baseUrl/serialPort/$name'));
     } catch (e) {
       LogService.error('EcuService: Set serial port failed: $e');
     }
@@ -71,9 +71,22 @@ class EcuService {
 
   Future<void> sendCommand(String command) async {
     try {
-      await http.get(Uri.parse('$baseUrl/command/$command'));
+      await http.post(Uri.parse('$baseUrl/command/$command'));
     } catch (e) {
       LogService.error('EcuService: Send command failed: $e');
+    }
+  }
+
+  /// Enables/disables WiFi on the device via the Go server (rfkill).
+  /// Returns true on HTTP 200. The /wifi/* routes are POST.
+  Future<bool> setWifiEnabled(bool enabled) async {
+    final action = enabled ? 'enable' : 'disable';
+    try {
+      final response = await http.post(Uri.parse('$baseUrl/wifi/$action'));
+      return response.statusCode == 200;
+    } catch (e) {
+      LogService.error('EcuService: Set WiFi $action failed: $e');
+      return false;
     }
   }
 

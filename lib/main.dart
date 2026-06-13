@@ -24,6 +24,14 @@ void main() async {
   final router = AppRouter.router;
 
   LogService.info("Application startup.");
+
+  // Re-apply the persisted WiFi choice on boot. rfkill state does not survive a
+  // reboot on this image, so if WiFi was turned off in settings, push that to
+  // the device again (best-effort; the Go server starts before the UI).
+  if (!settingsProvider.settings.wifiEnabled) {
+    ecuProvider.setWifiEnabled(false);
+  }
+
   SchedulerBinding.instance.addPostFrameCallback((_) async {
     if (!Platform.isLinux) return;
     try {

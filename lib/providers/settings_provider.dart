@@ -33,5 +33,8 @@ class SettingsProvider with ChangeNotifier {
     _update(_settings.copyWith(enabledScreens: current));
   }
 
+  void setWifiEnabled(bool enabled) =>
+      _update(_settings.copyWith(wifiEnabled: enabled));
+
   void resetSettings() => _update(SettingsData());
 }

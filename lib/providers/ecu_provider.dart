@@ -64,6 +64,8 @@ class EcuProvider with ChangeNotifier {
   Future<void> setSerialPort(String name) => _ecuService.setSerialPort(name);
   Future<void> sendCommand(String command) => _ecuService.sendCommand(command);
   Future<void> clearFaults() => _ecuService.sendCommand('clear_faults');
+  Future<bool> setWifiEnabled(bool enabled) =>
+      _ecuService.setWifiEnabled(enabled);
 
   @override
   void dispose() {
