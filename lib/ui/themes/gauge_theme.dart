@@ -43,7 +43,11 @@ class GaugeTheme extends ThemeExtension<GaugeTheme> {
       activeColor: Color.lerp(activeColor, other.activeColor, t),
       inactiveColor: Color.lerp(inactiveColor, other.inactiveColor, t),
       dangerColor: Color.lerp(dangerColor, other.dangerColor, t),
-      dangerInactiveColor: Color.lerp(dangerInactiveColor, other.dangerInactiveColor, t),
+      dangerInactiveColor: Color.lerp(
+        dangerInactiveColor,
+        other.dangerInactiveColor,
+        t,
+      ),
       borderColor: Color.lerp(borderColor, other.borderColor, t),
     );
   }

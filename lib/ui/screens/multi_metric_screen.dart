@@ -141,10 +141,7 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
               ),
             )
             .toList(),
-        child: MetricPrimaryDisplay(
-          metric: primary,
-          onCycle: _cyclePrimary,
-        ),
+        child: MetricPrimaryDisplay(metric: primary, onCycle: _cyclePrimary),
       ),
     );
   }
@@ -171,8 +168,9 @@ class MetricPrimaryDisplay extends StatelessWidget {
         final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
         final isDanger =
             metric.dangerThreshold != null && value >= metric.dangerThreshold!;
-        final color =
-            isDanger ? gaugeTheme.dangerColor! : gaugeTheme.activeColor!;
+        final color = isDanger
+            ? gaugeTheme.dangerColor!
+            : gaugeTheme.activeColor!;
 
         return GestureDetector(
           onTap: onCycle,
@@ -225,8 +223,7 @@ class MetricIndicator extends StatelessWidget {
     if (metric.isAction) {
       return Selector<EcuProvider, IconData?>(
         selector: (_, ecu) => metric.icon?.call(ecu.currentData),
-        builder: (context, iconData, _) =>
-            _buildContent(context, 0, iconData),
+        builder: (context, iconData, _) => _buildContent(context, 0, iconData),
       );
     }
 
@@ -234,8 +231,7 @@ class MetricIndicator extends StatelessWidget {
     final staticIcon = metric.icon?.call(null);
     return Selector<EcuProvider, double>(
       selector: (_, ecu) => metric.getValue(ecu.currentData),
-      builder: (context, value, _) =>
-          _buildContent(context, value, staticIcon),
+      builder: (context, value, _) => _buildContent(context, value, staticIcon),
     );
   }
 

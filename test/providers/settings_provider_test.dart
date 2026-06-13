@@ -54,7 +54,10 @@ void main() {
 
         provider.toggleScreen('/time');
 
-        expect(provider.settings.enabledScreens, equals({'/rpm', '/music', '/faults'}));
+        expect(
+          provider.settings.enabledScreens,
+          equals({'/rpm', '/music', '/faults'}),
+        );
       });
     });
 
@@ -62,9 +65,11 @@ void main() {
       test('updates background path', () {
         provider.setBackgroundImage('/path/to/image.png');
 
-        expect(provider.settings.backgroundImagePath, equals('/path/to/image.png'));
+        expect(
+          provider.settings.backgroundImagePath,
+          equals('/path/to/image.png'),
+        );
       });
-
 
       test('notifies listeners', () {
         var notified = false;
@@ -134,17 +139,22 @@ void main() {
 
     group('resetSettings', () {
       test('resets to default values', () {
-        provider.setSettings(SettingsData(
-          backgroundImagePath: '/custom.png',
-          themeMode: ThemeMode.light,
-          enabledScreens: {'/rpm'},
-        ));
+        provider.setSettings(
+          SettingsData(
+            backgroundImagePath: '/custom.png',
+            themeMode: ThemeMode.light,
+            enabledScreens: {'/rpm'},
+          ),
+        );
 
         provider.resetSettings();
 
         expect(provider.settings.backgroundImagePath, isNull);
         expect(provider.settings.themeMode, equals(ThemeMode.dark));
-        expect(provider.settings.enabledScreens, equals(SettingsData.allScreens));
+        expect(
+          provider.settings.enabledScreens,
+          equals(SettingsData.allScreens),
+        );
       });
 
       test('notifies listeners', () {

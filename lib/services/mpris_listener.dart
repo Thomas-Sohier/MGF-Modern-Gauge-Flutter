@@ -55,7 +55,9 @@ class MprisListener with ChangeNotifier implements MprisListenerBase {
   @override
   Future<void> start() async {
     if (!Platform.isLinux) {
-      LogService.warning('[MprisListener] - Skipping initialization. Not on Linux platform.');
+      LogService.warning(
+        '[MprisListener] - Skipping initialization. Not on Linux platform.',
+      );
       return;
     }
 
@@ -73,12 +75,16 @@ class MprisListener with ChangeNotifier implements MprisListenerBase {
       (signal) {
         if (!signal.name.startsWith(_mprisPrefix)) return;
 
-        final hasNewOwner = signal.newOwner != null && signal.newOwner!.isNotEmpty;
-        final hasOldOwner = signal.oldOwner != null && signal.oldOwner!.isNotEmpty;
+        final hasNewOwner =
+            signal.newOwner != null && signal.newOwner!.isNotEmpty;
+        final hasOldOwner =
+            signal.oldOwner != null && signal.oldOwner!.isNotEmpty;
 
         if (hasNewOwner && _playerObject == null) {
           _connectToPlayer(signal.name);
-        } else if (!hasNewOwner && hasOldOwner && signal.name == _currentPlayerName) {
+        } else if (!hasNewOwner &&
+            hasOldOwner &&
+            signal.name == _currentPlayerName) {
           _disconnectAndReset();
         }
       },
@@ -125,13 +131,18 @@ class MprisListener with ChangeNotifier implements MprisListenerBase {
     if (_playerObject == null) return;
 
     try {
-      final properties = await _playerObject!.getAllProperties(_playerInterface);
+      final properties = await _playerObject!.getAllProperties(
+        _playerInterface,
+      );
 
       _updateMetadata(properties['Metadata']?.asStringVariantDict() ?? {});
 
-      final statusString = properties['PlaybackStatus']?.asString() ?? 'Stopped';
+      final statusString =
+          properties['PlaybackStatus']?.asString() ?? 'Stopped';
       _playbackStatus = _stringToPlaybackStatus(statusString);
-      LogService.info("[MprisListener] - Initial playback status: ${_playbackStatus.name}");
+      LogService.info(
+        "[MprisListener] - Initial playback status: ${_playbackStatus.name}",
+      );
 
       await _syncPosition();
 
@@ -170,7 +181,9 @@ class MprisListener with ChangeNotifier implements MprisListenerBase {
           final newStatus = _stringToPlaybackStatus(newStatusString);
           if (_playbackStatus != newStatus) {
             _playbackStatus = newStatus;
-            LogService.info("[MprisListener] - Playback status: ${_playbackStatus.name}");
+            LogService.info(
+              "[MprisListener] - Playback status: ${_playbackStatus.name}",
+            );
 
             if (isPlaying) {
               await _syncPosition();
@@ -197,7 +210,10 @@ class MprisListener with ChangeNotifier implements MprisListenerBase {
   Future<void> _syncPosition() async {
     if (_playerObject == null) return;
     try {
-      final positionVariant = await _playerObject!.getProperty(_playerInterface, 'Position');
+      final positionVariant = await _playerObject!.getProperty(
+        _playerInterface,
+        'Position',
+      );
       _updatePosition(positionVariant.asInt64());
     } catch (e) {
       LogService.error("[MprisListener] - sync position: $e");
@@ -265,7 +281,9 @@ class MprisListener with ChangeNotifier implements MprisListenerBase {
         duration: Duration(microseconds: durationInMicroseconds),
       );
 
-      LogService.info("[MprisListener] - updated: ${_mediaInfo?.title} - ${_mediaInfo?.artist}");
+      LogService.info(
+        "[MprisListener] - updated: ${_mediaInfo?.title} - ${_mediaInfo?.artist}",
+      );
     } catch (e) {
       LogService.error("[MprisListener] - updateMetadata: $e");
     }

@@ -25,9 +25,7 @@ class AnalogClock extends StatelessWidget {
       children: [
         // Static face — cached as GPU texture; only redrawn on theme change.
         RepaintBoundary(
-          child: CustomPaint(
-            painter: _ClockFacePainter(theme: clockTheme),
-          ),
+          child: CustomPaint(painter: _ClockFacePainter(theme: clockTheme)),
         ),
         // Dynamic layer — hands + shadows + pivot; repaints once per minute.
         CustomPaint(
@@ -52,11 +50,10 @@ class _ClockFacePainter extends CustomPainter {
   final Paint _minuteDotPaint;
 
   _ClockFacePainter({required this.theme})
-      : _hourTickPaint = Paint()
-          ..color = theme.hourTickColor ?? Colors.black
-          ..strokeWidth = 2.0,
-        _minuteDotPaint = Paint()
-          ..color = theme.minuteDotColor ?? Colors.black54;
+    : _hourTickPaint = Paint()
+        ..color = theme.hourTickColor ?? Colors.black
+        ..strokeWidth = 2.0,
+      _minuteDotPaint = Paint()..color = theme.minuteDotColor ?? Colors.black54;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -134,8 +131,8 @@ class _CachedLabel {
   final double halfHeight;
 
   _CachedLabel(this.painter)
-      : halfWidth = painter.width / 2,
-        halfHeight = painter.height / 2;
+    : halfWidth = painter.width / 2,
+      halfHeight = painter.height / 2;
 }
 
 /// Memoized cache for hour label layouts, keyed by size.width.
@@ -152,7 +149,9 @@ class _LabelCache {
 
   static _LabelCache get(double width, double radius, AnalogClockTheme theme) {
     final textColor = theme.numberColor ?? Colors.black;
-    if (_instance != null && _cachedWidth == width && _cachedColor == textColor) {
+    if (_instance != null &&
+        _cachedWidth == width &&
+        _cachedColor == textColor) {
       return _instance!;
     }
 
@@ -195,17 +194,16 @@ class _ClockHandsPainter extends CustomPainter {
   final Paint _ridgesPaint; // strokeWidth set per paint call (size-dependent)
 
   _ClockHandsPainter({required this.dateTime, required this.theme})
-      : _handPaint = Paint()
-          ..color = theme.handColor ?? const Color.fromARGB(255, 184, 43, 43)
-          ..style = PaintingStyle.fill,
-        _shadowPaint = Paint()
-          ..color = (theme.shadowColor ?? Colors.black.withAlpha(128))
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
-        _pivotPaint = Paint()
-          ..color = theme.centerPivotColor ?? Colors.black,
-        _ridgesPaint = Paint()
-          ..color = theme.centerPivotRidgeColor ?? Colors.grey.shade600
-          ..style = PaintingStyle.stroke;
+    : _handPaint = Paint()
+        ..color = theme.handColor ?? const Color.fromARGB(255, 184, 43, 43)
+        ..style = PaintingStyle.fill,
+      _shadowPaint = Paint()
+        ..color = (theme.shadowColor ?? Colors.black.withAlpha(128))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
+      _pivotPaint = Paint()..color = theme.centerPivotColor ?? Colors.black,
+      _ridgesPaint = Paint()
+        ..color = theme.centerPivotRidgeColor ?? Colors.grey.shade600
+        ..style = PaintingStyle.stroke;
 
   @override
   void paint(Canvas canvas, Size size) {

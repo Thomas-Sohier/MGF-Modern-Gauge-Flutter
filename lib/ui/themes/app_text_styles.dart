@@ -10,19 +10,19 @@ class AppTextStyles {
 
   /// Large gauge reading — e.g. RPM value (45px bold).
   static TextStyle display(Color color) => TextStyle(
-        fontFamily: _font,
-        fontSize: 45,
-        fontWeight: FontWeight.bold,
-        color: color,
-      );
+    fontFamily: _font,
+    fontSize: 45,
+    fontWeight: FontWeight.bold,
+    color: color,
+  );
 
   /// Unit label beside a gauge value — e.g. "RPM", "km/h" (20px w500).
   static TextStyle unit(Color color) => TextStyle(
-        fontFamily: _font,
-        fontSize: 20,
-        fontWeight: FontWeight.w500,
-        color: color,
-      );
+    fontFamily: _font,
+    fontSize: 20,
+    fontWeight: FontWeight.w500,
+    color: color,
+  );
 
   /// Screen or section title — e.g. "Codes erreurs" (20px w700).
   static const TextStyle title = TextStyle(

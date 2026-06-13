@@ -28,7 +28,9 @@ class App extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => settingsProvider),
-        ChangeNotifierProvider<MprisListenerBase>(create: (context) => mprisListener..start()),
+        ChangeNotifierProvider<MprisListenerBase>(
+          create: (context) => mprisListener..start(),
+        ),
         ChangeNotifierProvider(create: (context) => appStateProvider),
         ChangeNotifierProvider(create: (context) => ecuProvider),
       ],

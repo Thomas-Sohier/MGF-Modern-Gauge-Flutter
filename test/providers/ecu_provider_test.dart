@@ -78,7 +78,10 @@ void main() {
       expect(provider!.initialDataFetched, isFalse);
       expect(fakeService.reconnectWebSocketCalled, isFalse);
 
-      fakeService.initialDataToReturn = EcuInfos(connected: true, ecuType: 'RETRY');
+      fakeService.initialDataToReturn = EcuInfos(
+        connected: true,
+        ecuType: 'RETRY',
+      );
       await provider!.retryInitialData();
 
       expect(fakeService.reconnectWebSocketCalled, isTrue);
@@ -121,7 +124,6 @@ void main() {
 
       expect(localService.disposed, isTrue);
     });
-
   });
 }
 

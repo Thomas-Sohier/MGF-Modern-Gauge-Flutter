@@ -99,7 +99,8 @@ class _ArcFlowDelegate extends FlowDelegate {
 
       final childSize = context.getChildSize(i) ?? Size.zero;
       final x = center.dx + childRadius * math.cos(angle) - childSize.width / 2;
-      final y = center.dy + childRadius * math.sin(angle) - childSize.height / 2;
+      final y =
+          center.dy + childRadius * math.sin(angle) - childSize.height / 2;
 
       context.paintChild(i, transform: Matrix4.translationValues(x, y, 0));
     }
