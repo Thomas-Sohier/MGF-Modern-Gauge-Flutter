@@ -55,7 +55,7 @@ class EcuService {
 
   Future<void> setEcuType(String name) async {
     try {
-      await http.get(Uri.parse('$baseUrl/ecu/$name'));
+      await http.post(Uri.parse('$baseUrl/ecu/$name'));
     } catch (e) {
       LogService.error('EcuService: Set ECU type failed: $e');
     }
@@ -63,7 +63,7 @@ class EcuService {
 
   Future<void> setSerialPort(String name) async {
     try {
-      await http.get(Uri.parse('$baseUrl/serialPort/$name'));
+      await http.post(Uri.parse('$baseUrl/serialPort/$name'));
     } catch (e) {
       LogService.error('EcuService: Set serial port failed: $e');
     }
@@ -71,7 +71,7 @@ class EcuService {
 
   Future<void> sendCommand(String command) async {
     try {
-      await http.get(Uri.parse('$baseUrl/command/$command'));
+      await http.post(Uri.parse('$baseUrl/command/$command'));
     } catch (e) {
       LogService.error('EcuService: Send command failed: $e');
     }
