@@ -22,60 +22,74 @@ class AppRouter {
     routes: <RouteBase>[
       GoRoute(
         path: RouteNames.splashRoute,
-        pageBuilder: (context, state) => const NoTransitionPage(child: SplashScreen()),
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: SplashScreen()),
       ),
 
       ShellRoute(
-        pageBuilder: (context, state, child) => NoTransitionPage(child: DashboardShellScreen(child: child)),
+        pageBuilder: (context, state, child) =>
+            NoTransitionPage(child: DashboardShellScreen(child: child)),
         routes: <RouteBase>[
           GoRoute(
             path: RouteNames.timeFull,
-            pageBuilder: (context, state) => const NoTransitionPage(child: ClockScreen()),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ClockScreen()),
           ),
           GoRoute(
             path: RouteNames.rpmFull,
-            pageBuilder: (context, state) => const NoTransitionPage(child: RpmScreen()),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: RpmScreen()),
           ),
           GoRoute(
             path: RouteNames.musicFull,
-            pageBuilder: (context, state) => const NoTransitionPage(child: MusicPlayerScreen()),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: MusicPlayerScreen()),
           ),
           GoRoute(
             path: RouteNames.faultsFull,
-            pageBuilder: (context, state) => const NoTransitionPage(child: FaultsScreen()),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: FaultsScreen()),
           ),
           GoRoute(
             path: RouteNames.tempsFull,
-            pageBuilder: (context, state) => const NoTransitionPage(child: TempsScreen()),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: TempsScreen()),
           ),
           GoRoute(
             path: RouteNames.injectionFull,
-            pageBuilder: (context, state) => const NoTransitionPage(child: InjectionScreen()),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: InjectionScreen()),
           ),
           GoRoute(
             path: RouteNames.lambdaFull,
-            pageBuilder: (context, state) => const NoTransitionPage(child: LambdaScreen()),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: LambdaScreen()),
           ),
           GoRoute(
             path: RouteNames.allumageFull,
-            pageBuilder: (context, state) => const NoTransitionPage(child: AllumageScreen()),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: AllumageScreen()),
           ),
           GoRoute(
             path: RouteNames.ralentiFull,
-            pageBuilder: (context, state) => const NoTransitionPage(child: RalentiScreen()),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: RalentiScreen()),
           ),
           GoRoute(
             path: RouteNames.admissionFull,
-            pageBuilder: (context, state) => const NoTransitionPage(child: AdmissionScreen()),
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: AdmissionScreen()),
           ),
         ],
       ),
 
       GoRoute(
         path: RouteNames.settingsRoute,
-        pageBuilder: (context, state) => const NoTransitionPage(child: SettingsScreen()),
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: SettingsScreen()),
       ),
     ],
-    errorBuilder: (context, state) => const Scaffold(body: Center(child: Text('Error: Page not found'))),
+    errorBuilder: (context, state) =>
+        const Scaffold(body: Center(child: Text('Error: Page not found'))),
   );
 }

@@ -46,8 +46,11 @@ class GaugeTexturedBackground extends StatelessWidget {
                     gaugeThemeBackground.backgroundColor ??
                     const Color(0xFFE0E0E0),
                 borderColor:
-                    borderColor ?? gaugeThemeBackground.borderColor ?? Colors.black54,
-                borderWidth: borderWidth ?? gaugeThemeBackground.borderWidth ?? 2.0,
+                    borderColor ??
+                    gaugeThemeBackground.borderColor ??
+                    Colors.black54,
+                borderWidth:
+                    borderWidth ?? gaugeThemeBackground.borderWidth ?? 2.0,
               ),
             ),
           ),

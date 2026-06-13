@@ -22,7 +22,9 @@ class SettingsService {
   // S'assure que le service a été initialisé avant utilisation.
   void _ensureInitialized() {
     if (_prefs == null) {
-      throw Exception('SettingsService not initialized. Call init() before using.');
+      throw Exception(
+        'SettingsService not initialized. Call init() before using.',
+      );
     }
   }
 
@@ -37,7 +39,9 @@ class SettingsService {
         final Map<String, dynamic> decodedJson = json.decode(settingsJson);
         return SettingsData.fromJson(decodedJson);
       } catch (e) {
-        LogService.error('[SettingsService] - Error decoding settings JSON, returning default settings: $e');
+        LogService.error(
+          '[SettingsService] - Error decoding settings JSON, returning default settings: $e',
+        );
         return SettingsData();
       }
     }

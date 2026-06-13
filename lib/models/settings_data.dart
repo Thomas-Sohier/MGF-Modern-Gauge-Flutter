@@ -16,8 +16,16 @@ class SettingsData {
   final Set<String> enabledScreens;
 
   static const Set<String> allScreens = {
-    '/rpm', '/time', '/faults', '/music',
-    '/temps', '/injection', '/lambda', '/allumage', '/ralenti', '/admission',
+    '/rpm',
+    '/time',
+    '/faults',
+    '/music',
+    '/temps',
+    '/injection',
+    '/lambda',
+    '/allumage',
+    '/ralenti',
+    '/admission',
   };
 
   SettingsData({

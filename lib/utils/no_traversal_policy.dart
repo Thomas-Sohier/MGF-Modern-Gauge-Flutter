@@ -33,24 +33,36 @@ class NoTraversalPolicy extends FocusTraversalPolicy {
   // --- Méthodes pour trouver le premier/dernier focus ---
 
   @override
-  FocusNode findFirstFocus(FocusNode currentNode, {bool ignoreCurrentFocus = true}) {
+  FocusNode findFirstFocus(
+    FocusNode currentNode, {
+    bool ignoreCurrentFocus = true,
+  }) {
     return currentNode;
   }
 
   @override
-  FocusNode findLastFocus(FocusNode currentNode, {bool ignoreCurrentFocus = true}) {
+  FocusNode findLastFocus(
+    FocusNode currentNode, {
+    bool ignoreCurrentFocus = true,
+  }) {
     return currentNode;
   }
 
   // --- NOUVELLES MÉTHODES REQUISES ---
 
   @override
-  FocusNode? findFirstFocusInDirection(FocusNode currentNode, TraversalDirection direction) {
+  FocusNode? findFirstFocusInDirection(
+    FocusNode currentNode,
+    TraversalDirection direction,
+  ) {
     return null;
   }
 
   @override
-  Iterable<FocusNode> sortDescendants(Iterable<FocusNode> descendants, FocusNode currentNode) {
+  Iterable<FocusNode> sortDescendants(
+    Iterable<FocusNode> descendants,
+    FocusNode currentNode,
+  ) {
     return _defaultPolicy.sortDescendants(descendants, currentNode);
   }
 }

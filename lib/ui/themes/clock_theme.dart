@@ -37,7 +37,8 @@ class AnalogClockTheme extends ThemeExtension<AnalogClockTheme> {
       minuteDotColor: minuteDotColor ?? this.minuteDotColor,
       numberColor: numberColor ?? this.numberColor,
       centerPivotColor: centerPivotColor ?? this.centerPivotColor,
-      centerPivotRidgeColor: centerPivotRidgeColor ?? this.centerPivotRidgeColor,
+      centerPivotRidgeColor:
+          centerPivotRidgeColor ?? this.centerPivotRidgeColor,
       shadowColor: shadowColor ?? this.shadowColor,
     );
   }
@@ -53,7 +54,11 @@ class AnalogClockTheme extends ThemeExtension<AnalogClockTheme> {
       minuteDotColor: Color.lerp(minuteDotColor, other.minuteDotColor, t),
       numberColor: Color.lerp(numberColor, other.numberColor, t),
       centerPivotColor: Color.lerp(centerPivotColor, other.centerPivotColor, t),
-      centerPivotRidgeColor: Color.lerp(centerPivotRidgeColor, other.centerPivotRidgeColor, t),
+      centerPivotRidgeColor: Color.lerp(
+        centerPivotRidgeColor,
+        other.centerPivotRidgeColor,
+        t,
+      ),
       shadowColor: Color.lerp(shadowColor, other.shadowColor, t),
     );
   }

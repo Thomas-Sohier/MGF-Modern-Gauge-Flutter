@@ -76,7 +76,8 @@ class EcuData {
   num? get ambientTemp => _json['ambient_temp'] as num?;
   num? get batteryVoltage => _json['battery_voltage'] as num?;
   num? get camPercent => _json['cam_percent'] as num?;
-  num? get carbonCanPurgeValveDutyCycle => _json['carbon_can_purge_valve_duty_cycle'] as num?;
+  num? get carbonCanPurgeValveDutyCycle =>
+      _json['carbon_can_purge_valve_duty_cycle'] as num?;
   num? get closedLoop => _json['closed_loop'] as num?;
   num? get coil1ChargeTime => _json['coil_1_charge_time'] as num?;
   num? get coil2ChargeTime => _json['coil_2_charge_time'] as num?;
@@ -87,7 +88,8 @@ class EcuData {
   num? get fan1Control => _json['fan_1_control'] as num?;
   num? get fan2Control => _json['fan_2_control'] as num?;
   num? get fuelRailTemp => _json['fuel_rail_temp'] as num?;
-  num? get fuellingFeedbackPercent => _json['fuelling_feedback_percent'] as num?;
+  num? get fuellingFeedbackPercent =>
+      _json['fuelling_feedback_percent'] as num?;
   num? get idleAdjusterRpm => _json['idle_adjuster_rpm'] as num?;
   num? get idleBasePosition => _json['idle_base_position'] as num?;
   num? get idleError => _json['idle_error'] as num?;
@@ -139,18 +141,21 @@ class EcuData {
   double get fuelRailTempValue => fuelRailTemp?.toDouble() ?? 0;
   double get mapSensorKpaValue => mapSensorKpa?.toDouble() ?? 0;
   double get ignitionAdvanceValue => ignitionAdvance?.toDouble() ?? 0;
-  double get ignitionAdvanceOffsetValue => ignitionAdvanceOffset?.toDouble() ?? 0;
+  double get ignitionAdvanceOffsetValue =>
+      ignitionAdvanceOffset?.toDouble() ?? 0;
   double get coilTimeMicrosecondsValue => coilTimeMicroseconds?.toDouble() ?? 0;
   double get coil1ChargeTimeValue => coil1ChargeTime?.toDouble() ?? 0;
   double get coil2ChargeTimeValue => coil2ChargeTime?.toDouble() ?? 0;
   double get injector1PwValue => injector1Pw?.toDouble() ?? 0;
   double get injector2PwValue => injector2Pw?.toDouble() ?? 0;
   double get lambdaMvValue => lambdaMv?.toDouble() ?? 0;
-  double get lambdaSensorDutyCycleValue => lambdaSensorDutyCycle?.toDouble() ?? 0;
+  double get lambdaSensorDutyCycleValue =>
+      lambdaSensorDutyCycle?.toDouble() ?? 0;
   double get o2MvValue => o2Mv?.toDouble() ?? 0;
   double get shortTermTrimPercentValue => shortTermTrimPercent?.toDouble() ?? 0;
   double get longTermTrimValue => longTermTrim?.toDouble() ?? 0;
-  double get fuellingFeedbackPercentValue => fuellingFeedbackPercent?.toDouble() ?? 0;
+  double get fuellingFeedbackPercentValue =>
+      fuellingFeedbackPercent?.toDouble() ?? 0;
   double get estimateAirFuelValue => estimateAirFuel?.toDouble() ?? 0;
   double get idleSetpointValue => idleSetpoint?.toDouble() ?? 0;
   double get idleAdjusterRpmValue => idleAdjusterRpm?.toDouble() ?? 0;

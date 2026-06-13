@@ -52,8 +52,7 @@ class _ClockScreenState extends State<ClockScreen>
   /// then switches to a periodic 1-minute timer.
   void _scheduleNextMinuteTick() {
     final now = DateTime.now();
-    final msUntilNextMinute =
-        (60 - now.second) * 1000 - now.millisecond;
+    final msUntilNextMinute = (60 - now.second) * 1000 - now.millisecond;
 
     _timer = Timer(Duration(milliseconds: msUntilNextMinute), () {
       _tick();

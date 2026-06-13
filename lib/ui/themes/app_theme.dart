@@ -34,7 +34,9 @@ class AppColors {
   // ── Commun ──────────────────────────────────────────────────────────────
   static const Color danger = Color(0xFFFF453A);
   static const Color dangerDim = Color(0x33FF453A);
-  static const Color clockHand = Color(0xFFB82B2B); // rouge original, identique dark/light
+  static const Color clockHand = Color(
+    0xFFB82B2B,
+  ); // rouge original, identique dark/light
 }
 
 class AppTheme {

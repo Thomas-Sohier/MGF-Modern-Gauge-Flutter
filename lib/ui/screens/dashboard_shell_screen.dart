@@ -42,8 +42,10 @@ class _DashboardShellScreenState extends State<DashboardShellScreen> {
     // pour éviter les doubles déclenchements.
     if (event is KeyDownEvent) {
       final String currentLocation = GoRouter.of(context).state.matchedLocation;
-      final enabledScreens =
-          context.read<SettingsProvider>().settings.enabledScreens;
+      final enabledScreens = context
+          .read<SettingsProvider>()
+          .settings
+          .enabledScreens;
 
       // Flèche droite -> écran suivant
       if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
@@ -75,9 +77,7 @@ class _DashboardShellScreenState extends State<DashboardShellScreen> {
         onKeyEvent: _handleKeyEvent,
         child: Scaffold(
           backgroundColor: Colors.transparent,
-          body: Center(
-            child: GaugeTexturedBackground(child: widget.child),
-          ),
+          body: Center(child: GaugeTexturedBackground(child: widget.child)),
         ),
       ),
     );
