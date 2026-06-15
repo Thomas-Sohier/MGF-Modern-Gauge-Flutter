@@ -263,7 +263,6 @@ class _AlbumArt extends StatelessWidget {
           shape: BoxShape.circle,
           color: Color(0xFFE0E5E8),
         );
-        const clip = BorderRadius.all(Radius.circular(1000));
 
         if (artUrl == null) {
           return Container(decoration: decoration, child: icon);
@@ -292,8 +291,9 @@ class _AlbumArt extends StatelessWidget {
               );
 
         return Container(
+          clipBehavior: Clip.antiAlias,
           decoration: decoration,
-          child: ClipRRect(borderRadius: clip, child: imageWidget),
+          child: imageWidget,
         );
       },
     );
