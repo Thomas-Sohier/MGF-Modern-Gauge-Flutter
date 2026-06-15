@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/models/settings_data.dart';
 import 'package:modern_gauge_flutter/services/settings_service.dart';
+import 'package:modern_gauge_flutter/utils/app_constants.dart';
 
 class SettingsProvider with ChangeNotifier {
   SettingsData _settings = SettingsData();
@@ -35,6 +36,14 @@ class SettingsProvider with ChangeNotifier {
 
   void setWifiEnabled(bool enabled) =>
       _update(_settings.copyWith(wifiEnabled: enabled));
+
+  void setNotificationDurationSeconds(int seconds) {
+    final clamped = seconds.clamp(
+      AppConstants.minNotificationDurationSeconds,
+      AppConstants.maxNotificationDurationSeconds,
+    );
+    _update(_settings.copyWith(notificationDurationSeconds: clamped));
+  }
 
   void resetSettings() => _update(SettingsData());
 }

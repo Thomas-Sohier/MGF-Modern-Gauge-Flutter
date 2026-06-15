@@ -42,4 +42,10 @@ class AppConstants {
   static const String navigationWsUrl = '$serverWsBase/ws/navigation';
   static const String navigationIconUrl = '$serverHttpBase/api/navigation/icon';
   static const String notificationsWsUrl = '$serverWsBase/ws/notifications';
+
+  // --- Notification overlay ---
+  /// How long the incoming-notification screen stays in front, in seconds.
+  static const int defaultNotificationDurationSeconds = 10;
+  static const int minNotificationDurationSeconds = 3;
+  static const int maxNotificationDurationSeconds = 30;
 }

@@ -7,6 +7,7 @@ import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/services/navigation_server_listener.dart';
 import 'package:modern_gauge_flutter/services/notification_server_listener.dart';
 import 'package:modern_gauge_flutter/ui/themes/app_theme.dart';
+import 'package:modern_gauge_flutter/ui/widgets/notification_overlay.dart';
 import 'package:provider/provider.dart';
 
 class App extends StatelessWidget {
@@ -59,6 +60,10 @@ class App extends StatelessWidget {
             themeMode: status,
             routerConfig: router,
             debugShowCheckedModeBanner: false,
+            builder: (context, child) => NotificationOverlayHost(
+              router: router,
+              child: child ?? const SizedBox.shrink(),
+            ),
           );
         },
       ),
