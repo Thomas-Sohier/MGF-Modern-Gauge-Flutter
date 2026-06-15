@@ -9,6 +9,8 @@ import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/routes/app_router.dart';
 import 'package:modern_gauge_flutter/services/ecu_service.dart';
 import 'package:modern_gauge_flutter/services/log_service.dart';
+import 'package:modern_gauge_flutter/services/navigation_server_listener.dart';
+import 'package:modern_gauge_flutter/services/notification_server_listener.dart';
 import 'package:modern_gauge_flutter/services/now_playing_server_listener.dart';
 import 'package:modern_gauge_flutter/services/settings_service.dart';
 
@@ -19,6 +21,8 @@ void main() async {
   final ecuService = EcuService();
   final settingsProvider = SettingsProvider();
   final mprisListener = NowPlayingServerListener();
+  final navigationListener = NavigationServerListener();
+  final notificationListener = NotificationServerListener();
   final appStateProvider = AppStateProvider();
   final ecuProvider = EcuProvider(ecuService);
   final router = AppRouter.router;
@@ -44,6 +48,8 @@ void main() async {
     App(
       settingsProvider: settingsProvider,
       mprisListener: mprisListener,
+      navigationListener: navigationListener,
+      notificationListener: notificationListener,
       appStateProvider: appStateProvider,
       ecuProvider: ecuProvider,
       router: router,
