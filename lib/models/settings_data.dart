@@ -27,6 +27,7 @@ class SettingsData {
     '/time',
     '/faults',
     '/music',
+    '/navigation',
     '/temps',
     '/injection',
     '/lambda',

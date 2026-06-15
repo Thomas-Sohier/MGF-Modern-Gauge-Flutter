@@ -39,6 +39,11 @@ const _kScreenDefs = [
     icon: Icons.music_note_rounded,
   ),
   _ScreenDef(
+    routeSegment: '/navigation',
+    label: 'Navigation',
+    icon: Icons.navigation_rounded,
+  ),
+  _ScreenDef(
     routeSegment: '/temps',
     label: 'Températures',
     icon: Icons.thermostat_rounded,

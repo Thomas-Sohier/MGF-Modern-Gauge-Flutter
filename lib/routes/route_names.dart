@@ -3,6 +3,7 @@ class RouteNames {
   static const String dashboardRoute = '/dashboard';
   static const String rpmRoute = '/rpm';
   static const String musicRoute = '/music';
+  static const String navigationRoute = '/navigation';
   static const String timeRoute = '/time';
   static const String settingsRoute = '/settings';
   static const String faultsRoute = '/faults';
@@ -16,6 +17,7 @@ class RouteNames {
   // Full dashboard paths
   static const String rpmFull = '$dashboardRoute$rpmRoute';
   static const String musicFull = '$dashboardRoute$musicRoute';
+  static const String navigationFull = '$dashboardRoute$navigationRoute';
   static const String timeFull = '$dashboardRoute$timeRoute';
   static const String faultsFull = '$dashboardRoute$faultsRoute';
   static const String tempsFull = '$dashboardRoute$tempsRoute';
