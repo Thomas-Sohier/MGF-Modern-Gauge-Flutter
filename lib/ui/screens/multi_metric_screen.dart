@@ -125,6 +125,7 @@ class _MultiMetricScreenState extends State<MultiMetricScreen> {
         // rebuilds on value changes, only DigitalDial does.
         backgroundDial: Selector<EcuProvider, double>(
           selector: (_, ecu) => primary.getValue(ecu.currentData),
+          shouldRebuild: (prev, next) => (prev - next).abs() > 0.5,
           builder: (_, primaryValue, __) => DigitalDial(
             value: primaryValue,
             maxValue: primary.maxValue,
