@@ -247,22 +247,29 @@ class _DialActivePainter extends CustomPainter {
     final fullSegments = continuousSegments.floor();
     final partialProgress = continuousSegments - fullSegments;
 
+    // Batch same-color segments into one Path each — a single drawPath per
+    // color instead of one drawArc per segment. Each addArc is its own
+    // sub-path, so stroking with StrokeCap.butt is visually identical.
+    final activePath = Path();
+    final dangerPath = Path();
+
     for (int i = 0; i <= fullSegments && i < numberOfSegments; i++) {
       final segStart = _startAngle + i * (_segmentRadians + _gapInRadians);
-      final paint = i >= _dangerSegmentStart
-          ? _dangerActivePaint
-          : _activePaint;
+      final path = i >= _dangerSegmentStart ? dangerPath : activePath;
 
       if (i < fullSegments) {
-        canvas.drawArc(rect, segStart, _segmentRadians, false, paint);
+        path.addArc(rect, segStart, _segmentRadians);
       } else {
         // Partial segment at the progress boundary.
         final partial = _segmentRadians * partialProgress;
         if (partial > 0) {
-          canvas.drawArc(rect, segStart, partial, false, paint);
+          path.addArc(rect, segStart, partial);
         }
       }
     }
+
+    canvas.drawPath(activePath, _activePaint);
+    canvas.drawPath(dangerPath, _dangerActivePaint);
   }
 
   @override

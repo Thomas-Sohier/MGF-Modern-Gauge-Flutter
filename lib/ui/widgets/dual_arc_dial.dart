@@ -251,28 +251,28 @@ class _DualArcActivePainter extends CustomPainter {
     final fullSegments = continuousSegments.floor();
     final partialProgress = continuousSegments - fullSegments;
 
+    // Batch same-color segments into one Path each — a single drawPath per
+    // color instead of one drawArc per segment.
+    final activePath = Path();
+    final dangerPath = Path();
+
     for (int i = 0; i <= fullSegments && i < _primarySegments; i++) {
       final segStart =
           _startAngle + i * (_primarySegmentRadians + _primaryGapRadians);
-      final paint = i >= _primaryDangerStart
-          ? _dangerActivePaint
-          : _activePaint;
+      final path = i >= _primaryDangerStart ? dangerPath : activePath;
 
       if (i < fullSegments) {
-        canvas.drawArc(
-          primaryRect,
-          segStart,
-          _primarySegmentRadians,
-          false,
-          paint,
-        );
+        path.addArc(primaryRect, segStart, _primarySegmentRadians);
       } else {
         final partial = _primarySegmentRadians * partialProgress;
         if (partial > 0) {
-          canvas.drawArc(primaryRect, segStart, partial, false, paint);
+          path.addArc(primaryRect, segStart, partial);
         }
       }
     }
+
+    canvas.drawPath(activePath, _activePaint);
+    canvas.drawPath(dangerPath, _dangerActivePaint);
 
     // Inner throttle arc
     final throttleRadius =
