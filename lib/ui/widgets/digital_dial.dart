@@ -118,16 +118,18 @@ class _DigitalDialState extends State<DigitalDial>
             ),
           ),
         ),
-        CustomPaint(
-          painter: _DialActivePainter(
-            animation: _animation,
-            maxValue: widget.maxValue,
-            numberOfSegments: widget.numberOfSegments,
-            segmentHeight: widget.segmentHeight,
-            segmentSpacing: widget.segmentSpacing,
-            activeColor: activeColor,
-            dangerThreshold: widget.dangerThreshold,
-            dangerColor: dangerColor,
+        RepaintBoundary(
+          child: CustomPaint(
+            painter: _DialActivePainter(
+              animation: _animation,
+              maxValue: widget.maxValue,
+              numberOfSegments: widget.numberOfSegments,
+              segmentHeight: widget.segmentHeight,
+              segmentSpacing: widget.segmentSpacing,
+              activeColor: activeColor,
+              dangerThreshold: widget.dangerThreshold,
+              dangerColor: dangerColor,
+            ),
           ),
         ),
       ],
