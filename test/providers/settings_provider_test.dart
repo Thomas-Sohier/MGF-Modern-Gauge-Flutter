@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modern_gauge_flutter/models/settings_data.dart';
+import 'package:modern_gauge_flutter/utils/app_constants.dart';
 
 void main() {
   group('SettingsProvider logic', () {
@@ -179,6 +180,48 @@ void main() {
         expect(count, equals(3));
       });
     });
+
+    group('setNotificationDurationSeconds', () {
+      test('defaults to 10 seconds', () {
+        expect(
+          provider.settings.notificationDurationSeconds,
+          AppConstants.defaultNotificationDurationSeconds,
+        );
+      });
+
+      test('updates the value within bounds', () {
+        provider.setNotificationDurationSeconds(15);
+
+        expect(provider.settings.notificationDurationSeconds, 15);
+      });
+
+      test('clamps below the minimum', () {
+        provider.setNotificationDurationSeconds(0);
+
+        expect(
+          provider.settings.notificationDurationSeconds,
+          AppConstants.minNotificationDurationSeconds,
+        );
+      });
+
+      test('clamps above the maximum', () {
+        provider.setNotificationDurationSeconds(9999);
+
+        expect(
+          provider.settings.notificationDurationSeconds,
+          AppConstants.maxNotificationDurationSeconds,
+        );
+      });
+
+      test('notifies listeners', () {
+        var notified = false;
+        provider.addListener(() => notified = true);
+
+        provider.setNotificationDurationSeconds(12);
+
+        expect(notified, isTrue);
+      });
+    });
   });
 }
 
@@ -213,6 +256,14 @@ class TestableSettingsProvider with ChangeNotifier {
       current.add(routeSegment);
     }
     _update(_settings.copyWith(enabledScreens: current));
+  }
+
+  void setNotificationDurationSeconds(int seconds) {
+    final clamped = seconds.clamp(
+      AppConstants.minNotificationDurationSeconds,
+      AppConstants.maxNotificationDurationSeconds,
+    );
+    _update(_settings.copyWith(notificationDurationSeconds: clamped));
   }
 
   void resetSettings() => _update(SettingsData());

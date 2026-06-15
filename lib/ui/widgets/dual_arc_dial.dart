@@ -7,8 +7,12 @@ import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
 /// Draws both arcs in a single paint pass, reducing GPU overdraw vs two
 /// separate DigitalDial widgets. Uses two-layer architecture:
 /// - [_DualArcBackgroundPainter] — inactive segments, wrapped in RepaintBoundary
-/// - [_DualArcActivePainter] — active segments, driven by animation
-class DualArcDial extends StatefulWidget {
+/// - [_DualArcActivePainter] — active segments, wrapped in RepaintBoundary,
+///   repaints only when a value changes.
+///
+/// No animation: data arrives at ~10 Hz, so a transition tween adds nothing
+/// visible and would force per-frame repaints.
+class DualArcDial extends StatelessWidget {
   final double throttleValue;
   final double throttleMaxValue;
   final double primaryValue;
@@ -25,65 +29,6 @@ class DualArcDial extends StatefulWidget {
   });
 
   @override
-  State<DualArcDial> createState() => _DualArcDialState();
-}
-
-class _DualArcDialState extends State<DualArcDial>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Tween<double> _throttleTween;
-  late final Tween<double> _primaryTween;
-  late final CurvedAnimation _curvedAnimation;
-  late final Animation<double> _throttleAnimation;
-  late final Animation<double> _primaryAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    );
-    _throttleTween = Tween<double>(begin: 0, end: widget.throttleValue);
-    _primaryTween = Tween<double>(begin: 0, end: widget.primaryValue);
-    _curvedAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutCubic,
-    );
-    _throttleAnimation = _throttleTween.animate(_curvedAnimation);
-    _primaryAnimation = _primaryTween.animate(_curvedAnimation);
-    _controller.forward();
-  }
-
-  @override
-  void didUpdateWidget(DualArcDial oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    bool changed = false;
-    if (widget.throttleValue != oldWidget.throttleValue) {
-      _throttleTween.begin = _throttleAnimation.value;
-      _throttleTween.end = widget.throttleValue;
-      changed = true;
-    }
-    if (widget.primaryValue != oldWidget.primaryValue) {
-      _primaryTween.begin = _primaryAnimation.value;
-      _primaryTween.end = widget.primaryValue;
-      changed = true;
-    }
-    if (changed) {
-      _controller
-        ..reset()
-        ..forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _curvedAnimation.dispose();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
 
@@ -98,9 +43,9 @@ class _DualArcDialState extends State<DualArcDial>
         RepaintBoundary(
           child: CustomPaint(
             painter: _DualArcBackgroundPainter(
-              throttleMaxValue: widget.throttleMaxValue,
-              primaryMaxValue: widget.primaryMaxValue,
-              primaryDangerThreshold: widget.primaryDangerThreshold,
+              throttleMaxValue: throttleMaxValue,
+              primaryMaxValue: primaryMaxValue,
+              primaryDangerThreshold: primaryDangerThreshold,
               inactiveColor: inactiveColor,
               dangerInactiveColor: dangerInactiveColor,
             ),
@@ -109,12 +54,11 @@ class _DualArcDialState extends State<DualArcDial>
         RepaintBoundary(
           child: CustomPaint(
             painter: _DualArcActivePainter(
-              repaint: _curvedAnimation,
-              throttleAnimation: _throttleAnimation,
-              primaryAnimation: _primaryAnimation,
-              throttleMaxValue: widget.throttleMaxValue,
-              primaryMaxValue: widget.primaryMaxValue,
-              primaryDangerThreshold: widget.primaryDangerThreshold,
+              throttleValue: throttleValue,
+              primaryValue: primaryValue,
+              throttleMaxValue: throttleMaxValue,
+              primaryMaxValue: primaryMaxValue,
+              primaryDangerThreshold: primaryDangerThreshold,
               activeColor: activeColor,
               dangerColor: dangerColor,
             ),
@@ -246,8 +190,8 @@ class _DualArcBackgroundPainter extends CustomPainter {
 // ── Active painter ────────────────────────────────────────────────────────────
 
 class _DualArcActivePainter extends CustomPainter {
-  final Animation<double> throttleAnimation;
-  final Animation<double> primaryAnimation;
+  final double throttleValue;
+  final double primaryValue;
   final double throttleMaxValue;
   final double primaryMaxValue;
   final double? primaryDangerThreshold;
@@ -261,9 +205,8 @@ class _DualArcActivePainter extends CustomPainter {
   final Paint _throttleActivePaint;
 
   _DualArcActivePainter({
-    required Listenable repaint,
-    required this.throttleAnimation,
-    required this.primaryAnimation,
+    required this.throttleValue,
+    required this.primaryValue,
     required this.throttleMaxValue,
     required this.primaryMaxValue,
     required this.primaryDangerThreshold,
@@ -293,8 +236,7 @@ class _DualArcActivePainter extends CustomPainter {
          ..color = activeColor
          ..style = PaintingStyle.stroke
          ..strokeWidth = _throttleSegmentHeight
-         ..strokeCap = StrokeCap.butt,
-       super(repaint: repaint);
+         ..strokeCap = StrokeCap.butt;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -302,7 +244,6 @@ class _DualArcActivePainter extends CustomPainter {
     final baseRadius = math.min(size.width, size.height) / 2;
 
     // Outer primary arc
-    final primaryValue = primaryAnimation.value;
     final primaryRadius = baseRadius - _primarySegmentHeight + 10;
     final primaryRect = Rect.fromCircle(center: center, radius: primaryRadius);
     final primaryProgress = (primaryValue / primaryMaxValue).clamp(0.0, 1.0);
@@ -310,31 +251,30 @@ class _DualArcActivePainter extends CustomPainter {
     final fullSegments = continuousSegments.floor();
     final partialProgress = continuousSegments - fullSegments;
 
+    // Batch same-color segments into one Path each — a single drawPath per
+    // color instead of one drawArc per segment.
+    final activePath = Path();
+    final dangerPath = Path();
+
     for (int i = 0; i <= fullSegments && i < _primarySegments; i++) {
       final segStart =
           _startAngle + i * (_primarySegmentRadians + _primaryGapRadians);
-      final paint = i >= _primaryDangerStart
-          ? _dangerActivePaint
-          : _activePaint;
+      final path = i >= _primaryDangerStart ? dangerPath : activePath;
 
       if (i < fullSegments) {
-        canvas.drawArc(
-          primaryRect,
-          segStart,
-          _primarySegmentRadians,
-          false,
-          paint,
-        );
+        path.addArc(primaryRect, segStart, _primarySegmentRadians);
       } else {
         final partial = _primarySegmentRadians * partialProgress;
         if (partial > 0) {
-          canvas.drawArc(primaryRect, segStart, partial, false, paint);
+          path.addArc(primaryRect, segStart, partial);
         }
       }
     }
 
+    canvas.drawPath(activePath, _activePaint);
+    canvas.drawPath(dangerPath, _dangerActivePaint);
+
     // Inner throttle arc
-    final throttleValue = throttleAnimation.value;
     final throttleRadius =
         (baseRadius - _primarySegmentHeight) * _throttleRadiusFactor;
     final throttleRect = Rect.fromCircle(
@@ -356,8 +296,8 @@ class _DualArcActivePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DualArcActivePainter old) =>
-      old.throttleAnimation != throttleAnimation ||
-      old.primaryAnimation != primaryAnimation ||
+      old.throttleValue != throttleValue ||
+      old.primaryValue != primaryValue ||
       old.primaryMaxValue != primaryMaxValue ||
       old.primaryDangerThreshold != primaryDangerThreshold ||
       old._activePaint.color != _activePaint.color ||

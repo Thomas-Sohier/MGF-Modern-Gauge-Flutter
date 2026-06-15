@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:modern_gauge_flutter/utils/app_constants.dart';
 
 enum WakeUpMode {
   onStart,
@@ -18,11 +19,15 @@ class SettingsData {
   /// WiFi activé (piloté côté appareil via le serveur Go / rfkill)
   final bool wifiEnabled;
 
+  /// Durée d'affichage de l'écran de notification, en secondes.
+  final int notificationDurationSeconds;
+
   static const Set<String> allScreens = {
     '/rpm',
     '/time',
     '/faults',
     '/music',
+    '/navigation',
     '/temps',
     '/injection',
     '/lambda',
@@ -36,6 +41,8 @@ class SettingsData {
     this.themeMode = ThemeMode.dark,
     this.enabledScreens = allScreens,
     this.wifiEnabled = true,
+    this.notificationDurationSeconds =
+        AppConstants.defaultNotificationDurationSeconds,
   });
 
   SettingsData copyWith({
@@ -43,12 +50,15 @@ class SettingsData {
     ThemeMode? themeMode,
     Set<String>? enabledScreens,
     bool? wifiEnabled,
+    int? notificationDurationSeconds,
   }) {
     return SettingsData(
       backgroundImagePath: backgroundImagePath ?? this.backgroundImagePath,
       themeMode: themeMode ?? this.themeMode,
       enabledScreens: enabledScreens ?? this.enabledScreens,
       wifiEnabled: wifiEnabled ?? this.wifiEnabled,
+      notificationDurationSeconds:
+          notificationDurationSeconds ?? this.notificationDurationSeconds,
     );
   }
 
@@ -64,6 +74,9 @@ class SettingsData {
               .toSet() ??
           allScreens,
       wifiEnabled: json['wifiEnabled'] as bool? ?? true,
+      notificationDurationSeconds:
+          json['notificationDurationSeconds'] as int? ??
+          AppConstants.defaultNotificationDurationSeconds,
     );
   }
 
@@ -74,11 +87,12 @@ class SettingsData {
       'themeMode': themeMode.index,
       'enabledScreens': enabledScreens.toList(),
       'wifiEnabled': wifiEnabled,
+      'notificationDurationSeconds': notificationDurationSeconds,
     };
   }
 
   @override
   String toString() {
-    return 'SettingsData(backgroundImagePath: $backgroundImagePath, themeMode: $themeMode, enabledScreens: $enabledScreens, wifiEnabled: $wifiEnabled)';
+    return 'SettingsData(backgroundImagePath: $backgroundImagePath, themeMode: $themeMode, enabledScreens: $enabledScreens, wifiEnabled: $wifiEnabled, notificationDurationSeconds: $notificationDurationSeconds)';
   }
 }

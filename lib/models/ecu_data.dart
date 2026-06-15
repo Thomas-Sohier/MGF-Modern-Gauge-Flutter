@@ -1,5 +1,5 @@
 class EcuInfos {
-  final List<dynamic>? faults;
+  // Champs scalaires — parsés en avance (bon marché).
   final bool connected;
   final String? ecuType;
   final String? userCommand;
@@ -8,12 +8,23 @@ class EcuInfos {
   final EcuData? ecuData;
   final String? agentVersion;
   final String? timestamp;
-  final List<String>? serialPorts;
   final String? selectedSerialPort;
-  final List<String>? logLines;
+
+  // Valeurs pré-parsées (utilisées par le constructeur nommé et les tests).
+  final List<dynamic>? _faults;
+  final List<String>? _serialPorts;
+  final List<String>? _logLines;
+
+  // Map JSON brute — non null uniquement si construit via fromJson.
+  final Map<String, dynamic>? _json;
+
+  // Cache des listes paresseuses.
+  List<dynamic>? _faultsCache;
+  List<String>? _serialPortsCache;
+  List<String>? _logLinesCache;
 
   EcuInfos({
-    this.faults,
+    List<dynamic>? faults,
     this.connected = false,
     this.ecuType,
     this.userCommand,
@@ -22,33 +33,34 @@ class EcuInfos {
     this.ecuData,
     this.agentVersion,
     this.timestamp,
-    this.serialPorts,
+    List<String>? serialPorts,
     this.selectedSerialPort,
-    this.logLines,
-  });
+    List<String>? logLines,
+  }) : _faults = faults,
+       _serialPorts = serialPorts,
+       _logLines = logLines,
+       _json = null;
 
-  factory EcuInfos.fromJson(Map<String, dynamic> json) {
-    return EcuInfos(
-      faults: json['faults'] as List<dynamic>?,
-      connected: json['connected'] ?? false,
-      ecuType: json['ecuType']?.toString(),
-      userCommand: json['userCommand']?.toString(),
-      alert: json['alert']?.toString(),
-      error: json['error']?.toString(),
-      ecuData: json['ecuData'] is Map
-          ? EcuData.fromJson(Map<String, dynamic>.from(json['ecuData'] as Map))
+  EcuInfos._fromJson(this._json)
+    : connected = (_json!['connected'] as bool?) ?? false,
+      ecuType = _json['ecuType']?.toString(),
+      userCommand = _json['userCommand']?.toString(),
+      alert = _json['alert']?.toString(),
+      error = _json['error']?.toString(),
+      ecuData = _json['ecuData'] is Map
+          ? EcuData.fromJson(
+              Map<String, dynamic>.from(_json['ecuData'] as Map),
+            )
           : null,
-      agentVersion: json['agentVersion']?.toString(),
-      timestamp: json['timestamp']?.toString(),
-      serialPorts: (json['serialPorts'] as List<dynamic>?)
-          ?.map((e) => e.toString())
-          .toList(),
-      selectedSerialPort: json['selectedSerialPort']?.toString(),
-      logLines: (json['logLines'] as List<dynamic>?)
-          ?.map((e) => e.toString())
-          .toList(),
-    );
-  }
+      agentVersion = _json['agentVersion']?.toString(),
+      timestamp = _json['timestamp']?.toString(),
+      selectedSerialPort = _json['selectedSerialPort']?.toString(),
+      _faults = null,
+      _serialPorts = null,
+      _logLines = null;
+
+  factory EcuInfos.fromJson(Map<String, dynamic> json) =>
+      EcuInfos._fromJson(json);
 
   factory EcuInfos.initial() {
     return EcuInfos(connected: false, ecuData: EcuData.initial());
@@ -56,6 +68,27 @@ class EcuInfos {
 
   /// Non-null accessor for UI binding — returns initial() if ecuData is null.
   EcuData get data => ecuData ?? EcuData.initial();
+
+  List<dynamic>? get faults {
+    if (_json == null) return _faults;
+    return _faultsCache ??= _json['faults'] as List<dynamic>?;
+  }
+
+  List<String>? get serialPorts {
+    if (_json == null) return _serialPorts;
+    return _serialPortsCache ??=
+        (_json['serialPorts'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList();
+  }
+
+  List<String>? get logLines {
+    if (_json == null) return _logLines;
+    return _logLinesCache ??=
+        (_json['logLines'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList();
+  }
 }
 
 /// ECU sensor data backed by raw JSON map.

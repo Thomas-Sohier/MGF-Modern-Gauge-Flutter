@@ -12,6 +12,7 @@ import 'package:modern_gauge_flutter/ui/screens/ralenti_screen.dart';
 import 'package:modern_gauge_flutter/ui/screens/rpm_screen.dart';
 import 'package:modern_gauge_flutter/ui/screens/dashboard_shell_screen.dart';
 import 'package:modern_gauge_flutter/ui/screens/music_player_screen.dart';
+import 'package:modern_gauge_flutter/ui/screens/navigation_screen.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings_screen.dart';
 import 'package:modern_gauge_flutter/ui/screens/splash_screen.dart';
 import 'package:modern_gauge_flutter/ui/screens/temps_screen.dart';
@@ -44,6 +45,11 @@ class AppRouter {
             path: RouteNames.musicFull,
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: MusicPlayerScreen()),
+          ),
+          GoRoute(
+            path: RouteNames.navigationFull,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: NavigationScreen()),
           ),
           GoRoute(
             path: RouteNames.faultsFull,

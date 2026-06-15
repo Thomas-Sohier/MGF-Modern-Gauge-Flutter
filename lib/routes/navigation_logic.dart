@@ -6,6 +6,7 @@ import 'package:modern_gauge_flutter/routes/route_names.dart';
 const List<String> allDashboardRoutes = [
   RouteNames.timeFull,
   RouteNames.musicFull,
+  RouteNames.navigationFull,
   RouteNames.rpmFull,
   RouteNames.faultsFull,
   RouteNames.tempsFull,

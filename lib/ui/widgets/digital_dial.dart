@@ -2,20 +2,19 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
 
-/// Jauge circulaire animée avec segments.
+/// Jauge circulaire à segments.
 ///
 /// Architecture deux couches:
 /// - [_DialBackgroundPainter] — dessine uniquement les segments inactifs.
 ///   Enveloppé dans un [RepaintBoundary] : rasterisé en texture GPU et jamais
 ///   repeint entre deux changements de valeur ou de thème.
 /// - [_DialActivePainter] — dessine uniquement les segments actifs/en cours.
-///   Utilise l'animation comme notifier de repaint au niveau RenderObject ;
-///   paint() est appelé à chaque tick sans rebuild de widget.
+///   Enveloppé dans un [RepaintBoundary] : ne repeint que lorsque la valeur
+///   change (shouldRepaint compare la valeur).
 ///
-/// [build] n'est appelé qu'à 10 Hz (changement de valeur via Selector).
-/// Le [Tween] et la [CurvedAnimation] sont créés une seule fois dans initState
-/// et mutés dans didUpdateWidget — zéro allocation par tick d'animation.
-class DigitalDial extends StatefulWidget {
+/// Aucune animation : les données arrivent à ~10 Hz, un tween de transition
+/// n'apporterait rien de visible et provoquerait des repeints à chaque frame.
+class DigitalDial extends StatelessWidget {
   final double value;
   final double maxValue;
   final int numberOfSegments;
@@ -42,92 +41,47 @@ class DigitalDial extends StatefulWidget {
   });
 
   @override
-  State<DigitalDial> createState() => _DigitalDialState();
-}
-
-class _DigitalDialState extends State<DigitalDial>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Tween<double> _tween;
-  late final CurvedAnimation _curvedAnimation;
-  late final Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    );
-    _tween = Tween<double>(begin: 0, end: widget.value);
-    _curvedAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutCubic,
-    );
-    _animation = _tween.animate(_curvedAnimation);
-    _controller.forward();
-  }
-
-  @override
-  void didUpdateWidget(DigitalDial oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.value != oldWidget.value) {
-      // Mutate the existing tween in-place — no allocation.
-      _tween.begin = _animation.value;
-      _tween.end = widget.value;
-      _controller
-        ..reset()
-        ..forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _curvedAnimation.dispose();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final gaugeTheme = Theme.of(context).extension<GaugeTheme>()!;
 
-    final activeColor = widget.activeColor ?? gaugeTheme.activeColor!;
-    final inactiveColor = widget.inactiveColor ?? gaugeTheme.inactiveColor!;
-    final dangerColor = widget.dangerColor ?? gaugeTheme.dangerColor!;
-    final dangerInactiveColor =
-        widget.dangerInactiveColor ?? gaugeTheme.dangerInactiveColor!;
+    final active = activeColor ?? gaugeTheme.activeColor!;
+    final inactive = inactiveColor ?? gaugeTheme.inactiveColor!;
+    final danger = dangerColor ?? gaugeTheme.dangerColor!;
+    final dangerInactive =
+        dangerInactiveColor ?? gaugeTheme.dangerInactiveColor!;
 
-    // Two-layer stack:
-    // 1. Background (inactive segments) wrapped in RepaintBoundary — GPU texture,
-    //    only invalidated when static config or theme changes.
-    // 2. Active segments driven by animation notifier at render layer.
+    // Two-layer stack, both wrapped in RepaintBoundary:
+    // 1. Background (inactive segments) — GPU texture, invalidated only on
+    //    static config or theme change.
+    // 2. Active segments — repaints only when the value changes.
     return Stack(
       fit: StackFit.expand,
       children: [
         RepaintBoundary(
           child: CustomPaint(
             painter: _DialBackgroundPainter(
-              maxValue: widget.maxValue,
-              numberOfSegments: widget.numberOfSegments,
-              segmentHeight: widget.segmentHeight,
-              segmentSpacing: widget.segmentSpacing,
-              inactiveColor: inactiveColor,
-              dangerThreshold: widget.dangerThreshold,
-              dangerInactiveColor: dangerInactiveColor,
+              maxValue: maxValue,
+              numberOfSegments: numberOfSegments,
+              segmentHeight: segmentHeight,
+              segmentSpacing: segmentSpacing,
+              inactiveColor: inactive,
+              dangerThreshold: dangerThreshold,
+              dangerInactiveColor: dangerInactive,
             ),
           ),
         ),
-        CustomPaint(
-          painter: _DialActivePainter(
-            animation: _animation,
-            maxValue: widget.maxValue,
-            numberOfSegments: widget.numberOfSegments,
-            segmentHeight: widget.segmentHeight,
-            segmentSpacing: widget.segmentSpacing,
-            activeColor: activeColor,
-            dangerThreshold: widget.dangerThreshold,
-            dangerColor: dangerColor,
+        RepaintBoundary(
+          child: CustomPaint(
+            painter: _DialActivePainter(
+              value: value,
+              maxValue: maxValue,
+              numberOfSegments: numberOfSegments,
+              segmentHeight: segmentHeight,
+              segmentSpacing: segmentSpacing,
+              activeColor: active,
+              dangerThreshold: dangerThreshold,
+              dangerColor: danger,
+            ),
           ),
         ),
       ],
@@ -233,11 +187,10 @@ class _DialBackgroundPainter extends CustomPainter {
 // ── Active painter (progress segments only) ───────────────────────────────────
 
 /// Draws only the active/progress portion of the dial.
-/// [super(repaint: animation)] hooks the animation into the RenderObject:
-/// [paint] is called at each animation tick without any widget rebuild.
 /// Geometry and [Paint] objects are pre-calculated once at construction.
+/// [shouldRepaint] compares the value, so paint only runs when it changes.
 class _DialActivePainter extends CustomPainter {
-  final Animation<double> animation;
+  final double value;
   final double maxValue;
   final int numberOfSegments;
   final double segmentHeight;
@@ -254,7 +207,7 @@ class _DialActivePainter extends CustomPainter {
   final Paint _dangerActivePaint;
 
   _DialActivePainter({
-    required this.animation,
+    required this.value,
     required this.maxValue,
     required this.numberOfSegments,
     required this.segmentHeight,
@@ -281,14 +234,10 @@ class _DialActivePainter extends CustomPainter {
          ..color = dangerColor
          ..style = PaintingStyle.stroke
          ..strokeWidth = segmentHeight
-         ..strokeCap = StrokeCap.butt,
-       super(repaint: animation); // drives repaints at render layer
+         ..strokeCap = StrokeCap.butt;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Read animated value at paint time — not at build time.
-    final value = animation.value;
-
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - segmentHeight + 10;
     final rect = Rect.fromCircle(center: center, radius: radius);
@@ -298,27 +247,34 @@ class _DialActivePainter extends CustomPainter {
     final fullSegments = continuousSegments.floor();
     final partialProgress = continuousSegments - fullSegments;
 
+    // Batch same-color segments into one Path each — a single drawPath per
+    // color instead of one drawArc per segment. Each addArc is its own
+    // sub-path, so stroking with StrokeCap.butt is visually identical.
+    final activePath = Path();
+    final dangerPath = Path();
+
     for (int i = 0; i <= fullSegments && i < numberOfSegments; i++) {
       final segStart = _startAngle + i * (_segmentRadians + _gapInRadians);
-      final paint = i >= _dangerSegmentStart
-          ? _dangerActivePaint
-          : _activePaint;
+      final path = i >= _dangerSegmentStart ? dangerPath : activePath;
 
       if (i < fullSegments) {
-        canvas.drawArc(rect, segStart, _segmentRadians, false, paint);
+        path.addArc(rect, segStart, _segmentRadians);
       } else {
         // Partial segment at the progress boundary.
         final partial = _segmentRadians * partialProgress;
         if (partial > 0) {
-          canvas.drawArc(rect, segStart, partial, false, paint);
+          path.addArc(rect, segStart, partial);
         }
       }
     }
+
+    canvas.drawPath(activePath, _activePaint);
+    canvas.drawPath(dangerPath, _dangerActivePaint);
   }
 
   @override
   bool shouldRepaint(covariant _DialActivePainter old) =>
-      old.animation != animation ||
+      old.value != value ||
       old.maxValue != maxValue ||
       old.numberOfSegments != numberOfSegments ||
       old.segmentHeight != segmentHeight ||

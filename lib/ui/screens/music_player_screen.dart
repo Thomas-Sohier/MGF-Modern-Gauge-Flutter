@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -218,7 +219,8 @@ class _ColorExtractorService {
   factory _ColorExtractorService() => _instance;
   _ColorExtractorService._();
 
-  final Map<String, ColorScheme> _colorCache = {};
+  static const _kMaxCacheSize = 32;
+  final LinkedHashMap<String, ColorScheme> _colorCache = LinkedHashMap();
 
   Future<ColorScheme> extractDominantColor(String? artUrl) async {
     if (artUrl == null || artUrl.isEmpty) {
@@ -226,7 +228,10 @@ class _ColorExtractorService {
     }
 
     if (_colorCache.containsKey(artUrl)) {
-      return _colorCache[artUrl]!;
+      // Déplacer en fin pour maintenir l'ordre LRU.
+      final cached = _colorCache.remove(artUrl)!;
+      _colorCache[artUrl] = cached;
+      return cached;
     }
 
     try {
@@ -238,6 +243,9 @@ class _ColorExtractorService {
       final palette = await ColorUtil().getColorsFromImage(imageProvider);
 
       final colorScheme = ColorScheme.fromSeed(seedColor: palette[0]);
+      if (_colorCache.length >= _kMaxCacheSize) {
+        _colorCache.remove(_colorCache.keys.first);
+      }
       _colorCache[artUrl] = colorScheme;
       return colorScheme;
     } catch (e) {
@@ -263,7 +271,6 @@ class _AlbumArt extends StatelessWidget {
           shape: BoxShape.circle,
           color: Color(0xFFE0E5E8),
         );
-        const clip = BorderRadius.all(Radius.circular(1000));
 
         if (artUrl == null) {
           return Container(decoration: decoration, child: icon);
@@ -292,8 +299,9 @@ class _AlbumArt extends StatelessWidget {
               );
 
         return Container(
+          clipBehavior: Clip.antiAlias,
           decoration: decoration,
-          child: ClipRRect(borderRadius: clip, child: imageWidget),
+          child: imageWidget,
         );
       },
     );

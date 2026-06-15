@@ -84,7 +84,9 @@ class LogService {
       output: MultiOutput(outputs),
       printer: SimplePrinter(printTime: true, colors: false),
     );
-    _deleteOldLogs();
+    unawaited(
+      Future.delayed(const Duration(seconds: 5), _deleteOldLogs),
+    );
     info("[LogService] - init.");
     info("[LogService] - log at $_logDirectory.");
   }
