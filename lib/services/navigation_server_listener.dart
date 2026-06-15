@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:modern_gauge_flutter/models/navigation_info.dart';
 import 'package:modern_gauge_flutter/services/log_service.dart';
+import 'package:modern_gauge_flutter/utils/app_constants.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Listens to the Go server's /ws/navigation websocket and exposes the current
@@ -39,8 +40,8 @@ class NavigationServerListener with ChangeNotifier {
   static const _reconnectDelays = [1, 2, 4, 8, 16, 30];
 
   NavigationServerListener({
-    this.wsUrl = 'ws://localhost:8080/ws/navigation',
-    this.iconUrl = 'http://localhost:8080/api/navigation/icon',
+    this.wsUrl = AppConstants.navigationWsUrl,
+    this.iconUrl = AppConstants.navigationIconUrl,
   });
 
   /// Current navigation state. Never null; defaults to inactive.

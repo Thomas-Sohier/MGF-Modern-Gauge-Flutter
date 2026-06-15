@@ -38,10 +38,13 @@ class App extends StatelessWidget {
           create: (context) => mprisListener..start(),
         ),
         ChangeNotifierProvider<NavigationServerListener>(
+          lazy: false,
           create: (context) => navigationListener..start(),
         ),
-        ChangeNotifierProvider<NotificationServerListener>(
+        Provider<NotificationServerListener>(
+          lazy: false,
           create: (context) => notificationListener..start(),
+          dispose: (context, listener) => listener.dispose(),
         ),
         ChangeNotifierProvider(create: (context) => appStateProvider),
         ChangeNotifierProvider(create: (context) => ecuProvider),

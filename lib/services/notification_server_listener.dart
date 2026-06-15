@@ -1,27 +1,23 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:modern_gauge_flutter/models/alert_info.dart';
 import 'package:modern_gauge_flutter/services/log_service.dart';
+import 'package:modern_gauge_flutter/utils/app_constants.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// Listens to the Go server's /ws/notifications websocket and exposes forwarded
-/// phone [AlertInfo]s.
+/// Listens to the Go server's /ws/notifications websocket and emits forwarded
+/// phone [AlertInfo]s as one-shot events on [alerts].
 ///
-/// Alerts are fire-once events: the server sends no initial snapshot on connect
-/// and never sends updates or dismissals. Each message is one alert:
+/// Alerts are fire-once: the server sends no initial snapshot on connect and
+/// never sends updates or dismissals. Nothing is retained — consumers react to
+/// each event (e.g. show a transient banner) as it arrives. Each message is one
+/// alert:
 /// ```json
 /// {"app": "Signal", "title": "Alice", "text": "Hi", "posted_at": 1700000000000}
 /// ```
-///
-/// The listener keeps the most recent alert plus a capped, newest-first history
-/// so a future UI can show either the latest alert or a short list.
-class NotificationServerListener with ChangeNotifier {
+class NotificationServerListener {
   final String wsUrl;
-
-  /// Maximum number of alerts retained in [recent].
-  final int maxHistory;
 
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
@@ -29,22 +25,17 @@ class NotificationServerListener with ChangeNotifier {
   bool _autoReconnect = false;
   int _reconnectAttempts = 0;
 
-  final List<AlertInfo> _recent = [];
+  final StreamController<AlertInfo> _alerts =
+      StreamController<AlertInfo>.broadcast();
 
   static const _reconnectDelays = [1, 2, 4, 8, 16, 30];
 
-  NotificationServerListener({
-    this.wsUrl = 'ws://localhost:8080/ws/notifications',
-    this.maxHistory = 20,
-  });
+  NotificationServerListener({this.wsUrl = AppConstants.notificationsWsUrl});
 
-  /// Most recent alert, or null if none received this session.
-  AlertInfo? get latest => _recent.isEmpty ? null : _recent.first;
+  /// Broadcast stream of alerts as they arrive. Fire-once events; not replayed.
+  Stream<AlertInfo> get alerts => _alerts.stream;
 
-  /// Recent alerts, newest first, capped at [maxHistory]. Unmodifiable.
-  List<AlertInfo> get recent => List.unmodifiable(_recent);
-
-  Future<void> start() async {
+  void start() {
     _autoReconnect = true;
     _reconnectAttempts = 0;
     _connect();
@@ -82,11 +73,7 @@ class NotificationServerListener with ChangeNotifier {
       // disconnect reconnects quickly instead of using the max delay.
       _reconnectAttempts = 0;
       final map = json.decode(raw) as Map<String, dynamic>;
-      _recent.insert(0, AlertInfo.fromJson(map));
-      if (_recent.length > maxHistory) {
-        _recent.removeRange(maxHistory, _recent.length);
-      }
-      notifyListeners();
+      _alerts.add(AlertInfo.fromJson(map));
     } catch (e) {
       LogService.error('NotificationServerListener: parse error: $e');
     }
@@ -95,8 +82,6 @@ class NotificationServerListener with ChangeNotifier {
   void _handleDisconnect() {
     if (_channel == null) return;
     _closeCurrentConnection();
-    // History is intentionally kept across reconnects: alerts are events, not
-    // a live state to clear.
     _scheduleReconnect();
   }
 
@@ -120,12 +105,11 @@ class NotificationServerListener with ChangeNotifier {
     } catch (_) {}
   }
 
-  @override
   void dispose() {
     _autoReconnect = false;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _closeCurrentConnection();
-    super.dispose();
+    _alerts.close();
   }
 }

@@ -19,4 +19,27 @@ class AppConstants {
   // --- Animation Durations ---
   static const Duration defaultAnimationDuration = Duration(milliseconds: 300);
   static const Duration splashScreenDelay = Duration(seconds: 2);
+
+  // --- Go backend server ---
+  // Host/port are overridable at build time:
+  //   flutter run --dart-define=SERVER_HOST=192.168.1.10 --dart-define=SERVER_PORT=8080
+  static const String serverHost = String.fromEnvironment(
+    'SERVER_HOST',
+    defaultValue: 'localhost',
+  );
+  static const int serverPort = int.fromEnvironment(
+    'SERVER_PORT',
+    defaultValue: 8080,
+  );
+
+  static const String serverHttpBase = 'http://$serverHost:$serverPort';
+  static const String serverWsBase = 'ws://$serverHost:$serverPort';
+
+  // Derived endpoint URLs (do not hardcode these elsewhere).
+  static const String ecuWsUrl = '$serverWsBase/ws';
+  static const String nowPlayingWsUrl = '$serverWsBase/ws/nowplaying';
+  static const String nowPlayingArtUrl = '$serverHttpBase/api/nowplaying/art';
+  static const String navigationWsUrl = '$serverWsBase/ws/navigation';
+  static const String navigationIconUrl = '$serverHttpBase/api/navigation/icon';
+  static const String notificationsWsUrl = '$serverWsBase/ws/notifications';
 }

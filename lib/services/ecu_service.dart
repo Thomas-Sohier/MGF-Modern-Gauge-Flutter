@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:modern_gauge_flutter/models/ecu_data.dart';
 import 'package:modern_gauge_flutter/services/log_service.dart';
+import 'package:modern_gauge_flutter/utils/app_constants.dart';
 
 class EcuService {
   final String baseUrl;
@@ -23,8 +24,8 @@ class EcuService {
   Stream<bool> get connectionStream => _connectionController.stream;
 
   EcuService({
-    this.baseUrl = 'http://localhost:8080',
-    this.wsUrl = 'ws://localhost:8080/ws',
+    this.baseUrl = AppConstants.serverHttpBase,
+    this.wsUrl = AppConstants.ecuWsUrl,
   });
 
   // --- HTTP Methods ---

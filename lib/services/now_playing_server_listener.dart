@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:modern_gauge_flutter/providers/mpris_provider.dart';
 import 'package:modern_gauge_flutter/services/log_service.dart';
 import 'package:modern_gauge_flutter/models/media_info.dart';
+import 'package:modern_gauge_flutter/utils/app_constants.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Listens to the Go server's /ws/nowplaying websocket and exposes
@@ -51,8 +52,8 @@ class NowPlayingServerListener
   static const _reconnectDelays = [1, 2, 4, 8, 16, 30];
 
   NowPlayingServerListener({
-    this.wsUrl = 'ws://localhost:8080/ws/nowplaying',
-    this.artUrl = 'http://localhost:8080/api/nowplaying/art',
+    this.wsUrl = AppConstants.nowPlayingWsUrl,
+    this.artUrl = AppConstants.nowPlayingArtUrl,
   });
 
   @override
