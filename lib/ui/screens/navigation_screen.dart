@@ -65,27 +65,45 @@ class _NavigationUI extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ManeuverIcon(iconUrl: nav.iconUrl, color: theme.primaryColor),
-            const SizedBox(height: 20),
-            if (nav.instruction != null)
-              Text(
-                nav.instruction!,
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.body.copyWith(fontWeight: FontWeight.bold),
-              ),
-            const SizedBox(height: 14),
-            _DistanceEta(distance: nav.distance, eta: nav.eta),
-          ],
+    final hasFooter = nav.distance != null || nav.eta != null;
+    // Content is clipped to the round display centrally (CircularContent), so
+    // the full-width green ETA banner follows the circle's bottom chord
+    // (Google Maps footer adapted to a round screen).
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Align(
+          alignment: const Alignment(0, -0.35),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 50),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ManeuverIcon(
+                  iconUrl: nav.iconUrl,
+                  color: theme.primaryColor,
+                ),
+                const SizedBox(height: 20),
+                if (nav.instruction != null)
+                  Text(
+                    nav.instruction!,
+                    textAlign: TextAlign.center,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.body.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
-      ),
+        if (hasFooter)
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: _EtaBanner(distance: nav.distance, eta: nav.eta),
+          ),
+      ],
     );
   }
 }
@@ -113,21 +131,41 @@ class _ManeuverIcon extends StatelessWidget {
   }
 }
 
-class _DistanceEta extends StatelessWidget {
+/// Google-Maps-style green footer banner. Spans the full width and is clipped
+/// to the circle's bottom chord by the parent [ClipOval]; the extra bottom
+/// padding keeps the text clear of the curved edge.
+class _EtaBanner extends StatelessWidget {
+  /// Google Maps navigation footer green.
+  static const Color _green = Color(0xFF1A8E3C);
+
   final String? distance;
   final String? eta;
 
-  const _DistanceEta({required this.distance, required this.eta});
+  const _EtaBanner({required this.distance, required this.eta});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final style = AppTextStyles.small.copyWith(color: theme.colorScheme.onSurface);
-    final parts = [
-      if (distance != null) distance!,
-      if (eta != null) eta!,
-    ];
-    if (parts.isEmpty) return const SizedBox.shrink();
-    return Text(parts.join('  ·  '), textAlign: TextAlign.center, style: style);
+    return Container(
+      width: double.infinity,
+      color: _green,
+      padding: const EdgeInsets.only(top: 14, bottom: 34),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (eta != null)
+            Text(
+              eta!,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.title.copyWith(color: Colors.white),
+            ),
+          if (distance != null)
+            Text(
+              distance!,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.small.copyWith(color: Colors.white),
+            ),
+        ],
+      ),
+    );
   }
 }

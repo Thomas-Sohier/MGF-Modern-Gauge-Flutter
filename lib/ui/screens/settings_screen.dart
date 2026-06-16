@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_ecu_pages.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_ecrans_pages.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_systeme_pages.dart';
+import 'package:modern_gauge_flutter/ui/widgets/circular_content.dart';
 import 'package:modern_gauge_flutter/ui/widgets/settings_widgets.dart';
 import 'package:modern_gauge_flutter/utils/no_traversal_policy.dart';
 
@@ -158,66 +159,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: Center(
-        child: ClipOval(
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: ColoredBox(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              child: KeyboardListener(
-                focusNode: _focusNode,
-                onKeyEvent: _handleKeyEvent,
-                child: FocusTraversalGroup(
-                  policy: NoTraversalPolicy(),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final size = constraints.maxWidth;
-                      return Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Positioned(
-                            top: size * 0.20,
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 180),
-                              transitionBuilder: (child, animation) =>
-                                  FadeTransition(
-                                    opacity: animation,
-                                    child: child,
-                                  ),
-                              child: KeyedSubtree(
-                                key: ValueKey(_category),
-                                child: _PagerBody(
-                                  pages: _pages,
-                                  controller: _pageController,
-                                  currentIndex: _page,
-                                  onPageChanged: (i) =>
-                                      setState(() => _page = i),
-                                  onPrev: _page > 0 ? _prevPage : null,
-                                  onNext: _page < _pages.length - 1
-                                      ? _nextPage
-                                      : null,
-                                ),
+      child: CircularContent(
+        child: ColoredBox(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: KeyboardListener(
+            focusNode: _focusNode,
+            onKeyEvent: _handleKeyEvent,
+            child: FocusTraversalGroup(
+              policy: NoTraversalPolicy(),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final size = constraints.maxWidth;
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Positioned(
+                        top: size * 0.20,
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          transitionBuilder: (child, animation) =>
+                              FadeTransition(
+                                opacity: animation,
+                                child: child,
                               ),
+                          child: KeyedSubtree(
+                            key: ValueKey(_category),
+                            child: _PagerBody(
+                              pages: _pages,
+                              controller: _pageController,
+                              currentIndex: _page,
+                              onPageChanged: (i) =>
+                                  setState(() => _page = i),
+                              onPrev: _page > 0 ? _prevPage : null,
+                              onNext: _page < _pages.length - 1
+                                  ? _nextPage
+                                  : null,
                             ),
                           ),
-                          Positioned(
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            child: SettingsHeader(
-                              title: _title,
-                              onBack: _handleBack,
-                              height: size * 0.20,
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: SettingsHeader(
+                          title: _title,
+                          onBack: _handleBack,
+                          height: size * 0.20,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ),

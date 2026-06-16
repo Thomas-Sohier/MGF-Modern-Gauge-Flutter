@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_background_theme.dart';
+import 'package:modern_gauge_flutter/ui/widgets/circular_content.dart';
 
-/// A widget that displays a simple circular background with a metallic/textured effect.
-/// It uses a radial gradient to simulate the look of a classic gauge face.
+/// Full-screen background for the dashboard: fills the whole framebuffer with
+/// the gauge-face color and draws the rim border at the inscribed circle.
+/// Any [child] is clipped to that circle via [CircularContent].
 class GaugeTexturedBackground extends StatelessWidget {
   /// The widget to display on top of the textured background.
   final Widget? child;
@@ -33,30 +35,27 @@ class GaugeTexturedBackground extends StatelessWidget {
     // Stack separates static background from dynamic child.
     // RepaintBoundary isolates the CustomPaint — rasterized as GPU texture,
     // never repainted when child rebuilds.
-    return AspectRatio(
-      aspectRatio: 1,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          RepaintBoundary(
-            child: CustomPaint(
-              painter: _TexturedBackgroundPainter(
-                backgroundColor:
-                    backgroundColor ??
-                    gaugeThemeBackground.backgroundColor ??
-                    const Color(0xFFE0E0E0),
-                borderColor:
-                    borderColor ??
-                    gaugeThemeBackground.borderColor ??
-                    Colors.black54,
-                borderWidth:
-                    borderWidth ?? gaugeThemeBackground.borderWidth ?? 2.0,
-              ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        RepaintBoundary(
+          child: CustomPaint(
+            painter: _TexturedBackgroundPainter(
+              backgroundColor:
+                  backgroundColor ??
+                  gaugeThemeBackground.backgroundColor ??
+                  const Color(0xFFE0E0E0),
+              borderColor:
+                  borderColor ??
+                  gaugeThemeBackground.borderColor ??
+                  Colors.black54,
+              borderWidth:
+                  borderWidth ?? gaugeThemeBackground.borderWidth ?? 2.0,
             ),
           ),
-          if (child != null) Center(child: child),
-        ],
-      ),
+        ),
+        if (child != null) CircularContent(child: child!),
+      ],
     );
   }
 }
@@ -76,14 +75,16 @@ class _TexturedBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
+    // La zone visible est le cercle inscrit ; on le dimensionne sur le plus
+    // petit côté pour que la bordure tombe sur le bord de l'écran rond.
+    final radius = size.shortestSide / 2;
 
-    // 1. Dessine le fond avec une couleur unie
+    // 1. Remplit tout l'écran avec une couleur unie
     final backgroundPaint = Paint()
       ..color = backgroundColor
       ..style = PaintingStyle.fill;
 
-    canvas.drawCircle(center, radius, backgroundPaint);
+    canvas.drawRect(Offset.zero & size, backgroundPaint);
 
     // 2. Dessine une bordure extérieure si sa largeur est supérieure à 0
     if (borderWidth > 0) {
