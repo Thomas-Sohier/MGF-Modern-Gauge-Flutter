@@ -77,7 +77,7 @@ class _DashboardShellScreenState extends State<DashboardShellScreen> {
         onKeyEvent: _handleKeyEvent,
         child: Scaffold(
           backgroundColor: Colors.transparent,
-          body: Center(child: GaugeTexturedBackground(child: widget.child)),
+          body: GaugeTexturedBackground(child: widget.child),
         ),
       ),
     );
