@@ -61,6 +61,21 @@ lib/
 3. Screens use `Selector<EcuProvider, double>` to extract single fields (rpm, temp, etc.)
 4. Only affected widgets rebuild
 
+## Companion remote control
+
+This app is the **source of truth** for the head unit's views and settings, and
+the companion phone controls them via the Go agent's bidirectional
+`/ws/headunit` socket. `HeadUnitControlService` (started in `app.dart`'s provider
+tree) publishes a self-describing catalog — the dashboard views (id = route
+segment, visibility from `enabledScreens`, `current` from the active route) plus
+three settings (theme/enum, wifi/bool, notification duration/number) — whenever
+settings or the active route change, and applies the phone's commands
+(`set_current_view` → `go_router`, `set_view_visibility` → `SettingsProvider`,
+`set_setting_value`, `request_catalog`). It enforces the invariant that the
+current view is always visible (hiding the on-screen view switches away first).
+Pure catalog/enum logic lives in `head_unit_catalog.dart` (unit-tested); the
+service handles WebSocket IO and state mutation.
+
 ## Key Conventions
 
 ### Dart/Flutter (Official Rules)

@@ -34,6 +34,16 @@ class SettingsProvider with ChangeNotifier {
     _update(_settings.copyWith(enabledScreens: current));
   }
 
+  /// Explicitly enables or disables a screen (no-op if already in that state).
+  void setScreenEnabled(String routeSegment, bool enabled) {
+    final current = Set<String>.from(_settings.enabledScreens);
+    final changed = enabled
+        ? current.add(routeSegment)
+        : current.remove(routeSegment);
+    if (!changed) return;
+    _update(_settings.copyWith(enabledScreens: current));
+  }
+
   void setWifiEnabled(bool enabled) =>
       _update(_settings.copyWith(wifiEnabled: enabled));
 

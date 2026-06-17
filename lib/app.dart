@@ -4,6 +4,7 @@ import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
 import 'package:modern_gauge_flutter/providers/app_state_provider.dart';
 import 'package:modern_gauge_flutter/providers/mpris_provider.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
+import 'package:modern_gauge_flutter/services/head_unit_control_service.dart';
 import 'package:modern_gauge_flutter/services/navigation_server_listener.dart';
 import 'package:modern_gauge_flutter/services/notification_server_listener.dart';
 import 'package:modern_gauge_flutter/ui/themes/app_theme.dart';
@@ -17,6 +18,7 @@ class App extends StatelessWidget {
   final NotificationServerListener notificationListener;
   final AppStateProvider appStateProvider;
   final EcuProvider ecuProvider;
+  final HeadUnitControlService headUnitControlService;
   final GoRouter router;
 
   const App({
@@ -27,6 +29,7 @@ class App extends StatelessWidget {
     required this.notificationListener,
     required this.appStateProvider,
     required this.ecuProvider,
+    required this.headUnitControlService,
     required this.router,
   });
 
@@ -46,6 +49,11 @@ class App extends StatelessWidget {
           lazy: false,
           create: (context) => notificationListener..start(),
           dispose: (context, listener) => listener.dispose(),
+        ),
+        Provider<HeadUnitControlService>(
+          lazy: false,
+          create: (context) => headUnitControlService..start(),
+          dispose: (context, service) => service.dispose(),
         ),
         ChangeNotifierProvider(create: (context) => appStateProvider),
         ChangeNotifierProvider(create: (context) => ecuProvider),

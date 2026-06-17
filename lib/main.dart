@@ -8,6 +8,7 @@ import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/routes/app_router.dart';
 import 'package:modern_gauge_flutter/services/ecu_service.dart';
+import 'package:modern_gauge_flutter/services/head_unit_control_service.dart';
 import 'package:modern_gauge_flutter/services/log_service.dart';
 import 'package:modern_gauge_flutter/services/navigation_server_listener.dart';
 import 'package:modern_gauge_flutter/services/notification_server_listener.dart';
@@ -26,6 +27,11 @@ void main() async {
   final appStateProvider = AppStateProvider();
   final ecuProvider = EcuProvider(ecuService);
   final router = AppRouter.router;
+  final headUnitControlService = HeadUnitControlService(
+    settingsProvider,
+    ecuProvider,
+    router,
+  );
 
   LogService.info("Application startup.");
 
@@ -52,6 +58,7 @@ void main() async {
       notificationListener: notificationListener,
       appStateProvider: appStateProvider,
       ecuProvider: ecuProvider,
+      headUnitControlService: headUnitControlService,
       router: router,
     ),
   );
