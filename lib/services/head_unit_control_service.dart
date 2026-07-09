@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
@@ -136,12 +137,64 @@ class HeadUnitControlService {
           _setSettingValue(cmd['setting_id'] as String?, cmd['value']);
         case 'request_catalog':
           _publishCatalog();
+        case 'nav_key':
+          _handleNavKey(cmd['key'] as String?);
         default:
           LogService.error('HeadUnitControlService: unknown command: $raw');
       }
     } catch (e) {
       LogService.error('HeadUnitControlService: command parse error: $e');
     }
+  }
+
+  /// Applies a remote-pad key press from the phone. Screen cycling and leaving
+  /// the settings page are handled via the router directly; arrows/OK are
+  /// injected as synthesized hardware key events so they behave exactly like a
+  /// plugged-in keyboard (the dashboard shell and any focused widget react).
+  void _handleNavKey(String? key) {
+    final enabledScreens = _settings.settings.enabledScreens;
+    final location = _currentLocation();
+    switch (key) {
+      case 'next':
+        if (location.startsWith(RouteNames.dashboardRoute)) {
+          _router.go(getNextRoute(location, enabledScreens));
+        }
+      case 'previous':
+        if (location.startsWith(RouteNames.dashboardRoute)) {
+          _router.go(getPreviousRoute(location, enabledScreens));
+        }
+      case 'back':
+        if (location == RouteNames.settingsRoute) {
+          _router.go(buildDashboardRoutes(enabledScreens).first);
+        } else {
+          _pressKey(LogicalKeyboardKey.escape, PhysicalKeyboardKey.escape);
+        }
+      case 'ok':
+        _pressKey(LogicalKeyboardKey.enter, PhysicalKeyboardKey.enter);
+      case 'up':
+        _pressKey(LogicalKeyboardKey.arrowUp, PhysicalKeyboardKey.arrowUp);
+      case 'down':
+        _pressKey(LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown);
+      case 'left':
+        _pressKey(LogicalKeyboardKey.arrowLeft, PhysicalKeyboardKey.arrowLeft);
+      case 'right':
+        _pressKey(
+          LogicalKeyboardKey.arrowRight,
+          PhysicalKeyboardKey.arrowRight,
+        );
+      default:
+        LogService.error('HeadUnitControlService: unknown nav key: $key');
+    }
+  }
+
+  void _pressKey(LogicalKeyboardKey logical, PhysicalKeyboardKey physical) {
+    final ts = Duration(milliseconds: DateTime.now().millisecondsSinceEpoch);
+    HardwareKeyboard.instance.handleKeyEvent(
+      KeyDownEvent(physicalKey: physical, logicalKey: logical, timeStamp: ts),
+    );
+    HardwareKeyboard.instance.handleKeyEvent(
+      KeyUpEvent(physicalKey: physical, logicalKey: logical, timeStamp: ts),
+    );
   }
 
   void _setCurrentView(String? viewId) {
@@ -158,7 +211,8 @@ class HeadUnitControlService {
 
     // Invariant: the current view is never hidden. If we just hid the visible
     // view that is on screen, switch to the first remaining visible one.
-    if (!visible && _currentLocation() == '${RouteNames.dashboardRoute}$viewId') {
+    if (!visible &&
+        _currentLocation() == '${RouteNames.dashboardRoute}$viewId') {
       final routes = buildDashboardRoutes(_settings.settings.enabledScreens);
       _router.go(routes.first);
     }
