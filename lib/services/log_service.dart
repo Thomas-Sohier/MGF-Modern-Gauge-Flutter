@@ -71,13 +71,10 @@ class LogService {
   }
 
   Future<void> _init() async {
-    final directory = await getApplicationSupportDirectory();
-    _logDirectory = '${directory.path}/logs';
+    _logDirectory = '/data/.local/share/flutter-pi/logs';
     await Directory(_logDirectory).create(recursive: true);
 
-    final logFile = File(
-      '$_logDirectory/app_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.log',
-    );
+    final logFile = File('$_logDirectory/app_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.log');
     _level = Level.info;
 
     final outputs = <LogOutput>[_BufferedFileOutput(file: logFile)];
@@ -95,22 +92,12 @@ class LogService {
     info("[LogService] - log at $_logDirectory.");
   }
 
-  void _log(
-    Level level,
-    dynamic message, [
-    dynamic error,
-    StackTrace? stackTrace,
-  ]) {
+  void _log(Level level, dynamic message, [dynamic error, StackTrace? stackTrace]) {
     if (_level.index > level.index) return;
     _logger.log(level, message, error: error, stackTrace: stackTrace);
   }
 
-  static void log(
-    Level level,
-    dynamic message, [
-    dynamic error,
-    StackTrace? stackTrace,
-  ]) {
+  static void log(Level level, dynamic message, [dynamic error, StackTrace? stackTrace]) {
     LogService.instance._log(level, message, error, stackTrace);
   }
 
@@ -122,11 +109,7 @@ class LogService {
     log(Level.info, message, error, stackTrace);
   }
 
-  static void warning(
-    dynamic message, [
-    dynamic error,
-    StackTrace? stackTrace,
-  ]) {
+  static void warning(dynamic message, [dynamic error, StackTrace? stackTrace]) {
     log(Level.warning, message, error, stackTrace);
   }
 
