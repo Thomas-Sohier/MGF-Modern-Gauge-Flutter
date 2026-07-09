@@ -9,9 +9,6 @@ class GaugeTexturedBackground extends StatelessWidget {
   /// The widget to display on top of the textured background.
   final Widget? child;
 
-  /// The solid background color.
-  final Color? backgroundColor;
-
   /// The color of the optional outer border.
   final Color? borderColor;
 
@@ -21,7 +18,6 @@ class GaugeTexturedBackground extends StatelessWidget {
   const GaugeTexturedBackground({
     super.key,
     this.child,
-    this.backgroundColor,
     this.borderColor,
     this.borderWidth,
   });
@@ -41,10 +37,7 @@ class GaugeTexturedBackground extends StatelessWidget {
         RepaintBoundary(
           child: CustomPaint(
             painter: _TexturedBackgroundPainter(
-              backgroundColor:
-                  backgroundColor ??
-                  gaugeThemeBackground.backgroundColor ??
-                  const Color(0xFFE0E0E0),
+              backgroundColor: const Color.fromARGB(0, 0, 0, 0),
               borderColor:
                   borderColor ??
                   gaugeThemeBackground.borderColor ??

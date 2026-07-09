@@ -197,6 +197,7 @@ class HeadUnitControlService {
       LogService.error('HeadUnitControlService: onKeyData est null');
       return;
     }
+    LogService.info('Received input. Logical : $logical, physical : $physical');
 
     final ts = Duration(milliseconds: DateTime.now().millisecondsSinceEpoch);
 

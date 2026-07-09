@@ -15,33 +15,38 @@ class _BufferedFileOutput extends LogOutput {
 
   _BufferedFileOutput({required this.file});
 
+  Future<void> _flush() async {
+    _flushTimer?.cancel();
+    _flushTimer = null;
+
+    if (_buffer.isEmpty) return;
+
+    final lines = _buffer.join('\n');
+    _buffer.clear();
+
+    await file.writeAsString('$lines\n', mode: FileMode.append, flush: true);
+  }
+
   @override
   void output(OutputEvent event) {
     _buffer.addAll(event.lines);
+
     if (_buffer.length >= _maxBufferSize) {
-      _flush();
+      unawaited(_flush());
     } else {
       _scheduleFlush();
     }
   }
 
   void _scheduleFlush() {
-    _flushTimer ??= Timer(_flushInterval, _flush);
-  }
-
-  void _flush() {
-    _flushTimer?.cancel();
-    _flushTimer = null;
-    if (_buffer.isEmpty) return;
-
-    final lines = _buffer.join('\n');
-    _buffer.clear();
-    file.writeAsString('$lines\n', mode: FileMode.append, flush: true);
+    _flushTimer ??= Timer(_flushInterval, () {
+      unawaited(_flush());
+    });
   }
 
   @override
   Future<void> destroy() async {
-    _flush();
+    await _flush();
     await super.destroy();
   }
 }
@@ -83,10 +88,9 @@ class LogService {
     _logger = Logger(
       output: MultiOutput(outputs),
       printer: SimplePrinter(printTime: true, colors: false),
+      level: _level,
     );
-    unawaited(
-      Future.delayed(const Duration(seconds: 5), _deleteOldLogs),
-    );
+    unawaited(Future.delayed(const Duration(seconds: 5), _deleteOldLogs));
     info("[LogService] - init.");
     info("[LogService] - log at $_logDirectory.");
   }
