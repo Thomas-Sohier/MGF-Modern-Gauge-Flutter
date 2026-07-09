@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -188,12 +189,39 @@ class HeadUnitControlService {
   }
 
   void _pressKey(LogicalKeyboardKey logical, PhysicalKeyboardKey physical) {
+    // On récupère le dispatcher qui fait le pont entre le moteur C++ et Flutter
+    final dispatcher = ui.PlatformDispatcher.instance;
+    final onKeyData = dispatcher.onKeyData;
+
+    if (onKeyData == null) {
+      LogService.error('HeadUnitControlService: onKeyData est null');
+      return;
+    }
+
     final ts = Duration(milliseconds: DateTime.now().millisecondsSinceEpoch);
-    HardwareKeyboard.instance.handleKeyEvent(
-      KeyDownEvent(physicalKey: physical, logicalKey: logical, timeStamp: ts),
+
+    // 1. On simule l'appui de la touche (Key Down)
+    onKeyData(
+      ui.KeyData(
+        type: ui.KeyEventType.down,
+        physical: physical.usbHidUsage,
+        logical: logical.keyId,
+        timeStamp: ts,
+        character: null,
+        synthesized: false,
+      ),
     );
-    HardwareKeyboard.instance.handleKeyEvent(
-      KeyUpEvent(physicalKey: physical, logicalKey: logical, timeStamp: ts),
+
+    // 2. On simule le relâchement de la touche (Key Up)
+    onKeyData(
+      ui.KeyData(
+        type: ui.KeyEventType.up,
+        physical: physical.usbHidUsage,
+        logical: logical.keyId,
+        timeStamp: ts,
+        character: null,
+        synthesized: false,
+      ),
     );
   }
 
