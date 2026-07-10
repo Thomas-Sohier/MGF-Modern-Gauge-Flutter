@@ -24,7 +24,12 @@ class _BufferedFileOutput extends LogOutput {
     final lines = _buffer.join('\n');
     _buffer.clear();
 
-    await file.writeAsString('$lines\n', mode: FileMode.append, flush: true);
+    try {
+      await file.writeAsString('$lines\n', mode: FileMode.append, flush: true);
+    } catch (e) {
+      // Visible dans journalctl -u flutter-pi
+      stderr.writeln('[LogService] écriture impossible dans ${file.path}: $e');
+    }
   }
 
   @override
@@ -71,18 +76,28 @@ class LogService {
   }
 
   Future<void> _init() async {
-    _logDirectory = '/data/.local/share/flutter-pi/logs';
-    await Directory(_logDirectory).create(recursive: true);
-
-    final logFile = File('$_logDirectory/app_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.log');
+    // Surchargeable via systemd : Environment=MGF_LOG_DIR=/chemin
+    _logDirectory = Platform.environment['MGF_LOG_DIR'] ??
+        '/data/.local/share/flutter-pi/logs';
     _level = Level.info;
 
-    final outputs = <LogOutput>[_BufferedFileOutput(file: logFile)];
+    final outputs = <LogOutput>[];
     if (kDebugMode) {
-      outputs.insert(0, ConsoleOutput());
+      outputs.add(ConsoleOutput());
+    }
+    try {
+      await Directory(_logDirectory).create(recursive: true);
+      final logFile = File('$_logDirectory/app_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.log');
+      outputs.add(_BufferedFileOutput(file: logFile));
+      stdout.writeln('[LogService] logs fichier dans $_logDirectory');
+    } catch (e) {
+      stderr.writeln(
+          '[LogService] impossible de créer $_logDirectory: $e — logs fichier désactivés');
     }
 
     _logger = Logger(
+      // Le filtre par défaut (DevelopmentFilter) bloque tout en release.
+      filter: ProductionFilter(),
       output: MultiOutput(outputs),
       printer: SimplePrinter(printTime: true, colors: false),
       level: _level,
