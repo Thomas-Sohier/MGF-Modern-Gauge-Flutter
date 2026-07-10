@@ -1,25 +1,67 @@
-import 'dart:collection';
+import 'dart:async';
 import 'dart:io';
+import 'dart:math';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:marquee/marquee.dart';
 import 'package:modern_gauge_flutter/mixins/screen_navigation_mixin.dart';
 import 'package:modern_gauge_flutter/providers/mpris_provider.dart';
 import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 import 'package:modern_gauge_flutter/models/media_info.dart';
-import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
+import 'package:modern_gauge_flutter/ui/themes/music_player_theme.dart';
 import 'package:modern_gauge_flutter/ui/widgets/music_dial.dart';
-import 'package:modern_gauge_flutter/utils/color_util.dart';
 import 'package:provider/provider.dart';
 
-const _kInfoTitleTextStyle = TextStyle(
-  color: Colors.black87,
-  fontWeight: FontWeight.bold,
-  fontSize: 18,
-);
-final _kInfoTimeTextStyle = AppTextStyles.body.copyWith(color: Colors.black);
+// ── Dimensions du design ─────────────────────────────────────────────────────
+// La maquette est dessinée pour un écran rond de 480 px ; chaque valeur
+// ci-dessous est exprimée dans ce repère puis multipliée par `scale`
+// (= côté réel / 480) pour rester proportionnelle sur toute résolution.
+/// Diamètre de référence de la maquette.
+const _kDesignSize = 480.0;
+
+/// Marge entre le bord de l'écran et l'anneau de progression.
+const _kRingPadding = 6.0;
+
+/// Épaisseur du trait de l'anneau de progression.
+const _kRingStroke = 12.0;
+
+/// Marge horizontale du bloc central (évite que le texte touche l'anneau).
+const _kContentHPadding = 60.0;
+
+/// Diamètre de la pochette ronde centrale.
+const _kArtSize = 190.0;
+
+/// Espacements verticaux : pochette→titre, titre→artiste, artiste→ligne temps.
+const _kArtTitleGap = 4.0;
+const _kTitleArtistGap = 0;
+const _kArtistTimeGap = 20.0;
+
+/// Ligne du bas : largeur réservée aux temps (stabilise le centrage quand le
+/// texte passe de 0:59 à 1:00), écart temps↔bouton, diamètre du bouton et
+/// taille de son icône.
+const _kTimeTextWidth = 70.0;
+const _kTimeButtonGap = 12.0;
+const _kPlayButtonSize = 80.0;
+const _kPlayIconSize = 28.0;
+
+/// Police embarquée dans les assets : la police système par défaut n'existe
+/// pas sur l'image du Pi (pas de fontconfig), le texte ne s'y rendrait pas.
+const _kFontFamily = 'JetBrainsMono';
+
+/// Tailles de police : titre, artiste, temps.
+const _kTitleFontSize = 30.0;
+const _kArtistFontSize = 22.0;
+const _kTimeFontSize = 20.0;
+
+/// Interlignes, et hauteurs réservées aux textes : le titre occupe toujours
+/// la place de 2 lignes et l'artiste d'1 ligne, pour que la mise en page ne
+/// saute pas quand le morceau change.
+const _kTitleLineHeight = 1.2;
+const _kArtistLineHeight = 1.35;
+const _kTitleBoxHeight = _kTitleFontSize * _kTitleLineHeight * 2;
+const _kArtistBoxHeight = _kArtistFontSize * _kArtistLineHeight;
 
 String formatDuration(Duration d) {
   if (d.inSeconds <= 0) return '00:00';
@@ -60,15 +102,52 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen>
     return buildNavigableScreen(
       child: Selector<MprisListenerBase, PlaybackStatus>(
         selector: (_, listener) => listener.playbackStatus,
-        builder: (context, status, _) {
-          if (status == PlaybackStatus.stopped) {
-            return const _NoMusicPlayerUI();
-          }
-          return const _MusicPlayerUI();
-        },
+        builder: (context, status, _) => _PlayerOrEmpty(status: status),
       ),
     );
   }
+}
+
+/// L'agent envoie brièvement `stopped` entre deux morceaux : on ne bascule
+/// sur l'écran « aucun lecteur » que si l'état persiste, pour éviter le
+/// clignotement au changement de musique. Le retour à la lecture est immédiat.
+class _PlayerOrEmpty extends StatefulWidget {
+  final PlaybackStatus status;
+  const _PlayerOrEmpty({required this.status});
+
+  @override
+  State<_PlayerOrEmpty> createState() => _PlayerOrEmptyState();
+}
+
+class _PlayerOrEmptyState extends State<_PlayerOrEmpty> {
+  static const _stoppedDebounce = Duration(milliseconds: 1500);
+
+  Timer? _timer;
+  late bool _showEmpty = widget.status == PlaybackStatus.stopped;
+
+  @override
+  void didUpdateWidget(_PlayerOrEmpty oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.status == oldWidget.status) return;
+    _timer?.cancel();
+    if (widget.status == PlaybackStatus.stopped) {
+      _timer = Timer(_stoppedDebounce, () {
+        if (mounted) setState(() => _showEmpty = true);
+      });
+    } else if (_showEmpty) {
+      setState(() => _showEmpty = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _showEmpty ? const _NoMusicPlayerUI() : const _MusicPlayerUI();
 }
 
 class _NoMusicPlayerUI extends StatelessWidget {
@@ -93,58 +172,86 @@ class _NoMusicPlayerUI extends StatelessWidget {
 
 // --- STRUCTURE DE L'INTERFACE ---
 
+/// Met le lecteur à l'échelle (cf. constantes `_kDesignSize`…) dans un carré
+/// centré : sur une zone non carrée (fenêtre desktop), un ClipOval direct
+/// découperait une ellipse et l'anneau — dont le rayon suit la largeur —
+/// déborderait de l'écran.
 class _MusicPlayerUI extends StatelessWidget {
   const _MusicPlayerUI();
 
   @override
   Widget build(BuildContext context) {
-    return const Stack(
-      alignment: Alignment.center,
-      children: [_AlbumArt(), _ProgressDial(), _InfoPanel()],
-    );
-  }
-}
-
-class _InfoPanel extends StatelessWidget {
-  const _InfoPanel();
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      bottom: 0,
-      height: 80,
-      width: 300,
-      child: Container(
-        color: Colors.white,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned(
-              top: 5,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 25, maxWidth: 200),
-                child: _TitleText(),
-              ),
-            ),
-            Positioned(
-              top: 25,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 160),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.max,
-                  spacing: 6,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.center,
+    final colors = Theme.of(context).extension<MusicPlayerTheme>()!;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final side = constraints.biggest.shortestSide;
+        final scale = side / _kDesignSize;
+        return Center(
+          child: SizedBox.square(
+            dimension: side,
+            child: ClipOval(
+              child: ColoredBox(
+                color: colors.surface,
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    _CurrentPositionText(),
-                    _PlaybackStatusIndicator(),
-                    _TotalDurationText(),
+                    const _BlurredArtBackground(),
+                    Padding(
+                      padding: EdgeInsets.all(_kRingPadding * scale),
+                      child: _ProgressRing(scale: scale),
+                    ),
+                    _CenterContent(scale: scale),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CenterContent extends StatelessWidget {
+  final double scale;
+  const _CenterContent({required this.scale});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: _kContentHPadding * scale),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _AlbumArt(size: _kArtSize * scale),
+          SizedBox(height: _kArtTitleGap * scale),
+          SizedBox(
+            height: _kTitleBoxHeight * scale,
+            child: Center(child: _TitleText(scale: scale)),
+          ),
+          SizedBox(height: _kTitleArtistGap * scale),
+          SizedBox(
+            height: _kArtistBoxHeight * scale,
+            child: Center(child: _ArtistText(scale: scale)),
+          ),
+          SizedBox(height: _kArtistTimeGap * scale),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: _kTimeTextWidth * scale,
+                child: _CurrentPositionText(scale: scale),
+              ),
+              SizedBox(width: _kTimeButtonGap * scale),
+              _PlaybackStatusIndicator(scale: scale),
+              SizedBox(width: _kTimeButtonGap * scale),
+              SizedBox(
+                width: _kTimeTextWidth * scale,
+                child: _TotalDurationText(scale: scale),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -152,248 +259,250 @@ class _InfoPanel extends StatelessWidget {
 
 // --- WIDGETS ATOMIQUES ---
 class _TitleText extends StatelessWidget {
+  final double scale;
+  const _TitleText({required this.scale});
+
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MusicPlayerTheme>()!;
     return Selector<MprisListenerBase, String>(
       selector: (_, listener) => listener.mediaInfo?.title ?? 'Titre inconnu',
-      builder: (_, title, __) => Marquee(
-        text: title,
-        blankSpace: 60,
-        style: _kInfoTitleTextStyle,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        pauseAfterRound: const Duration(seconds: 2),
-        showFadingOnlyWhenScrolling: true,
-        fadingEdgeStartFraction: 0.12,
-        fadingEdgeEndFraction: 0.12,
+      builder: (_, title, __) => Text(
+        title,
+        textAlign: TextAlign.center,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontFamily: _kFontFamily,
+          color: colors.title,
+          fontWeight: FontWeight.bold,
+          fontSize: _kTitleFontSize * scale,
+          height: _kTitleLineHeight,
+        ),
+      ),
+    );
+  }
+}
+
+class _ArtistText extends StatelessWidget {
+  final double scale;
+  const _ArtistText({required this.scale});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MusicPlayerTheme>()!;
+    return Selector<MprisListenerBase, String>(
+      selector: (_, listener) => listener.mediaInfo?.artist ?? '',
+      builder: (_, artist, __) => Text(
+        artist,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontFamily: _kFontFamily,
+          color: colors.subtle,
+          fontSize: _kArtistFontSize * scale,
+          height: _kArtistLineHeight,
+        ),
       ),
     );
   }
 }
 
 class _CurrentPositionText extends StatelessWidget {
-  const _CurrentPositionText();
+  final double scale;
+  const _CurrentPositionText({required this.scale});
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MusicPlayerTheme>()!;
     return Selector<MprisListenerBase, Duration>(
       selector: (_, listener) => listener.position,
-      builder: (_, position, __) =>
-          Text(formatDuration(position), style: _kInfoTimeTextStyle),
+      builder: (_, position, __) => Text(
+        formatDuration(position),
+        textAlign: TextAlign.right,
+        style: TextStyle(
+          fontFamily: _kFontFamily,
+          color: colors.subtle,
+          fontSize: _kTimeFontSize * scale,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
     );
   }
 }
 
+/// Bouton central du design : simple indicateur (MPRIS est en écoute seule).
 class _PlaybackStatusIndicator extends StatelessWidget {
-  const _PlaybackStatusIndicator();
+  final double scale;
+  const _PlaybackStatusIndicator({required this.scale});
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MusicPlayerTheme>()!;
     return Selector<MprisListenerBase, PlaybackStatus>(
       selector: (_, listener) => listener.playbackStatus,
       builder: (_, status, __) {
         final iconData = status == PlaybackStatus.playing
             ? Icons.pause_rounded
             : Icons.play_arrow_rounded;
-        return Icon(iconData, color: Colors.black54, size: 30);
+        return Container(
+          width: _kPlayButtonSize * scale,
+          height: _kPlayButtonSize * scale,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: colors.primary,
+          ),
+          child: Icon(
+            iconData,
+            color: colors.surface,
+            size: _kPlayIconSize * scale,
+          ),
+        );
       },
     );
   }
 }
 
 class _TotalDurationText extends StatelessWidget {
-  const _TotalDurationText();
+  final double scale;
+  const _TotalDurationText({required this.scale});
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MusicPlayerTheme>()!;
     return Selector<MprisListenerBase, Duration>(
       selector: (_, listener) => listener.mediaInfo?.duration ?? Duration.zero,
-      builder: (_, totalDuration, __) =>
-          Text(formatDuration(totalDuration), style: _kInfoTimeTextStyle),
+      builder: (_, totalDuration, __) => Text(
+        formatDuration(totalDuration),
+        textAlign: TextAlign.left,
+        style: TextStyle(
+          fontFamily: _kFontFamily,
+          color: colors.subtle,
+          fontSize: _kTimeFontSize * scale,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
     );
   }
 }
 
-// --- EXTRACTION DE COULEUR AVEC CACHE ---
-class _ColorExtractorService {
-  static final _instance = _ColorExtractorService._();
-  factory _ColorExtractorService() => _instance;
-  _ColorExtractorService._();
+Widget _artImage(String artUrl, {required Widget fallback}) {
+  final isNetwork =
+      artUrl.startsWith('http://') || artUrl.startsWith('https://');
+  return isNetwork
+      ? Image.network(
+          artUrl,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          filterQuality: FilterQuality.medium,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => fallback,
+        )
+      : Image.file(
+          File(artUrl),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (_, __, ___) => fallback,
+        );
+}
 
-  static const _kMaxCacheSize = 32;
-  final LinkedHashMap<String, ColorScheme> _colorCache = LinkedHashMap();
+/// Pochette floutée et assombrie en fond plein écran.
+class _BlurredArtBackground extends StatelessWidget {
+  const _BlurredArtBackground();
 
-  Future<ColorScheme> extractDominantColor(String? artUrl) async {
-    if (artUrl == null || artUrl.isEmpty) {
-      return ColorScheme.fromSeed(seedColor: Colors.blue);
-    }
-
-    if (_colorCache.containsKey(artUrl)) {
-      // Déplacer en fin pour maintenir l'ordre LRU.
-      final cached = _colorCache.remove(artUrl)!;
-      _colorCache[artUrl] = cached;
-      return cached;
-    }
-
-    try {
-      final isNetwork =
-          artUrl.startsWith('http://') || artUrl.startsWith('https://');
-      final ImageProvider imageProvider = isNetwork
-          ? NetworkImage(artUrl)
-          : FileImage(File(artUrl));
-      final palette = await ColorUtil().getColorsFromImage(imageProvider);
-
-      final colorScheme = ColorScheme.fromSeed(seedColor: palette[0]);
-      if (_colorCache.length >= _kMaxCacheSize) {
-        _colorCache.remove(_colorCache.keys.first);
-      }
-      _colorCache[artUrl] = colorScheme;
-      return colorScheme;
-    } catch (e) {
-      return ColorScheme.fromSeed(seedColor: Colors.blue);
-    }
-  }
-
-  void clearCache() {
-    _colorCache.clear();
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MusicPlayerTheme>()!;
+    return Selector<MprisListenerBase, String?>(
+      selector: (_, listener) => listener.mediaInfo?.artUrl,
+      builder: (_, artUrl, __) {
+        if (artUrl == null) return const SizedBox.shrink();
+        return RepaintBoundary(
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Transform.scale(
+              scale: 1.25,
+              child: ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  colors.surface.withValues(alpha: 0.4),
+                  BlendMode.srcOver,
+                ),
+                child: _artImage(artUrl, fallback: const SizedBox.shrink()),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
 class _AlbumArt extends StatelessWidget {
-  const _AlbumArt();
+  final double size;
+  const _AlbumArt({required this.size});
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).extension<MusicPlayerTheme>()!;
     return Selector<MprisListenerBase, String?>(
       selector: (_, listener) => listener.mediaInfo?.artUrl,
       builder: (_, artUrl, __) {
-        const icon = Icon(Icons.music_note, size: 150, color: Colors.grey);
-        const decoration = BoxDecoration(
-          shape: BoxShape.circle,
-          color: Color(0xFFE0E5E8),
+        final fallback = Icon(
+          Icons.music_note,
+          size: size * 0.6,
+          color: colors.subtle,
         );
-
-        if (artUrl == null) {
-          return Container(decoration: decoration, child: icon);
-        }
-
-        final isNetwork =
-            artUrl.startsWith('http://') || artUrl.startsWith('https://');
-        final imageWidget = isNetwork
-            ? Image.network(
-                artUrl,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                filterQuality: FilterQuality.medium,
-                gaplessPlayback: true,
-                errorBuilder: (_, __, ___) => icon,
-              )
-            : Image.file(
-                File(artUrl),
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                gaplessPlayback: true,
-                filterQuality: FilterQuality.medium,
-                errorBuilder: (_, __, ___) => icon,
-              );
-
         return Container(
+          width: size,
+          height: size,
           clipBehavior: Clip.antiAlias,
-          decoration: decoration,
-          child: imageWidget,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: colors.artFallback,
+          ),
+          child: artUrl == null
+              ? fallback
+              : _artImage(artUrl, fallback: fallback),
         );
       },
     );
   }
 }
 
-// --- CADRAN AVEC COULEUR DYNAMIQUE ---
-class _ProgressDial extends StatelessWidget {
-  const _ProgressDial();
+// --- ANNEAU DE PROGRESSION PÉRIPHÉRIQUE ---
+class _ProgressRing extends StatelessWidget {
+  final double scale;
+  const _ProgressRing({required this.scale});
 
   @override
   Widget build(BuildContext context) {
-    return Selector<MprisListenerBase, (Duration, Duration, String?)>(
-      selector: (_, listener) => (
-        listener.position,
-        listener.mediaInfo?.duration ?? Duration.zero,
-        listener.mediaInfo?.artUrl,
-      ),
+    final colors = Theme.of(context).extension<MusicPlayerTheme>()!;
+    return Selector<MprisListenerBase, (Duration, Duration)>(
+      selector: (_, listener) =>
+          (listener.position, listener.mediaInfo?.duration ?? Duration.zero),
       builder: (_, data, __) {
-        final (position, totalDuration, artUrl) = data;
+        final (position, totalDuration) = data;
         final progress = (totalDuration.inMilliseconds > 0)
             ? position.inMilliseconds / totalDuration.inMilliseconds
             : 0.0;
 
-        return _DynamicColorDial(
-          position: position,
-          totalDuration: totalDuration,
-          progress: progress.clamp(0.0, 1.0),
-          artUrl: artUrl,
+        // MusicDial démarre en bas ; le design démarre en haut (12 h).
+        return Transform.rotate(
+          angle: pi,
+          child: MusicDial(
+            progress: progress.clamp(0.0, 1.0),
+            foregroundColor: colors.primary,
+            backgroundColor: colors.ringTrack,
+            sweepFactor: 1.0,
+            strokeWidth: _kRingStroke * scale,
+          ),
         );
       },
-    );
-  }
-}
-
-class _DynamicColorDial extends StatefulWidget {
-  final Duration position;
-  final Duration totalDuration;
-  final double progress;
-  final String? artUrl;
-
-  const _DynamicColorDial({
-    required this.position,
-    required this.totalDuration,
-    required this.progress,
-    required this.artUrl,
-  });
-
-  @override
-  State<_DynamicColorDial> createState() => _DynamicColorDialState();
-}
-
-class _DynamicColorDialState extends State<_DynamicColorDial> {
-  Color _foregroundColor = Colors.blue;
-  Color _containerColor = Colors.white;
-
-  @override
-  void initState() {
-    super.initState();
-    _extractColor();
-  }
-
-  @override
-  void didUpdateWidget(_DynamicColorDial oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Si l'artUrl change, extraire la nouvelle couleur
-    if (oldWidget.artUrl != widget.artUrl) {
-      _extractColor();
-    }
-  }
-
-  Future<ColorScheme> _extractColor() async {
-    final colorScheme = await _ColorExtractorService().extractDominantColor(
-      widget.artUrl,
-    );
-    if (mounted) {
-      setState(() {
-        _foregroundColor = colorScheme.primary;
-        _containerColor = colorScheme.primaryContainer;
-      });
-    }
-    return colorScheme;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MusicDial(
-      progress: widget.progress,
-      foregroundColor: _foregroundColor,
-      backgroundColor: _containerColor.withAlpha(160),
-      sweepFactor: 0.67,
-      strokeWidth: 14,
     );
   }
 }

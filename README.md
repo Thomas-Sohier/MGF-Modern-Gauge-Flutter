@@ -45,6 +45,27 @@ flutter build apk        # build for Android
 flutter pub run build_runner build --delete-conflicting-outputs
 ```
 
+## Startup options
+
+Compile-time flags (`--dart-define`, work with `flutter run` and `flutter build`):
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `SERVER_HOST` | `localhost` | Host of the Go agent (WebSocket + HTTP API) |
+| `SERVER_PORT` | `8080` | Port of the Go agent |
+| `FAKE_NOW_PLAYING` | `false` | Replace the now-playing WebSocket source with a fake in-app player (debug the music screen without the Go server) |
+
+```bash
+flutter run --dart-define=SERVER_HOST=10.0.0.39 --dart-define=SERVER_PORT=8080
+flutter run --dart-define=FAKE_NOW_PLAYING=true
+```
+
+Runtime environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MGF_LOG_DIR` | `/data/.local/share/flutter-pi/logs` | Log file directory (e.g. set via systemd `Environment=`) |
+
 ## Running on Raspberry Pi 3B+
 
 Build in release mode for optimal performance:

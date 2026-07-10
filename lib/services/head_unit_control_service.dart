@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui' as ui;
-
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
@@ -148,81 +146,62 @@ class HeadUnitControlService {
     }
   }
 
-  /// Applies a remote-pad key press from the phone. Screen cycling and leaving
-  /// the settings page are handled via the router directly; arrows/OK are
-  /// injected as synthesized hardware key events so they behave exactly like a
-  /// plugged-in keyboard (the dashboard shell and any focused widget react).
+  /// Correspondance touche distante → touche clavier. Le pavé du téléphone est
+  /// traduit en événements clavier synthétisés : toute la logique (cycle des
+  /// écrans, hiérarchie des settings…) vit dans les handlers clavier des
+  /// écrans, identiques pour un clavier branché.
+  static const _navKeyMap = {
+    'next': (LogicalKeyboardKey.arrowRight, PhysicalKeyboardKey.arrowRight),
+    'previous': (LogicalKeyboardKey.arrowLeft, PhysicalKeyboardKey.arrowLeft),
+    'settings': (LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown),
+    'back': (LogicalKeyboardKey.escape, PhysicalKeyboardKey.escape),
+    'ok': (LogicalKeyboardKey.enter, PhysicalKeyboardKey.enter),
+    'up': (LogicalKeyboardKey.arrowUp, PhysicalKeyboardKey.arrowUp),
+    'down': (LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown),
+    'left': (LogicalKeyboardKey.arrowLeft, PhysicalKeyboardKey.arrowLeft),
+    'right': (LogicalKeyboardKey.arrowRight, PhysicalKeyboardKey.arrowRight),
+  };
+
   void _handleNavKey(String? key) {
-    final enabledScreens = _settings.settings.enabledScreens;
-    final location = _currentLocation();
-    switch (key) {
-      case 'next':
-        if (location.startsWith(RouteNames.dashboardRoute)) {
-          _router.go(getNextRoute(location, enabledScreens));
-        }
-      case 'previous':
-        if (location.startsWith(RouteNames.dashboardRoute)) {
-          _router.go(getPreviousRoute(location, enabledScreens));
-        }
-      case 'back':
-        if (location == RouteNames.settingsRoute) {
-          _router.go(buildDashboardRoutes(enabledScreens).first);
-        } else {
-          _pressKey(LogicalKeyboardKey.escape, PhysicalKeyboardKey.escape);
-        }
-      case 'ok':
-        _pressKey(LogicalKeyboardKey.enter, PhysicalKeyboardKey.enter);
-      case 'up':
-        _pressKey(LogicalKeyboardKey.arrowUp, PhysicalKeyboardKey.arrowUp);
-      case 'down':
-        _pressKey(LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown);
-      case 'left':
-        _pressKey(LogicalKeyboardKey.arrowLeft, PhysicalKeyboardKey.arrowLeft);
-      case 'right':
-        _pressKey(
-          LogicalKeyboardKey.arrowRight,
-          PhysicalKeyboardKey.arrowRight,
-        );
-      default:
-        LogService.error('HeadUnitControlService: unknown nav key: $key');
+    final mapped = _navKeyMap[key];
+    if (mapped == null) {
+      LogService.error('HeadUnitControlService: unknown nav key: $key');
+      return;
     }
+    _pressKey(mapped.$1, mapped.$2);
   }
 
+  /// Injecte la touche au niveau framework (FocusManager) via
+  /// [KeyEventManager.keyMessageHandler]. On n'utilise pas
+  /// `PlatformDispatcher.onKeyData` : dès qu'un vrai clavier a envoyé un
+  /// événement par le canal `flutter/keyevent`, le framework verrouille ce
+  /// mode de transit et ignore les KeyData injectés côté moteur.
+  // KeyEventManager/KeyMessage sont dépréciés mais restent, dans cette version
+  // du SDK, le seul point d'entrée du FocusManager pour injecter des touches.
+  // ignore_for_file: deprecated_member_use
   void _pressKey(LogicalKeyboardKey logical, PhysicalKeyboardKey physical) {
-    // On récupère le dispatcher qui fait le pont entre le moteur C++ et Flutter
-    final dispatcher = ui.PlatformDispatcher.instance;
-    final onKeyData = dispatcher.onKeyData;
-
-    if (onKeyData == null) {
-      LogService.error('HeadUnitControlService: onKeyData est null');
+    final handler = ServicesBinding.instance.keyEventManager.keyMessageHandler;
+    if (handler == null) {
+      LogService.error('HeadUnitControlService: keyMessageHandler est null');
       return;
     }
     LogService.info('Received input. Logical : $logical, physical : $physical');
 
     final ts = Duration(milliseconds: DateTime.now().millisecondsSinceEpoch);
 
-    // 1. On simule l'appui de la touche (Key Down)
-    onKeyData(
-      ui.KeyData(
-        type: ui.KeyEventType.down,
-        physical: physical.usbHidUsage,
-        logical: logical.keyId,
-        timeStamp: ts,
-        character: null,
-        synthesized: false,
-      ),
+    handler(
+      KeyMessage([
+        KeyDownEvent(
+          physicalKey: physical,
+          logicalKey: logical,
+          timeStamp: ts,
+        ),
+      ], null),
     );
-
-    // 2. On simule le relâchement de la touche (Key Up)
-    onKeyData(
-      ui.KeyData(
-        type: ui.KeyEventType.up,
-        physical: physical.usbHidUsage,
-        logical: logical.keyId,
-        timeStamp: ts,
-        character: null,
-        synthesized: false,
-      ),
+    handler(
+      KeyMessage([
+        KeyUpEvent(physicalKey: physical, logicalKey: logical, timeStamp: ts),
+      ], null),
     );
   }
 

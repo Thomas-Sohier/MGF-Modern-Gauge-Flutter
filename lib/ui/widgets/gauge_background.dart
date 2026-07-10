@@ -37,7 +37,8 @@ class GaugeTexturedBackground extends StatelessWidget {
         RepaintBoundary(
           child: CustomPaint(
             painter: _TexturedBackgroundPainter(
-              backgroundColor: const Color.fromARGB(0, 0, 0, 0),
+              backgroundColor:
+                  gaugeThemeBackground.backgroundColor ?? Colors.black,
               borderColor:
                   borderColor ??
                   gaugeThemeBackground.borderColor ??
@@ -72,12 +73,14 @@ class _TexturedBackgroundPainter extends CustomPainter {
     // petit côté pour que la bordure tombe sur le bord de l'écran rond.
     final radius = size.shortestSide / 2;
 
-    // 1. Remplit tout l'écran avec une couleur unie
+    // 1. Noir hors de l'écran rond, couleur du thème dans le cercle inscrit
+    canvas.drawRect(Offset.zero & size, Paint()..color = Colors.black);
+
     final backgroundPaint = Paint()
       ..color = backgroundColor
       ..style = PaintingStyle.fill;
 
-    canvas.drawRect(Offset.zero & size, backgroundPaint);
+    canvas.drawCircle(center, radius, backgroundPaint);
 
     // 2. Dessine une bordure extérieure si sa largeur est supérieure à 0
     if (borderWidth > 0) {

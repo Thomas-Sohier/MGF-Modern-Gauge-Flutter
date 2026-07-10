@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/ui/themes/clock_theme.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_background_theme.dart';
 import 'package:modern_gauge_flutter/ui/themes/gauge_theme.dart';
+import 'package:modern_gauge_flutter/ui/themes/music_player_theme.dart';
 
 /// Palette centrale — toutes les couleurs en un seul endroit.
 class AppColors {
@@ -102,6 +103,15 @@ class AppTheme {
         borderColor: AppColors.darkBg,
         borderWidth: 2.0,
       ),
+      // Lecteur de musique — palette MD3 sombre du design.
+      MusicPlayerTheme(
+        surface: Color(0xFF1C1B1F),
+        primary: Color(0xFFD0BCFF),
+        ringTrack: Color(0xFF49454F),
+        title: Color.fromARGB(255, 11, 11, 11),
+        subtle: Color.fromARGB(255, 58, 58, 58),
+        artFallback: Color(0xFF3A3742),
+      ),
     ],
   );
 
@@ -166,6 +176,15 @@ class AppTheme {
         backgroundColor: AppColors.lightGaugeBg,
         borderColor: AppColors.lightBorder,
         borderWidth: 2.0,
+      ),
+      // Lecteur de musique — variante MD3 claire.
+      MusicPlayerTheme(
+        surface: Color(0xFFFEF7FF),
+        primary: Color(0xFF6750A4),
+        ringTrack: Color(0xFFE7E0EC),
+        title: Color(0xFF1D1B20),
+        subtle: Color.fromARGB(255, 0, 0, 0),
+        artFallback: Color(0xFFE7E0EC),
       ),
     ],
   );

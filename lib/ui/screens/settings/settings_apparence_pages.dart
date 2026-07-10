@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
+import 'package:modern_gauge_flutter/ui/screens/settings/settings_page_input.dart';
 import 'package:modern_gauge_flutter/ui/widgets/settings_widgets.dart';
 import 'package:provider/provider.dart';
 
 /// Retourne la liste des pages Apparence.
-List<Widget> buildApparencePages() => [const _ThemePage()];
+List<SettingsPage> buildApparencePages() => const [
+  SettingsPage(_ThemePage(), input: SimpleSettingsInput(_toggleTheme)),
+];
+
+void _toggleTheme(BuildContext context) {
+  final provider = context.read<SettingsProvider>();
+  provider.setThemeMode(
+    provider.settings.themeMode == ThemeMode.dark
+        ? ThemeMode.light
+        : ThemeMode.dark,
+  );
+}
 
 // ── Pages Apparence ─────────────────────────────────────────────────────────
 
@@ -22,12 +34,7 @@ class _ThemePage extends StatelessWidget {
         label: 'Thème',
         value: themeMode == ThemeMode.dark,
         valueLabel: Text(themeMode == ThemeMode.dark ? 'Sombre' : 'Clair'),
-        onToggle: () {
-          final provider = context.read<SettingsProvider>();
-          provider.setThemeMode(
-            themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark,
-          );
-        },
+        onToggle: () => _toggleTheme(context),
       ),
     );
   }

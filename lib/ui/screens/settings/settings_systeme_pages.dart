@@ -2,15 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
+import 'package:modern_gauge_flutter/ui/screens/settings/settings_page_input.dart';
 import 'package:modern_gauge_flutter/ui/widgets/settings_widgets.dart';
 import 'package:modern_gauge_flutter/utils/app_constants.dart';
 import 'package:provider/provider.dart';
 
 /// Retourne la liste des pages Système.
-List<Widget> buildSystemePages() => const [
-  _WifiPage(),
-  _NotificationDurationPage(),
+List<SettingsPage> buildSystemePages() => [
+  const SettingsPage(_WifiPage(), input: SimpleSettingsInput(_toggleWifi)),
+  SettingsPage(
+    const _NotificationDurationPage(),
+    input: ValueSettingsInput(
+      onDecrease: (context) => _stepNotificationDuration(context, -1),
+      onIncrease: (context) => _stepNotificationDuration(context, 1),
+    ),
+  ),
 ];
+
+void _toggleWifi(BuildContext context) {
+  final settings = context.read<SettingsProvider>();
+  final next = !settings.settings.wifiEnabled;
+  settings.setWifiEnabled(next);
+  context.read<EcuProvider>().setWifiEnabled(next);
+}
+
+void _stepNotificationDuration(BuildContext context, int delta) {
+  final provider = context.read<SettingsProvider>();
+  provider.setNotificationDurationSeconds(
+    provider.settings.notificationDurationSeconds + delta,
+  );
+}
 
 // ── Pages Système ───────────────────────────────────────────────────────────
 
@@ -28,11 +49,7 @@ class _WifiPage extends StatelessWidget {
           icon: enabled ? Icons.wifi_rounded : Icons.wifi_off_rounded,
           label: 'WiFi',
           value: enabled,
-          onToggle: () {
-            final next = !enabled;
-            settings.setWifiEnabled(next);
-            context.read<EcuProvider>().setWifiEnabled(next);
-          },
+          onToggle: () => _toggleWifi(context),
         );
       },
     );

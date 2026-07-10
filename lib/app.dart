@@ -39,6 +39,7 @@ class App extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => settingsProvider),
         ChangeNotifierProvider<MprisListenerBase>(
+          lazy: false,
           create: (context) => mprisListener..start(),
         ),
         ChangeNotifierProvider<NavigationServerListener>(

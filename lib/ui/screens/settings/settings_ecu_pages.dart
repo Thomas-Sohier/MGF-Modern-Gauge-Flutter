@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
+import 'package:modern_gauge_flutter/ui/screens/settings/settings_page_input.dart';
 import 'package:modern_gauge_flutter/ui/widgets/settings_widgets.dart';
 import 'package:provider/provider.dart';
 
 /// Retourne la liste des pages ECU (5 cartes info en lecture seule).
-List<Widget> buildEcuPages() => [
-  const _EcuConnexionPage(),
-  const _EcuTypePage(),
-  const _EcuAgentVersionPage(),
-  const _EcuSerialPortPage(),
-  const _EcuFaultsPage(),
+List<SettingsPage> buildEcuPages() => const [
+  SettingsPage(_EcuConnexionPage()),
+  SettingsPage(_EcuTypePage()),
+  SettingsPage(_EcuAgentVersionPage()),
+  SettingsPage(_EcuSerialPortPage()),
+  SettingsPage(_EcuFaultsPage()),
 ];
 
 // ── Pages ECU ───────────────────────────────────────────────────────────────

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/routes/navigation_logic.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_apparence_pages.dart';
+import 'package:modern_gauge_flutter/ui/screens/settings/settings_page_input.dart';
 import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
 import 'package:provider/provider.dart';
 import 'package:modern_gauge_flutter/ui/screens/settings/settings_ecu_pages.dart';
@@ -35,7 +38,7 @@ enum _Category {
     _Category.systeme => Icons.tune_rounded,
   };
 
-  List<Widget> get pages => switch (this) {
+  List<SettingsPage> get pages => switch (this) {
     _Category.ecu => buildEcuPages(),
     _Category.apparence => buildApparencePages(),
     _Category.ecrans => buildEcransPages(),
@@ -55,8 +58,11 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _focusNode = FocusNode();
   late PageController _pageController;
-  late List<Widget> _pages;
+  late List<SettingsPage> _pages;
   int _page = 0;
+  bool _valueEditing = false; // focus capturé par un réglage « valeur »
+  bool _toggleFlash = false; // flash bref après un toggle « simple »
+  Timer? _flashTimer;
   int _rootPage = 0; // position mémorisée de la page racine
   _Category? _category;
 
@@ -72,6 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   void dispose() {
+    _flashTimer?.cancel();
     _focusNode.dispose();
     _pageController.dispose();
     super.dispose();
@@ -79,8 +86,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ── Navigation ─────────────────────────────────────────────────────────
 
-  List<Widget> _buildRootPages() => _Category.values
-      .map((c) => _CategoryCard(category: c, onTap: () => _enterCategory(c)))
+  List<SettingsPage> _buildRootPages() => _Category.values
+      .map(
+        (c) => SettingsPage(
+          _CategoryCard(category: c, onTap: () => _enterCategory(c)),
+          input: SimpleSettingsInput((_) => _enterCategory(c)),
+        ),
+      )
       .toList();
 
   void _enterCategory(_Category category) {
@@ -88,6 +100,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _category = category;
       _page = 0;
+      _valueEditing = false;
       _pages = category.pages;
       _pageController.dispose();
       _pageController = PageController();
@@ -98,6 +111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _category = null;
       _page = _rootPage;
+      _valueEditing = false;
       _pages = _buildRootPages();
       _pageController.dispose();
       _pageController = PageController(initialPage: _rootPage);
@@ -126,8 +140,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
       );
-    } else {
-      _handleBack();
     }
   }
 
@@ -140,14 +152,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// « OK » : délègue au [SettingsPageInput] de la page visible — toggle en
+  /// mode simple, capture/libération du focus en mode valeur.
+  void _handleOk() {
+    switch (_pages[_page].input) {
+      case SimpleSettingsInput(:final onToggle):
+        onToggle(context);
+        _flashCurrentCard();
+      case ValueSettingsInput():
+        setState(() => _valueEditing = !_valueEditing);
+      case null:
+        break;
+    }
+  }
+
+  /// Flash bref de la carte visible pour confirmer un toggle « simple ».
+  void _flashCurrentCard() {
+    _flashTimer?.cancel();
+    setState(() => _toggleFlash = true);
+    _flashTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _toggleFlash = false);
+    });
+  }
+
   void _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return;
     final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowLeft ||
-        key == LogicalKeyboardKey.escape) {
+    final isOk =
+        key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.select;
+
+    // Focus capturé : gauche/droite ajustent la valeur, OK/back libèrent.
+    if (_valueEditing) {
+      final input = _pages[_page].input;
+      if (input is! ValueSettingsInput) {
+        _valueEditing = false;
+        return;
+      }
+      if (key == LogicalKeyboardKey.arrowLeft) {
+        input.onDecrease(context);
+      } else if (key == LogicalKeyboardKey.arrowRight) {
+        input.onIncrease(context);
+      } else if (isOk || key == LogicalKeyboardKey.escape) {
+        setState(() => _valueEditing = false);
+      }
+      return;
+    }
+
+    if (key == LogicalKeyboardKey.arrowLeft) {
       _prevPage();
     } else if (key == LogicalKeyboardKey.arrowRight) {
       _nextPage();
+    } else if (key == LogicalKeyboardKey.escape) {
+      _handleBack();
+    } else if (isOk) {
+      _handleOk();
     }
   }
 
@@ -181,18 +239,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 180),
                           transitionBuilder: (child, animation) =>
-                              FadeTransition(
-                                opacity: animation,
-                                child: child,
-                              ),
+                              FadeTransition(opacity: animation, child: child),
                           child: KeyedSubtree(
                             key: ValueKey(_category),
                             child: _PagerBody(
-                              pages: _pages,
+                              pages: [
+                                for (final (i, p) in _pages.indexed)
+                                  (_valueEditing || _toggleFlash) && i == _page
+                                      ? _EditingHighlight(child: p.widget)
+                                      : p.widget,
+                              ],
                               controller: _pageController,
                               currentIndex: _page,
-                              onPageChanged: (i) =>
-                                  setState(() => _page = i),
+                              onPageChanged: (i) => setState(() {
+                                _page = i;
+                                _valueEditing = false;
+                              }),
                               onPrev: _page > 0 ? _prevPage : null,
                               onNext: _page < _pages.length - 1
                                   ? _nextPage
@@ -219,6 +281,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Surbrillance du mode édition ────────────────────────────────────────────
+
+/// Retour visuel quand un [ValueSettingsInput] a capturé le focus : bordure
+/// et fond légèrement teintés de la couleur primaire.
+class _EditingHighlight extends StatelessWidget {
+  final Widget child;
+
+  const _EditingHighlight({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: primary.withValues(alpha: 0.08),
+        border: Border.symmetric(
+          horizontal: BorderSide(color: primary, width: 4),
+        ),
+      ),
+      child: child,
     );
   }
 }

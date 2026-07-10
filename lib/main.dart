@@ -7,7 +7,9 @@ import 'package:modern_gauge_flutter/providers/app_state_provider.dart';
 import 'package:modern_gauge_flutter/providers/ecu_provider.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/routes/app_router.dart';
+import 'package:modern_gauge_flutter/providers/mpris_provider.dart';
 import 'package:modern_gauge_flutter/services/ecu_service.dart';
+import 'package:modern_gauge_flutter/services/fake_now_playing_listener.dart';
 import 'package:modern_gauge_flutter/services/head_unit_control_service.dart';
 import 'package:modern_gauge_flutter/services/log_service.dart';
 import 'package:modern_gauge_flutter/services/navigation_server_listener.dart';
@@ -21,7 +23,12 @@ void main() async {
   await SettingsService().init();
   final ecuService = EcuService();
   final settingsProvider = SettingsProvider();
-  final mprisListener = NowPlayingServerListener();
+  // Source musique factice pour déboguer l'écran sans serveur Go :
+  // flutter run --dart-define=FAKE_NOW_PLAYING=true
+  const useFakeNowPlaying = bool.fromEnvironment('FAKE_NOW_PLAYING');
+  final MprisListenerBase mprisListener = useFakeNowPlaying
+      ? FakeNowPlayingListener()
+      : NowPlayingServerListener();
   final navigationListener = NavigationServerListener();
   final notificationListener = NotificationServerListener();
   final appStateProvider = AppStateProvider();
