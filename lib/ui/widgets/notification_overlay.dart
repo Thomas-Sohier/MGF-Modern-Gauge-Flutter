@@ -6,6 +6,7 @@ import 'package:modern_gauge_flutter/models/alert_info.dart';
 import 'package:modern_gauge_flutter/providers/settings_provider.dart';
 import 'package:modern_gauge_flutter/routes/route_names.dart';
 import 'package:modern_gauge_flutter/services/notification_server_listener.dart';
+import 'package:modern_gauge_flutter/ui/widgets/circular_content.dart';
 import 'package:modern_gauge_flutter/ui/themes/app_text_styles.dart';
 import 'package:provider/provider.dart';
 
@@ -42,10 +43,9 @@ class _NotificationOverlayHostState extends State<NotificationOverlayHost> {
     super.didChangeDependencies();
     if (_subscribed) return;
     _subscribed = true;
-    _subscription = context
-        .read<NotificationServerListener>()
-        .alerts
-        .listen(_onAlert);
+    _subscription = context.read<NotificationServerListener>().alerts.listen(
+      _onAlert,
+    );
     widget.router.routerDelegate.addListener(_onRouteChanged);
   }
 
@@ -131,47 +131,49 @@ class _NotificationScreen extends StatelessWidget {
       child: GestureDetector(
         onTap: onDismiss,
         behavior: HitTestBehavior.opaque,
-        child: ColoredBox(
-          color: theme.scaffoldBackgroundColor.withValues(alpha: 0.92),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.notifications_active, size: 44, color: primary),
-                  const SizedBox(height: 16),
-                  if (alert.app.isNotEmpty)
-                    Text(
-                      alert.app.toUpperCase(),
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.small.copyWith(color: primary),
-                    ),
-                  if (alert.title.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      alert.title,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.body.copyWith(
-                        fontWeight: FontWeight.bold,
+        child: CircularContent(
+          child: ColoredBox(
+            color: theme.scaffoldBackgroundColor,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.notifications_active, size: 44, color: primary),
+                    const SizedBox(height: 16),
+                    if (alert.app.isNotEmpty)
+                      Text(
+                        alert.app.toUpperCase(),
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.small.copyWith(color: primary),
                       ),
-                    ),
-                  ],
-                  if (alert.text.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      alert.text,
-                      textAlign: TextAlign.center,
-                      maxLines: 4,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.small.copyWith(
-                        color: theme.colorScheme.onSurface,
+                    if (alert.title.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        alert.title,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.body.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
+                    ],
+                    if (alert.text.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        alert.text,
+                        textAlign: TextAlign.center,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.small.copyWith(
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
