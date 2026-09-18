@@ -34,10 +34,6 @@
 #define RPM_MIN       0.0f
 #define RPM_MAX       6000.0f
 
-// Indicateur court de régime (stub radial intérieur)
-#define IND_LEN       34.0f
-#define IND_W         6.0f
-
 // Traits de séparation
 #define SEP_W         0.8f
 #define SEP_GAP       3.5f
@@ -163,15 +159,7 @@ static void canvas_draw_cb(lv_event_t *e) {
         draw_arc_bar(layer, cx, cy, r_out, bar_thickness, a0, a1, col);
     }
 
-    // Aiguille courte ambre
-    const float d2r = (float)M_PI / 180.0f;
-    const float ang = (DIAL_START + prog * DIAL_SWEEP) * d2r;
-    const float ir_out = (float)r_in - 2.0f * t.k;
-    const float ir_in  = ir_out - IND_LEN * t.k;
-    draw_line(layer,
-              (float)cx + ir_in * cosf(ang),  (float)cy + ir_in * sinf(ang),
-              (float)cx + ir_out * cosf(ang), (float)cy + ir_out * sinf(ang),
-              IND_W * t.k, AMBER_BRIGHT);
+    // (Pas d'aiguille : les barres allumées suffisent à indiquer le régime.)
 
     // Séparateur horizontal
     const float hy_out = PY(&t, VSEP_TOP_OUT);
