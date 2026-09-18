@@ -32,7 +32,7 @@
 
 // Plage régime
 #define RPM_MIN       0.0f
-#define RPM_MAX       6000.0f
+#define RPM_MAX       8000.0f
 
 // Traits de séparation
 #define SEP_W         0.8f
@@ -70,14 +70,22 @@ static const ind_def_t kInd[M_COUNT] = {
     {DASH_ICON_OIL,      195.0f, 205.0f, 236.0f},
     {DASH_ICON_OBD_LINK, 246.0f, 176.0f, 204.0f},
 };
-#define IND_ICON_SZ   36.0f
+#define IND_ICON_SZ   40.0f
 
 // ── État / mise à l'échelle ──────────────────────────────────────────────────
 struct amber_screen_s {
     lv_obj_t *canvas;
     lv_obj_t *value;
+    lv_obj_t *value_sh;               // calque faux-gras
     lv_obj_t *ind_value[M_COUNT];
+    lv_obj_t *ind_value_sh[M_COUNT];  // calques faux-gras
 };
+
+// Michroma n'existe qu'en une graisse : on simule le gras en superposant un
+// second calque décalé (spread px de part et d'autre). L'écart dépend de la
+// taille (trop d'écart sur un petit texte le ferait « doubler »).
+#define BOLD_XL 2   // grande valeur (« 800 »)
+#define BOLD_SM 1   // RPM / valeurs des indicateurs
 
 static float rpm_ref = 0.0f;
 
@@ -185,23 +193,40 @@ static void place(lv_obj_t *o, lv_obj_t *parent, float rx, float ry) {
                  (int32_t)lroundf(oy + ry * k));
 }
 
-static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font, float rx,
-                            float ry, const char *txt) {
-    lv_obj_t *lbl = lv_label_create(parent);
-    lv_obj_set_style_text_font(lbl, font, 0);
-    lv_obj_set_style_text_color(lbl, AMBER_BRIGHT, 0);
-    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(lbl, txt);
+// Centre un label sur (rx,ry) en 320-ref, avec un décalage horizontal dx (px).
+static void place_centered(lv_obj_t *lbl, lv_obj_t *parent, float rx, float ry,
+                           int dx) {
     lv_obj_update_layout(lbl);
-
     const float w = (float)lv_obj_get_width(parent), h = (float)lv_obj_get_height(parent);
     const float s = LV_MIN(w, h), k = s / REF_SIZE;
     const float ox = (w - s) * 0.5f, oy = (h - s) * 0.5f;
     const int32_t lw = lv_obj_get_width(lbl), lh = lv_obj_get_height(lbl);
     lv_obj_align(lbl, LV_ALIGN_TOP_LEFT,
-                 (int32_t)lroundf(ox + rx * k) - lw / 2,
+                 (int32_t)lroundf(ox + rx * k) - lw / 2 + dx,
                  (int32_t)lroundf(oy + ry * k) - lh / 2);
+}
+
+static lv_obj_t *new_amber_label(lv_obj_t *parent, const lv_font_t *font,
+                                 const char *txt) {
+    lv_obj_t *lbl = lv_label_create(parent);
+    lv_obj_set_style_text_font(lbl, font, 0);
+    lv_obj_set_style_text_color(lbl, AMBER_BRIGHT, 0);
+    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(lbl, txt);
     return lbl;
+}
+
+// Crée une paire faux-gras (calque décalé + label avant). Renvoie l'avant ;
+// *shadow reçoit le calque (à mettre à jour en même temps, ou NULL si statique).
+static lv_obj_t *make_bold(lv_obj_t *parent, const lv_font_t *font, float rx,
+                           float ry, const char *txt, int spread,
+                           lv_obj_t **shadow) {
+    lv_obj_t *sh = new_amber_label(parent, font, txt); // dessous
+    lv_obj_t *fr = new_amber_label(parent, font, txt); // dessus
+    place_centered(sh, parent, rx, ry, +spread);
+    place_centered(fr, parent, rx, ry, -spread);
+    if (shadow) *shadow = sh;
+    return fr;
 }
 
 amber_screen_t *amber_screen_create(lv_obj_t *parent) {
@@ -220,10 +245,10 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
     lv_obj_clear_flag(scr->canvas, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(scr->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
-    scr->value = make_label(parent, ui_font_or(ui_font_xl, &lv_font_montserrat_48),
-                            RPM_VAL_X, RPM_VAL_Y, "0");
-    make_label(parent, ui_font_or(ui_font_m, &lv_font_montserrat_20),
-               DIAL_CX, RPM_UNIT_Y, "RPM");
+    scr->value = make_bold(parent, ui_font_or(ui_font_xl, &lv_font_montserrat_48),
+                           RPM_VAL_X, RPM_VAL_Y, "0", BOLD_XL, &scr->value_sh);
+    make_bold(parent, ui_font_or(ui_font_m, &lv_font_montserrat_20),
+              DIAL_CX, RPM_UNIT_Y, "RPM", BOLD_SM, NULL);
 
     for (int i = 0; i < M_COUNT; i++) {
         const int32_t isz = (int32_t)lroundf(IND_ICON_SZ * k);
@@ -231,9 +256,9 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
         place(icon, parent, kInd[i].x - IND_ICON_SZ * 0.5f,
               kInd[i].icon_y - IND_ICON_SZ * 0.5f);
 
-        scr->ind_value[i] = make_label(
+        scr->ind_value[i] = make_bold(
             parent, ui_font_or(ui_font_m, &lv_font_montserrat_20),
-            kInd[i].x, kInd[i].label_y, "");
+            kInd[i].x, kInd[i].label_y, "", BOLD_SM, &scr->ind_value_sh[i]);
     }
 
     return scr;
@@ -241,17 +266,13 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
 
 // ── 5. SETTERS ───────────────────────────────────────────────────────────────
 
-static void set_centered(lv_obj_t *lbl, lv_obj_t *parent, float rx, float ry,
-                         const char *txt) {
-    lv_label_set_text(lbl, txt);
-    lv_obj_update_layout(lbl);
-    const float w = (float)lv_obj_get_width(parent), h = (float)lv_obj_get_height(parent);
-    const float s = LV_MIN(w, h), k = s / REF_SIZE;
-    const float ox = (w - s) * 0.5f, oy = (h - s) * 0.5f;
-    const int32_t lw = lv_obj_get_width(lbl), lh = lv_obj_get_height(lbl);
-    lv_obj_align(lbl, LV_ALIGN_TOP_LEFT,
-                 (int32_t)lroundf(ox + rx * k) - lw / 2,
-                 (int32_t)lroundf(oy + ry * k) - lh / 2);
+// Met à jour le texte d'une paire faux-gras (avant + calque) et la recentre.
+static void set_bold(lv_obj_t *front, lv_obj_t *shadow, lv_obj_t *parent,
+                     float rx, float ry, int spread, const char *txt) {
+    lv_label_set_text(front, txt);
+    place_centered(front, parent, rx, ry, -spread);
+    lv_label_set_text(shadow, txt);
+    place_centered(shadow, parent, rx, ry, +spread);
 }
 
 void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
@@ -261,17 +282,17 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
 
     char buf[24];
     snprintf(buf, sizeof(buf), "%.0f", d->rpm);
-    set_centered(scr->value, parent, RPM_VAL_X, RPM_VAL_Y, buf);
+    set_bold(scr->value, scr->value_sh, parent, RPM_VAL_X, RPM_VAL_Y, BOLD_XL, buf);
 
     snprintf(buf, sizeof(buf), "%.0f°C", d->coolant_temp);
-    set_centered(scr->ind_value[M_COOLANT], parent, kInd[M_COOLANT].x,
-                 kInd[M_COOLANT].label_y, buf);
+    set_bold(scr->ind_value[M_COOLANT], scr->ind_value_sh[M_COOLANT], parent,
+             kInd[M_COOLANT].x, kInd[M_COOLANT].label_y, BOLD_SM, buf);
     snprintf(buf, sizeof(buf), "%.1fV", d->battery_voltage);
-    set_centered(scr->ind_value[M_BATTERY], parent, kInd[M_BATTERY].x,
-                 kInd[M_BATTERY].label_y, buf);
+    set_bold(scr->ind_value[M_BATTERY], scr->ind_value_sh[M_BATTERY], parent,
+             kInd[M_BATTERY].x, kInd[M_BATTERY].label_y, BOLD_SM, buf);
     snprintf(buf, sizeof(buf), "%.0f°C", d->oil_temp);
-    set_centered(scr->ind_value[M_OIL], parent, kInd[M_OIL].x,
-                 kInd[M_OIL].label_y, buf);
-    set_centered(scr->ind_value[M_OBD], parent, kInd[M_OBD].x,
-                 kInd[M_OBD].label_y, d->connected ? "OBD" : "--");
+    set_bold(scr->ind_value[M_OIL], scr->ind_value_sh[M_OIL], parent,
+             kInd[M_OIL].x, kInd[M_OIL].label_y, BOLD_SM, buf);
+    set_bold(scr->ind_value[M_OBD], scr->ind_value_sh[M_OBD], parent,
+             kInd[M_OBD].x, kInd[M_OBD].label_y, BOLD_SM, d->connected ? "OBD" : "--");
 }
