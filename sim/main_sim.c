@@ -43,21 +43,32 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 }
 
 // ── Export ARGB8888 -> PNG RGB via stb ───────────────────────────────────────
-static int write_png(const lv_draw_buf_t *snap, const char *path) {
+// `round` : masque les pixels hors du disque inscrit (panneau physiquement rond
+// de l'ESP32-S3-Touch-LCD-2.1) -> golden représentatif de l'écran réel.
+static int write_png(const lv_draw_buf_t *snap, const char *path, int round) {
     const uint32_t w = snap->header.w;
     const uint32_t h = snap->header.h;
     const uint32_t stride = snap->header.stride;
     uint8_t *rgb = malloc((size_t)w * h * 3);
     if (!rgb) return 0;
 
+    const float cx = (w - 1) * 0.5f, cy = (h - 1) * 0.5f;
+    const float r = (float)((w < h ? w : h)) * 0.5f;
+    const float r2 = r * r;
+
     for (uint32_t y = 0; y < h; y++) {
         const uint8_t *row = snap->data + (size_t)y * stride;
         for (uint32_t x = 0; x < w; x++) {
             const uint8_t *p = row + (size_t)x * 4; // ARGB8888 little-endian : B,G,R,A
             uint8_t *o = rgb + ((size_t)y * w + x) * 3;
-            o[0] = p[2]; // R
-            o[1] = p[1]; // G
-            o[2] = p[0]; // B
+            const float dx = (float)x - cx, dy = (float)y - cy;
+            if (round && dx * dx + dy * dy > r2) {   // hors du disque : bezel noir
+                o[0] = o[1] = o[2] = 0;
+            } else {
+                o[0] = p[2]; // R
+                o[1] = p[1]; // G
+                o[2] = p[0]; // B
+            }
         }
     }
     const int ok = stbi_write_png(path, (int)w, (int)h, 3, rgb, (int)w * 3);
@@ -84,11 +95,13 @@ int main(int argc, char **argv) {
     const char *style = (argc > 1) ? argv[1] : "dual";
     const char *out = (argc > 2) ? argv[2] : "rpm_screen.png";
 
-    // L'ambre cible un écran ROND ~52 mm -> canvas carré. Les autres restent
-    // en 1024x600 (écran paysage MIPI-DSI) pour l'instant.
+    // L'ambre cible l'ESP32-S3-Touch-LCD-2.1 : écran IPS ROND 480x480 (driver
+    // ST7701, interface RGB). On rend donc à la résolution réelle du panneau,
+    // avec masque circulaire. Les styles legacy (dual/cream) restent en
+    // 1024x600 (ancienne cible P4 paysage), non masqués.
     const int is_amber = (strcmp(style, "amber") == 0);
-    const int32_t W = is_amber ? 720 : 1024;
-    const int32_t H = is_amber ? 720 : 600;
+    const int32_t W = is_amber ? 480 : 1024;
+    const int32_t H = is_amber ? 480 : 600;
 
     lv_init();
     lv_tick_set_cb(tick_cb);
@@ -139,7 +152,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (!write_png(snap, out)) {
+    if (!write_png(snap, out, is_amber)) {
         fprintf(stderr, "ecriture PNG echouee: %s\n", out);
         lv_draw_buf_destroy(snap);
         return 1;
