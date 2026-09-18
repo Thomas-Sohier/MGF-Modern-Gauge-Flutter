@@ -20,9 +20,9 @@
 
 // Compte-tours
 #define DIAL_CX       160.0f   // centre de l'arc
-#define DIAL_CY       143.0f
-#define DIAL_R_IN     84.0f    // rayon interne des barres
-#define DIAL_R_OUT    115.0f   // rayon externe des barres
+#define DIAL_CY       155.0f
+#define DIAL_R_IN     124.0f   // dimensionnement plein écran 480x480
+#define DIAL_R_OUT    155.0f
 
 #define SEG_COUNT     26       // 26 barres
 #define SEG_GAP_DEG   1.80f    // espacement angulaire constant entre chaque barre
@@ -39,23 +39,23 @@
 #define SEP_GAP       3.5f
 
 // Ligne horizontale
-#define HSEP_Y        178.0f
-#define HSEP_X1       58.0f
-#define HSEP_X2       263.0f
+#define HSEP_Y        190.0f
+#define HSEP_X1       30.0f
+#define HSEP_X2       290.0f
 
 // Séparateurs verticaux
-#define VSEP_TOP_OUT  150.0f
+#define VSEP_TOP_OUT  160.0f
 #define VSEP_TOP_MID  (HSEP_Y + SEP_GAP)
 static const float kVSep[3][3] = {
-    {105.0f, VSEP_TOP_OUT, 244.0f},
-    {166.0f, VSEP_TOP_MID, 250.0f},
-    {222.0f, VSEP_TOP_OUT, 245.0f},
+    {95.0f, VSEP_TOP_OUT, 280.0f},
+    {160.0f, VSEP_TOP_MID, 288.0f},
+    {225.0f, VSEP_TOP_OUT, 280.0f},
 };
 
 // Valeur centrale
 #define RPM_VAL_X     162.0f
-#define RPM_VAL_Y     126.0f
-#define RPM_UNIT_Y    166.0f
+#define RPM_VAL_Y     142.0f
+#define RPM_UNIT_Y    180.0f
 
 // ── 1. CONSTANTES : indicateurs bas ──────────────────────────────────────────
 enum { M_COOLANT = 0, M_BATTERY, M_OIL, M_OBD, M_COUNT };
@@ -65,10 +65,10 @@ typedef struct {
 } ind_def_t;
 
 static const ind_def_t kInd[M_COUNT] = {
-    {DASH_ICON_COOLANT,  77.0f,  176.0f, 204.0f},
-    {DASH_ICON_BATTERY,  136.0f, 205.0f, 236.0f},
-    {DASH_ICON_OIL,      195.0f, 205.0f, 236.0f},
-    {DASH_ICON_OBD_LINK, 246.0f, 176.0f, 204.0f},
+    {DASH_ICON_COOLANT,  62.5f,  215.0f, 255.0f},
+    {DASH_ICON_BATTERY,  127.5f, 242.0f, 278.0f},
+    {DASH_ICON_OIL,      192.5f, 242.0f, 278.0f},
+    {DASH_ICON_OBD_LINK, 257.5f, 215.0f, 255.0f},
 };
 #define IND_ICON_SZ   40.0f
 
@@ -151,7 +151,7 @@ static void canvas_draw_cb(lv_event_t *e) {
     const int32_t r_out = (int32_t)lroundf(DIAL_R_OUT * t.k);
     const int32_t bar_thickness = r_out - r_in;
 
-    // Répartition uniforme stricte : 24 barres et 23 interstices égaux
+    // Répartition uniforme stricte : 26 barres et 25 interstices égaux
     const float total_gaps = (float)(SEG_COUNT - 1) * SEG_GAP_DEG;
     const float bar_deg = (DIAL_SWEEP - total_gaps) / (float)SEG_COUNT;
     const float pitch_deg = bar_deg + SEG_GAP_DEG;
@@ -159,7 +159,7 @@ static void canvas_draw_cb(lv_event_t *e) {
     const float prog = LV_CLAMP(0.0f, (rpm_ref - RPM_MIN) / (RPM_MAX - RPM_MIN), 1.0f);
     const int bright = (int)lroundf(prog * SEG_COUNT);
 
-    // Dessin direct des 24 barres
+    // Dessin direct des 26 barres
     for (int i = 0; i < SEG_COUNT; i++) {
         const float a0 = DIAL_START + (float)i * pitch_deg;
         const float a1 = a0 + bar_deg;
@@ -172,9 +172,9 @@ static void canvas_draw_cb(lv_event_t *e) {
     // Séparateur horizontal
     const float hy_out = PY(&t, VSEP_TOP_OUT);
     const float hy_mid = PY(&t, HSEP_Y);
-    draw_line(layer, PX(&t, HSEP_X1), hy_out, PX(&t, 105.0f - SEP_GAP), hy_out, SEP_W * t.k, AMBER_SEP);
-    draw_line(layer, PX(&t, 105.0f + SEP_GAP), hy_mid, PX(&t, 222.0f - SEP_GAP), hy_mid, SEP_W * t.k, AMBER_SEP);
-    draw_line(layer, PX(&t, 222.0f + SEP_GAP), hy_out, PX(&t, HSEP_X2), hy_out, SEP_W * t.k, AMBER_SEP);
+    draw_line(layer, PX(&t, HSEP_X1), hy_out, PX(&t, 95.0f - SEP_GAP), hy_out, SEP_W * t.k, AMBER_SEP);
+    draw_line(layer, PX(&t, 95.0f + SEP_GAP), hy_mid, PX(&t, 225.0f - SEP_GAP), hy_mid, SEP_W * t.k, AMBER_SEP);
+    draw_line(layer, PX(&t, 225.0f + SEP_GAP), hy_out, PX(&t, HSEP_X2), hy_out, SEP_W * t.k, AMBER_SEP);
 
     // Séparateurs verticaux
     for (int i = 0; i < 3; i++) {
