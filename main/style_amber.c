@@ -65,10 +65,10 @@ typedef struct {
 } ind_def_t;
 
 static const ind_def_t kInd[M_COUNT] = {
-    {DASH_ICON_COOLANT,  62.5f,  200.0f, 235.0f},
+    {DASH_ICON_COOLANT,  62.5f,  180.0f, 215.0f},
     {DASH_ICON_BATTERY,  127.5f, 210.0f, 245.0f},
     {DASH_ICON_OIL,      192.5f, 210.0f, 245.0f},
-    {DASH_ICON_OBD_LINK, 257.5f, 200.0f, 235.0f},
+    {DASH_ICON_OBD_LINK, 257.5f,  180.0f, 215.0f},
 };
 #define IND_ICON_SZ   40.0f
 
