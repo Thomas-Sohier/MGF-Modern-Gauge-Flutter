@@ -19,11 +19,21 @@ piloté par des données ECU simulées. Le style de référence est **« amber �
 | Autres | IMU QMI8658, RTC PCF85063, slot TF, USB-C (CH343P), WiFi + BLE5 |
 | Variantes | `-2.1` (dalle plate, SKU 28169) / `-2.1B` (2.5D incurvée, 30697) |
 
-> ⚠️ La cible a changé : le code/README/`idf_component.yml`/`sdkconfig.defaults`
-> parlent encore de l'ancien **ESP32-P4** (1024×600, MIPI-DSI, BSP
-> `espressif/esp32_p4_function_ev_board`). À migrer vers le S3/ST7701 pour un vrai
-> build (BSP Waveshare, `idf.py set-target esp32s3`). Le simulateur, lui, rend
-> déjà l'ambre à la résolution réelle **480×480 ronde**.
+> Le bring-up matériel S3 est fait dans `main/board_display.c` (pas de BSP
+> tout-en-un pour cette carte) à partir des composants esp_lcd standard et du
+> **brochage officiel Waveshare** (repris en tête du fichier). `idf_component.yml`,
+> `sdkconfig.defaults`, `main/CMakeLists.txt` et `app_main.c` ciblent le S3.
+>
+> ⚠️ **Non compilé/validé sur matériel** (ESP-IDF absent de l'environnement de
+> génération). Points à vérifier sur la carte réelle :
+> - **Séquence d'init ST7701** : `init_cmds = NULL` utilise la séquence par
+>   défaut du composant ; si l'écran reste noir/brouillé, coller la séquence
+>   spécifique du panneau Waveshare (`st7701_lcd_init_cmd_t[]`).
+> - **Timings RGB** (porches/pulses, pclk 16 MHz) : à ajuster si l'image roule.
+> - **CST820** piloté par `esp_lcd_touch_cst816s` (compatible) — vérifier
+>   l'orientation (swap/mirror) et l'adresse I²C.
+> - **API I²C legacy** (`driver/i2c.h`) : si l'IDF impose le nouveau pilote
+>   `i2c_master`, adapter `i2c_bus_init()`.
 
 ## Build & rendu
 

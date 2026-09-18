@@ -1,34 +1,32 @@
-# ── Cible ────────────────────────────────────────────────────────────────────
-CONFIG_IDF_TARGET="esp32p4"
+# ── Cible : ESP32-S3 (Waveshare ESP32-S3-Touch-LCD-2.1) ──────────────────────
+CONFIG_IDF_TARGET="esp32s3"
 
-# ── PSRAM (obligatoire : framebuffers MIPI-DSI + buffers LVGL) ────────────────
+# ── PSRAM octale 8 Mo @ 80 MHz (framebuffers RGB + buffers LVGL) ──────────────
 CONFIG_SPIRAM=y
-CONFIG_SPIRAM_MODE_HEX=y
-CONFIG_SPIRAM_SPEED_200M=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+# NB : on NE met PAS le code/rodata en PSRAM (SPIRAM_FETCH_INSTRUCTIONS/RODATA)
+# pour laisser toute la bande passante PSRAM au framebuffer RGB (anti-flicker).
 
-# ── Fréquence CPU max ─────────────────────────────────────────────────────────
-CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
+# ── CPU 240 MHz ───────────────────────────────────────────────────────────────
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 
-# ── LVGL : polices Montserrat utilisées par l'écran RPM ───────────────────────
-# (valeur centrale, sous-titre, labels des indicateurs)
-CONFIG_LV_FONT_MONTSERRAT_14=y
-CONFIG_LV_FONT_MONTSERRAT_20=y
-CONFIG_LV_FONT_MONTSERRAT_28=y
-CONFIG_LV_FONT_MONTSERRAT_48=y
-
-# Couleur 16 bits (RGB565) — cohérent avec le panneau et le port LVGL.
-CONFIG_LV_COLOR_DEPTH_16=y
-
-# Rafraîchissement fluide pour l'animation du régime moteur simulé (~30 Hz).
-CONFIG_LV_DEF_REFR_PERIOD=30
-
-# Rendu TTF à la volée (JetBrains Mono monospace, style ambre).
-CONFIG_LV_USE_TINY_TTF=y
-
-# ── Flash 16 Mo + table de partitions personnalisée ──────────────────────────
+# ── Flash 16 Mo QIO 80 MHz + table de partitions personnalisée ───────────────
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# ── Panneau RGB : ISR en IRAM (stabilité du rafraîchissement avec la PSRAM) ───
+CONFIG_LCD_RGB_ISR_IRAM_SAFE=y
+
+# ── LVGL ──────────────────────────────────────────────────────────────────────
+CONFIG_LV_COLOR_DEPTH_16=y            # RGB565, cohérent avec le panneau
+CONFIG_LV_USE_TINY_TTF=y              # rendu Michroma à la volée (style ambre)
+CONFIG_LV_DEF_REFR_PERIOD=30          # ~30 Hz (régime moteur simulé)
+CONFIG_LV_FONT_MONTSERRAT_20=y        # fallback si le TTF échoue
+CONFIG_LV_FONT_MONTSERRAT_48=y
 
 # ── Log ───────────────────────────────────────────────────────────────────────
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y

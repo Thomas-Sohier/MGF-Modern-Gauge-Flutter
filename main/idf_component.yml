@@ -1,13 +1,16 @@
-## Dépendances managées (téléchargées par `idf.py reconfigure` / build).
+## Dépendances managées (téléchargées par `idf.py reconfigure` / build) pour la
+## carte Waveshare ESP32-S3-Touch-LCD-2.1 : écran ST7701 (RGB) + tactile CST820
+## (pilote CST816S) + expander TCA9554, portés à LVGL 9 via esp_lvgl_port.
 ##
-## Le BSP de la carte Espressif ESP32-P4-Function-EV-Board tire lui-même
-## LVGL 9.x et esp_lvgl_port, et configure l'écran MIPI-DSI (panneau EK79007,
-## 1024x600) + le rétroéclairage. On garde ainsi le code applicatif concentré
-## sur l'UI de la jauge.
-##
-## Autre carte P4 (Waveshare, M5Stack Tab5, ...) : remplacer la dépendance BSP
-## par celle de la carte, l'API bsp_display_* reste identique.
+## Pas de BSP tout-en-un pour cette carte : le bring-up est fait dans
+## main/board_display.c à partir des composants esp_lcd standard et du brochage
+## officiel (cf. CLAUDE.md).
 dependencies:
   idf:
     version: ">=5.3"
-  espressif/esp32_p4_function_ev_board: "^2"
+  lvgl/lvgl: "^9.2"
+  espressif/esp_lvgl_port: "^2"
+  espressif/esp_lcd_st7701: "^1"
+  espressif/esp_lcd_panel_io_additions: "^1"
+  espressif/esp_io_expander_tca9554: "^1"
+  espressif/esp_lcd_touch_cst816s: "^1"

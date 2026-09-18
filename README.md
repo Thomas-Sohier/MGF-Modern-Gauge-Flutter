@@ -2,12 +2,16 @@
 
 Portage **de faisabilité** de l'écran RPM principal du projet Flutter
 [`MGF-Modern-Gauge-Flutter`](../MGF-Modern-Gauge-Flutter) vers **LVGL 9 / ESP-IDF**,
-pour tourner sur un **ESP32-P4** avec écran MIPI-DSI.
+pour tourner sur la carte **Waveshare ESP32-S3-Touch-LCD-2.1** (écran IPS **rond
+480×480**, driver ST7701, tactile CST820).
 
-Objectif : vérifier qu'un microcontrôleur (RISC-V bicœur, sans GPU) peut rendre
-fidèlement et de façon fluide la jauge segmentée à double arc, sans passer par
-Flutter/Impeller. Seul l'écran RPM est reproduit ; les données ECU sont
-simulées (balayage ralenti → ligne rouge → ralenti).
+Objectif : vérifier qu'un microcontrôleur (Xtensa LX7 bicœur, sans GPU) peut
+rendre fidèlement et de façon fluide la jauge, sans passer par Flutter/Impeller.
+L'écran cible est le style **ambre** (cadran rond monochrome) ; les données ECU
+sont simulées.
+
+> Détails matériel, système de conception et points de validation : voir
+> [`CLAUDE.md`](CLAUDE.md).
 
 ## Rendu reproduit
 
@@ -35,36 +39,44 @@ Palette et géométrie reprises à l'identique du thème sombre Flutter.
 
 ## Matériel cible
 
-Par défaut : **ESP32-P4-Function-EV-Board** (panneau EK79007, 1024×600, MIPI-DSI),
-via le BSP `espressif/esp32_p4_function_ev_board` qui gère l'écran, le
-rétroéclairage et le port LVGL.
+**Waveshare ESP32-S3-Touch-LCD-2.1** (fiche dans `specs/`) : ESP32-S3 (LX7 bicœur
+240 MHz, 16 Mo Flash, 8 Mo PSRAM), écran IPS **rond 480×480** (driver **ST7701**,
+interface RGB), tactile capacitif **CST820** (I²C), expander **TCA9554**.
 
-Autre carte P4 (Waveshare, M5Stack Tab5…) : remplacer la dépendance BSP dans
-`main/idf_component.yml` — l'API `bsp_display_*` reste identique.
+Pas de BSP tout-en-un pour cette carte : le bring-up (ST7701 RGB + CST820 +
+TCA9554 + port LVGL) est fait dans `main/board_display.c` à partir des composants
+`esp_lcd` standard et du brochage officiel Waveshare.
 
 ## Build & flash
 
 Nécessite **ESP-IDF ≥ 5.3** installé et sourcé (`. $IDF_PATH/export.sh`).
 
 ```bash
-idf.py set-target esp32p4
+idf.py set-target esp32s3
 idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
-Les dépendances (BSP, LVGL, esp_lvgl_port) sont téléchargées automatiquement
-au premier `build` dans `managed_components/`.
+Les dépendances (LVGL, esp_lvgl_port, esp_lcd_st7701, esp_lcd_touch_cst816s,
+esp_io_expander_tca9554…) sont téléchargées au premier `build` dans
+`managed_components/`.
+
+> ⚠️ Le firmware n'a pas encore été compilé/validé sur matériel (ESP-IDF absent
+> de l'environnement de portage). Points de validation listés dans `CLAUDE.md`
+> (séquence d'init ST7701, timings RGB, tactile).
 
 ## Structure
 
 ```
 main/
-  app_main.c        # init BSP/LVGL, timers de rafraîchissement
-  gauge_theme.h     # palette + géométrie (constantes du thème Flutter)
+  app_main.c        # init écran/LVGL + timer de rafraîchissement (écran ambre)
+  board_display.c   # bring-up ST7701 RGB + CST820 + TCA9554 + port LVGL (S3)
   ecu_data.h        # struct ecu_data_t
   fake_ecu.c        # source de données simulée
-  dual_arc_dial.*   # widget jauge double arc (dessin custom)
-  rpm_screen.*      # composition de l'écran RPM
+  style_amber.*     # écran ambre (cible) — cadran rond vectoriel
+  dash_icons.*      # icônes vectorielles (eau, batterie, huile, OBD)
+  ui_fonts.*        # police Michroma via tiny_ttf
+  # dual_arc_dial.* / rpm_screen.* / style_cream.* / gauge_icons.* : sim-only
 ```
 
 ## Simulateur hôte & golden
