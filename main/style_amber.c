@@ -9,16 +9,6 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// Cadran automobile circulaire, entièrement vectoriel (aucune image de fond).
-// Reproduit la photo `specs/image/amber.png` : compte-tours en couronne de
-// barres radiales dans la moitié haute, gros « 800 » central, quatre
-// indicateurs (eau, batterie, huile, OBD) posés sur le fond sombre et séparés
-// par de fins traits ambre. Cf. `specs/image/amber.png`.
-//
-// Toute la géométrie est exprimée dans un repère de RÉFÉRENCE de 320 px (les
-// coordonnées de la spec), puis mise à l'échelle du côté réel de l'écran. Aucune
-// coordonnée « magique » n'est dispersée : tout est ci-dessous.
-
 // ── 1. CONSTANTES : couleurs ─────────────────────────────────────────────────
 #define AMBER_BG      lv_color_hex(0x1B1712) // fond brun-noir
 #define AMBER_BRIGHT  lv_color_hex(0xFFB51B) // ambre principal (actif, texte)
@@ -33,38 +23,33 @@
 #define DIAL_CY       143.0f
 #define DIAL_R_IN     84.0f    // rayon interne des barres
 #define DIAL_R_OUT    115.0f   // rayon externe des barres
-#define SEG_COUNT     30       // nombre de barres radiales
-#define SEG_BAR_W     6.0f     // largeur (px-ref) d'une barre radiale
-// Balayage : convention y-bas x=cx+cos·r, y=cy+sin·r. Demi-cercle EXACT de
-// 180° : 180° (9 h, horizontale gauche) → 270° (12 h) → 360° (3 h, horizontale
-// droite). Les barres extrêmes retombent droit sur l'horizontale.
-#define DIAL_START    180.0f
-#define DIAL_SWEEP    180.0f
 
-// Plage régime -> nombre de barres allumées (facilement configurable).
+#define SEG_COUNT     26       // 26 barres
+#define SEG_GAP_DEG   1.80f    // espacement angulaire constant entre chaque barre
+
+#define DIAL_START    180.0f   // 9h (horizontale gauche)
+#define DIAL_SWEEP    180.0f   // demi-cercle jusqu'à 3h (horizontale droite)
+
+// Plage régime
 #define RPM_MIN       0.0f
 #define RPM_MAX       6000.0f
 
-// Indicateur court de régime (stub radial côté intérieur des barres).
-#define IND_LEN       34.0f    // longueur
-#define IND_W         6.0f     // épaisseur
+// Indicateur court de régime (stub radial intérieur)
+#define IND_LEN       34.0f
+#define IND_W         6.0f
 
-// Traits de séparation : fins, et marge à chaque intersection (la grille n'est
-// jamais fermée — style combiné d'instruments).
-#define SEP_W         0.8f     // épaisseur des séparateurs (très fine)
-#define SEP_GAP       3.5f     // marge à chaque croisement (px-ref)
+// Traits de séparation
+#define SEP_W         0.8f
+#define SEP_GAP       3.5f
 
-// Séparateur horizontal
+// Ligne horizontale
 #define HSEP_Y        178.0f
 #define HSEP_X1       58.0f
 #define HSEP_X2       263.0f
 
-// Séparateurs verticaux : {x, y1, y2}. Les deux extérieurs remontent au-dessus
-// de la ligne horizontale pour suivre les widgets d'extrémité relevés ; le
-// central reste sous la ligne. Aucun ne touche la ligne (marge SEP_GAP, obtenue
-// ici en interrompant la ligne horizontale aux croisements extérieurs).
-#define VSEP_TOP_OUT  156.0f              // haut des séparateurs extérieurs
-#define VSEP_TOP_MID  (HSEP_Y + SEP_GAP)  // haut du séparateur central
+// Séparateurs verticaux
+#define VSEP_TOP_OUT  150.0f
+#define VSEP_TOP_MID  (HSEP_Y + SEP_GAP)
 static const float kVSep[3][3] = {
     {105.0f, VSEP_TOP_OUT, 244.0f},
     {166.0f, VSEP_TOP_MID, 250.0f},
@@ -72,36 +57,34 @@ static const float kVSep[3][3] = {
 };
 
 // Valeur centrale
-#define RPM_VAL_X     162.0f   // centre du « 800 » (léger dégagement à gauche)
-#define RPM_VAL_Y     126.0f   // centre du « 800 »
-#define RPM_UNIT_Y    166.0f   // centre du « RPM »
+#define RPM_VAL_X     162.0f
+#define RPM_VAL_Y     126.0f
+#define RPM_UNIT_Y    166.0f
 
-// ── 1. CONSTANTES : les quatre indicateurs bas ───────────────────────────────
-// {icône, x_centre, y_icône, y_label}. Les deux du centre descendent pour
-// suivre la courbe du cadran (disposition en V de la photo).
+// ── 1. CONSTANTES : indicateurs bas ──────────────────────────────────────────
 enum { M_COOLANT = 0, M_BATTERY, M_OIL, M_OBD, M_COUNT };
 typedef struct {
     dash_icon_type_t icon;
     float x, icon_y, label_y;
 } ind_def_t;
+
 static const ind_def_t kInd[M_COUNT] = {
-    {DASH_ICON_COOLANT,  77.0f,  176.0f, 204.0f}, // extrémité gauche : remontée
+    {DASH_ICON_COOLANT,  77.0f,  176.0f, 204.0f},
     {DASH_ICON_BATTERY,  136.0f, 205.0f, 236.0f},
     {DASH_ICON_OIL,      195.0f, 205.0f, 236.0f},
-    {DASH_ICON_OBD_LINK, 246.0f, 176.0f, 204.0f}, // extrémité droite : remontée
+    {DASH_ICON_OBD_LINK, 246.0f, 176.0f, 204.0f},
 };
-#define IND_ICON_SZ   27.0f
+#define IND_ICON_SZ   36.0f
 
 // ── État / mise à l'échelle ──────────────────────────────────────────────────
 struct amber_screen_s {
-    lv_obj_t *canvas;              // objet plein écran : dessin vectoriel
-    lv_obj_t *value;               // « 800 »
-    lv_obj_t *ind_value[M_COUNT];  // labels des indicateurs
+    lv_obj_t *canvas;
+    lv_obj_t *value;
+    lv_obj_t *ind_value[M_COUNT];
 };
 
 static float rpm_ref = 0.0f;
 
-// Repère : côté carré S = min(w,h) centré ; k = S/320 ; origine (ox,oy).
 typedef struct { float ox, oy, k; } xform_t;
 
 static xform_t xform_of(const lv_area_t *a) {
@@ -116,10 +99,8 @@ static xform_t xform_of(const lv_area_t *a) {
 static inline float PX(const xform_t *t, float x) { return t->ox + x * t->k; }
 static inline float PY(const xform_t *t, float y) { return t->oy + y * t->k; }
 
-// ── 3. DESSIN CUSTOM : compte-tours + séparateurs ────────────────────────────
+// ── 3. DESSIN : primitives ───────────────────────────────────────────────────
 
-// Trait épais à bouts droits (butt caps) : une seule primitive -> pas de
-// liseré interne ni de segment incomplet comme avec deux triangles.
 static void draw_line(lv_layer_t *l, float x1, float y1, float x2, float y2,
                       float w, lv_color_t c) {
     lv_draw_line_dsc_t d;
@@ -127,19 +108,29 @@ static void draw_line(lv_layer_t *l, float x1, float y1, float x2, float y2,
     d.color = c;
     d.opa = LV_OPA_COVER;
     d.width = (int32_t)lroundf(w);
-    d.round_start = d.round_end = 0; // extrémités droites
+    d.round_start = 0;
+    d.round_end = 0;
     d.p1.x = x1; d.p1.y = y1;
     d.p2.x = x2; d.p2.y = y2;
     lv_draw_line(l, &d);
 }
 
-// Barre radiale : un trait épais du rayon interne au rayon externe, à l'angle
-// `ang`. Bouts droits -> aspect de graduation mécanique franche.
-static void draw_bar(lv_layer_t *l, float cx, float cy, float r_in, float r_out,
-                     float ang, float w, lv_color_t c) {
-    const float ca = cosf(ang), sa = sinf(ang);
-    draw_line(l, cx + r_in * ca, cy + r_in * sa, cx + r_out * ca, cy + r_out * sa,
-              w, c);
+// Dessine un segment annulaire en une seule passe via lv_draw_arc
+static void draw_arc_bar(lv_layer_t *l, int32_t cx, int32_t cy,
+                         int32_t r_out, int32_t thickness,
+                         float a0, float a1, lv_color_t c) {
+    lv_draw_arc_dsc_t d;
+    lv_draw_arc_dsc_init(&d);
+    d.center.x = cx;
+    d.center.y = cy;
+    d.radius = r_out;
+    d.width = thickness;
+    d.start_angle = a0;
+    d.end_angle = a1;
+    d.color = c;
+    d.opa = LV_OPA_COVER;
+    d.rounded = 0; // Extrémités coupées radialement droites
+    lv_draw_arc(l, &d);
 }
 
 static void canvas_draw_cb(lv_event_t *e) {
@@ -150,44 +141,46 @@ static void canvas_draw_cb(lv_event_t *e) {
     lv_obj_get_coords(obj, &a);
     const xform_t t = xform_of(&a);
 
-    const float cx = PX(&t, DIAL_CX), cy = PY(&t, DIAL_CY);
-    const float r_in = DIAL_R_IN * t.k, r_out = DIAL_R_OUT * t.k;
+    const int32_t cx = (int32_t)lroundf(PX(&t, DIAL_CX));
+    const int32_t cy = (int32_t)lroundf(PY(&t, DIAL_CY));
+    const int32_t r_in  = (int32_t)lroundf(DIAL_R_IN * t.k);
+    const int32_t r_out = (int32_t)lroundf(DIAL_R_OUT * t.k);
+    const int32_t bar_thickness = r_out - r_in;
 
-    // Barres centrées sur un pas régulier ; la 1re et la dernière retombent aux
-    // extrémités exactes du demi-cercle (180° et 360°).
-    const float d2r = (float)M_PI / 180.0f;
-    const float step_deg = DIAL_SWEEP / (SEG_COUNT - 1);
+    // Répartition uniforme stricte : 24 barres et 23 interstices égaux
+    const float total_gaps = (float)(SEG_COUNT - 1) * SEG_GAP_DEG;
+    const float bar_deg = (DIAL_SWEEP - total_gaps) / (float)SEG_COUNT;
+    const float pitch_deg = bar_deg + SEG_GAP_DEG;
 
-    // Barres allumées selon le régime.
     const float prog = LV_CLAMP(0.0f, (rpm_ref - RPM_MIN) / (RPM_MAX - RPM_MIN), 1.0f);
     const int bright = (int)lroundf(prog * SEG_COUNT);
 
+    // Dessin direct des 24 barres
     for (int i = 0; i < SEG_COUNT; i++) {
-        const float ang = (DIAL_START + i * step_deg) * d2r;
-        draw_bar(layer, cx, cy, r_in, r_out, ang, SEG_BAR_W * t.k,
-                 (i < bright) ? AMBER_BRIGHT : AMBER_DIM);
+        const float a0 = DIAL_START + (float)i * pitch_deg;
+        const float a1 = a0 + bar_deg;
+        const lv_color_t col = (i < bright) ? AMBER_BRIGHT : AMBER_DIM;
+        draw_arc_bar(layer, cx, cy, r_out, bar_thickness, a0, a1, col);
     }
 
-    // Indicateur court : stub radial ambre à la position du régime, côté
-    // intérieur des barres (raccord visuel avec la graduation active).
+    // Aiguille courte ambre
+    const float d2r = (float)M_PI / 180.0f;
     const float ang = (DIAL_START + prog * DIAL_SWEEP) * d2r;
-    const float ir_out = r_in - 2.0f * t.k;
-    const float ir_in = ir_out - IND_LEN * t.k;
-    draw_line(layer, cx + ir_in * cosf(ang), cy + ir_in * sinf(ang),
-              cx + ir_out * cosf(ang), cy + ir_out * sinf(ang), IND_W * t.k,
-              AMBER_BRIGHT);
+    const float ir_out = (float)r_in - 2.0f * t.k;
+    const float ir_in  = ir_out - IND_LEN * t.k;
+    draw_line(layer,
+              (float)cx + ir_in * cosf(ang),  (float)cy + ir_in * sinf(ang),
+              (float)cx + ir_out * cosf(ang), (float)cy + ir_out * sinf(ang),
+              IND_W * t.k, AMBER_BRIGHT);
 
-    // Séparateur horizontal en 3 tronçons (marge à chaque croisement extérieur).
-    // Les tronçons d'extrémité sont relevés à la hauteur du sommet des
-    // séparateurs verticaux extérieurs (coin franc à l'angle relevé) ; le
-    // tronçon central reste plus bas, au niveau des cellules du centre.
+    // Séparateur horizontal
     const float hy_out = PY(&t, VSEP_TOP_OUT);
     const float hy_mid = PY(&t, HSEP_Y);
     draw_line(layer, PX(&t, HSEP_X1), hy_out, PX(&t, 105.0f - SEP_GAP), hy_out, SEP_W * t.k, AMBER_SEP);
     draw_line(layer, PX(&t, 105.0f + SEP_GAP), hy_mid, PX(&t, 222.0f - SEP_GAP), hy_mid, SEP_W * t.k, AMBER_SEP);
     draw_line(layer, PX(&t, 222.0f + SEP_GAP), hy_out, PX(&t, HSEP_X2), hy_out, SEP_W * t.k, AMBER_SEP);
 
-    // Séparateurs verticaux (détachés de la ligne horizontale : marge visible).
+    // Séparateurs verticaux
     for (int i = 0; i < 3; i++) {
         draw_line(layer, PX(&t, kVSep[i][0]), PY(&t, kVSep[i][1]),
                   PX(&t, kVSep[i][0]), PY(&t, kVSep[i][2]), SEP_W * t.k, AMBER_SEP);
@@ -196,7 +189,6 @@ static void canvas_draw_cb(lv_event_t *e) {
 
 // ── 2. CRÉATION ──────────────────────────────────────────────────────────────
 
-// Place un objet en coordonnées 320-ref (centre) par rapport au parent carré.
 static void place(lv_obj_t *o, lv_obj_t *parent, float rx, float ry) {
     const float w = (float)lv_obj_get_width(parent), h = (float)lv_obj_get_height(parent);
     const float s = LV_MIN(w, h), k = s / REF_SIZE;
@@ -205,7 +197,6 @@ static void place(lv_obj_t *o, lv_obj_t *parent, float rx, float ry) {
                  (int32_t)lroundf(oy + ry * k));
 }
 
-// Label centré sur (rx,ry) en 320-ref, aligné après calcul de sa taille.
 static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font, float rx,
                             float ry, const char *txt) {
     lv_obj_t *lbl = lv_label_create(parent);
@@ -214,6 +205,7 @@ static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font, float rx,
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(lbl, txt);
     lv_obj_update_layout(lbl);
+
     const float w = (float)lv_obj_get_width(parent), h = (float)lv_obj_get_height(parent);
     const float s = LV_MIN(w, h), k = s / REF_SIZE;
     const float ox = (w - s) * 0.5f, oy = (h - s) * 0.5f;
@@ -234,20 +226,17 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
     const float w = (float)lv_obj_get_width(parent), h = (float)lv_obj_get_height(parent);
     const float k = LV_MIN(w, h) / REF_SIZE;
 
-    // Objet plein écran portant tout le dessin vectoriel.
     scr->canvas = lv_obj_create(parent);
     lv_obj_remove_style_all(scr->canvas);
     lv_obj_set_size(scr->canvas, LV_PCT(100), LV_PCT(100));
     lv_obj_clear_flag(scr->canvas, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(scr->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
-    // Valeur centrale « 800 » + « RPM ».
     scr->value = make_label(parent, ui_font_or(ui_font_xl, &lv_font_montserrat_48),
                             RPM_VAL_X, RPM_VAL_Y, "0");
     make_label(parent, ui_font_or(ui_font_m, &lv_font_montserrat_20),
                DIAL_CX, RPM_UNIT_Y, "RPM");
 
-    // Quatre indicateurs : icône + label posés sur le fond (sans cadre).
     for (int i = 0; i < M_COUNT; i++) {
         const int32_t isz = (int32_t)lroundf(IND_ICON_SZ * k);
         lv_obj_t *icon = dash_icon_create(parent, kInd[i].icon, isz, AMBER_BRIGHT);
@@ -262,9 +251,8 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
     return scr;
 }
 
-// ── 5. SETTERS : mise à jour temps réel ──────────────────────────────────────
+// ── 5. SETTERS ───────────────────────────────────────────────────────────────
 
-// Re-centre un label après changement de texte (largeur variable, monospace).
 static void set_centered(lv_obj_t *lbl, lv_obj_t *parent, float rx, float ry,
                          const char *txt) {
     lv_label_set_text(lbl, txt);

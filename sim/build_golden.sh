@@ -30,7 +30,7 @@ mapfile -t LVGL_SRCS < <(find "$LVGL_DIR/src" -name '*.c')
 echo ">> compilation (${#LVGL_SRCS[@]} fichiers LVGL + UI)..."
 gcc -O2 -w \
     -I"$SIM_DIR" -I"$MAIN_DIR" -I"$LVGL_DIR" -DLV_CONF_INCLUDE_SIMPLE \
-    -DTTF_PATH="\"$MAIN_DIR/fonts/JetBrainsMono-Bold.ttf\"" \
+    -DTTF_PATH="\"$MAIN_DIR/fonts/Michroma-Regular.ttf\"" \
     "$SIM_DIR/main_sim.c" \
     "$MAIN_DIR/dual_arc_dial.c" "$MAIN_DIR/rpm_screen.c" "$MAIN_DIR/fake_ecu.c" \
     "$MAIN_DIR/gauge_icons.c" "$MAIN_DIR/dash_icons.c" \

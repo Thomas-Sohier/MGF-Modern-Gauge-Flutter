@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Compilation + régénération des goldens en une commande.
+#
+#   ./build.sh          compile l'UI et régénère test/golden/{rpm_screen,rpm_amber,rpm_cream}.png
+#   ./build.sh clean    repart de zéro (efface le cache sim/build/)
+#
+# LVGL n'est compilé qu'UNE fois (objets mis en cache dans sim/build/lvgl_obj/) ;
+# les fois suivantes seule l'UI est recompilée -> rebuild quasi instantané.
+#
+#   LVGL_DIR : sources LVGL 9.x à utiliser. Absent -> clone v9.2.2 dans sim/.lvgl.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SIM="$ROOT/sim"
+MAIN="$ROOT/main"
+BUILD="$SIM/build"
+GDIR="$ROOT/test/golden"
+: "${LVGL_DIR:=$SIM/.lvgl}"
+JOBS="$(nproc 2>/dev/null || echo 4)"
+
+CFLAGS=(-O2 -w -I"$SIM" -I"$MAIN" -I"$LVGL_DIR" -DLV_CONF_INCLUDE_SIMPLE)
+
+# Sources UI (mêmes fichiers que la cible ESP32-P4 ; ne dépendent que de LVGL).
+UI_SRCS=(
+    "$SIM/main_sim.c"
+    "$MAIN/dual_arc_dial.c" "$MAIN/rpm_screen.c" "$MAIN/fake_ecu.c"
+    "$MAIN/gauge_icons.c" "$MAIN/dash_icons.c"
+    "$MAIN/style_amber.c" "$MAIN/style_cream.c" "$MAIN/ui_fonts.c"
+)
+
+if [ "${1:-}" = "clean" ]; then
+    echo ">> clean : $BUILD"
+    rm -rf "$BUILD"
+fi
+
+# 1. Sources LVGL (clonées au besoin).
+if [ ! -d "$LVGL_DIR" ]; then
+    echo ">> clone LVGL v9.2.2 -> $LVGL_DIR"
+    git clone --depth 1 --branch v9.2.2 https://github.com/lvgl/lvgl.git "$LVGL_DIR"
+fi
+
+OBJ="$BUILD/lvgl_obj"
+mkdir -p "$OBJ" "$GDIR"
+
+# 2. LVGL compilé une seule fois -> objets en cache (recompilés en parallèle).
+export CC_CFLAGS="${CFLAGS[*]}"
+export OBJ_DIR="$OBJ"
+compile_one() {
+    local src="$1"
+    local obj="$OBJ_DIR/$(printf '%s' "$src" | tr '/.' '__').o"
+    [ -f "$obj" ] && return 0
+    gcc $CC_CFLAGS -c "$src" -o "$obj"
+}
+export -f compile_one
+
+mapfile -t LVGL_SRCS < <(find "$LVGL_DIR/src" -name '*.c')
+need_lvgl=0
+for s in "${LVGL_SRCS[@]}"; do
+    [ -f "$OBJ/$(printf '%s' "$s" | tr '/.' '__').o" ] || { need_lvgl=1; break; }
+done
+
+if [ "$need_lvgl" = 1 ]; then
+    echo ">> compilation LVGL (${#LVGL_SRCS[@]} fichiers, $JOBS jobs, cache une fois)..."
+    printf '%s\n' "${LVGL_SRCS[@]}" | xargs -P"$JOBS" -I{} bash -c 'compile_one "$1"' _ {}
+else
+    echo ">> LVGL déjà en cache ($OBJ)"
+fi
+
+mapfile -t LVGL_OBJS < <(find "$OBJ" -name '*.o')
+
+# 3. UI + simulateur (recompilés à chaque fois), liés aux objets LVGL du cache.
+echo ">> compilation UI + simulateur..."
+gcc "${CFLAGS[@]}" \
+    -DTTF_PATH="\"$MAIN/fonts/Michroma-Regular.ttf\"" \
+    "${UI_SRCS[@]}" "${LVGL_OBJS[@]}" \
+    -lm -o "$BUILD/gen_golden"
+
+# 4. Régénération des trois goldens.
+echo ">> génération des goldens..."
+"$BUILD/gen_golden" dual  "$GDIR/rpm_screen.png"
+"$BUILD/gen_golden" amber "$GDIR/rpm_amber.png"
+"$BUILD/gen_golden" cream "$GDIR/rpm_cream.png"
+echo ">> OK — goldens régénérés dans test/golden/"

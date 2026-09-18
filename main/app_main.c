@@ -9,9 +9,9 @@
 
 static const char *TAG = "mgf_gauge";
 
-// TTF JetBrains Mono embarqué (cf. EMBED_FILES dans main/CMakeLists.txt).
-extern const uint8_t jbmono_start[] asm("_binary_JetBrainsMono_Bold_ttf_start");
-extern const uint8_t jbmono_end[]   asm("_binary_JetBrainsMono_Bold_ttf_end");
+// TTF Michroma embarqué (cf. EMBED_FILES dans main/CMakeLists.txt).
+extern const uint8_t jbmono_start[] asm("_binary_Michroma_Regular_ttf_start");
+extern const uint8_t jbmono_end[]   asm("_binary_Michroma_Regular_ttf_end");
 
 // Rafraîchit l'UI depuis l'instantané ECU factice (~25 Hz).
 static void ui_tick_cb(lv_timer_t *t) {
@@ -29,7 +29,7 @@ void app_main(void) {
     // Toute manipulation d'objets LVGL doit se faire sous verrou (thread LVGL).
     bsp_display_lock(0);
 
-    // Polices monospace JetBrains Mono (utilisées par le style ambre).
+    // Police Michroma (carrée, esprit Microgramma ; utilisée par le style ambre).
     ui_fonts_init(jbmono_start, (size_t)(jbmono_end - jbmono_start));
 
     lv_obj_t *screen = lv_screen_active();

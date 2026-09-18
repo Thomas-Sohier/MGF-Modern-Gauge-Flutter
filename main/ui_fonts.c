@@ -4,10 +4,11 @@ const lv_font_t *ui_font_xl = NULL;
 const lv_font_t *ui_font_l = NULL;
 const lv_font_t *ui_font_m = NULL;
 
-// Tailles (px) des trois polices monospace.
-#define UI_FONT_XL_PX 108
-#define UI_FONT_L_PX  50
-#define UI_FONT_M_PX  36
+// Tailles (px) des trois polices. Michroma est nettement plus large que la
+// JetBrains Mono d'origine -> tailles réduites pour tenir dans le cadran.
+#define UI_FONT_XL_PX 76
+#define UI_FONT_L_PX  30
+#define UI_FONT_M_PX  24
 
 void ui_fonts_init(const void *ttf_data, size_t ttf_size) {
     if (ui_font_xl || !ttf_data || ttf_size == 0) return; // déjà fait / pas de données

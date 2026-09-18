@@ -10,5 +10,5 @@ idf_component_register(
         "style_cream.c"
         "ui_fonts.c"
     INCLUDE_DIRS "."
-    EMBED_FILES "fonts/JetBrainsMono-Bold.ttf"
+    EMBED_FILES "fonts/Michroma-Regular.ttf"
 )

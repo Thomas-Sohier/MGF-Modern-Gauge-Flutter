@@ -90,63 +90,50 @@ static void draw_circle_fill(lv_layer_t * layer,
                    cx - r, cy - r, cx + r, cy + r);
 }
 
-/* -------------------- COOLANT -------------------- */
+/* -------------------- 1. COOLANT (Thermomètre + vagues) -------------------- */
 
 static void draw_coolant(lv_layer_t * layer,
                          const lv_area_t * a,
                          lv_color_t color)
 {
-    const lv_coord_t lw = sw(a, 55);
+    const lv_coord_t lw = sw(a, 60);
 
-    /* thermomètre */
+    /* Tige du thermomètre */
     draw_line(layer, color, lw,
-              sx(a, 405), sy(a, 170),
-              sx(a, 405), sy(a, 600));
+              sx(a, 410), sy(a, 130),
+              sx(a, 410), sy(a, 540));
 
+    /* Bulbe inférieur */
     draw_circle_fill(layer, color,
-                     sx(a, 405), sy(a, 655),
-                     sw(a, 95));
+                     sx(a, 410), sy(a, 595),
+                     sw(a, 85));
 
-    /* graduations */
+    /* Graduations horizontales à droite */
     draw_line(layer, color, lw,
-              sx(a, 405), sy(a, 255),
-              sx(a, 545), sy(a, 255));
+              sx(a, 410), sy(a, 210),
+              sx(a, 560), sy(a, 210));
     draw_line(layer, color, lw,
-              sx(a, 405), sy(a, 365),
-              sx(a, 520), sy(a, 365));
+              sx(a, 410), sy(a, 320),
+              sx(a, 510), sy(a, 320));
     draw_line(layer, color, lw,
-              sx(a, 405), sy(a, 475),
-              sx(a, 545), sy(a, 475));
+              sx(a, 410), sy(a, 430),
+              sx(a, 560), sy(a, 430));
 
-    /* vagues */
-    const int wave_y[2] = { 770, 885 };
+    /* Deux vagues ondulées superposées */
+    const int wave_y[2] = { 750, 875 };
     for(int k = 0; k < 2; k++) {
-        int y = wave_y[k];
-        draw_line(layer, color, lw,
-                  sx(a, 140), sy(a, y),
-                  sx(a, 250), sy(a, y - 45));
-        draw_line(layer, color, lw,
-                  sx(a, 250), sy(a, y - 45),
-                  sx(a, 360), sy(a, y));
-        draw_line(layer, color, lw,
-                  sx(a, 360), sy(a, y),
-                  sx(a, 470), sy(a, y + 45));
-        draw_line(layer, color, lw,
-                  sx(a, 470), sy(a, y + 45),
-                  sx(a, 580), sy(a, y));
-        draw_line(layer, color, lw,
-                  sx(a, 580), sy(a, y),
-                  sx(a, 690), sy(a, y - 45));
-        draw_line(layer, color, lw,
-                  sx(a, 690), sy(a, y - 45),
-                  sx(a, 800), sy(a, y));
-        draw_line(layer, color, lw,
-                  sx(a, 800), sy(a, y),
-                  sx(a, 900), sy(a, y + 35));
+        const int y = wave_y[k];
+        const int dy = 40;
+        draw_line(layer, color, lw, sx(a, 160), sy(a, y),      sx(a, 270), sy(a, y - dy));
+        draw_line(layer, color, lw, sx(a, 270), sy(a, y - dy), sx(a, 380), sy(a, y + dy));
+        draw_line(layer, color, lw, sx(a, 380), sy(a, y + dy), sx(a, 490), sy(a, y - dy));
+        draw_line(layer, color, lw, sx(a, 490), sy(a, y - dy), sx(a, 600), sy(a, y + dy));
+        draw_line(layer, color, lw, sx(a, 600), sy(a, y + dy), sx(a, 710), sy(a, y - dy));
+        draw_line(layer, color, lw, sx(a, 710), sy(a, y - dy), sx(a, 820), sy(a, y));
     }
 }
 
-/* -------------------- BATTERY -------------------- */
+/* -------------------- 2. BATTERY (Cadre + bornes + symboles -/+) ----------- */
 
 static void draw_battery(lv_layer_t * layer,
                          const lv_area_t * a,
@@ -154,33 +141,34 @@ static void draw_battery(lv_layer_t * layer,
 {
     const lv_coord_t lw = sw(a, 55);
 
-    draw_rect_outline(layer, color, lw, sw(a, 30),
-                      sx(a, 145), sy(a, 300),
-                      sx(a, 855), sy(a, 720));
+    /* Boîtier principal */
+    draw_rect_outline(layer, color, lw, sw(a, 35),
+                      sx(a, 150), sy(a, 320),
+                      sx(a, 850), sy(a, 780));
 
-    /* bornes */
-    draw_rect_fill(layer, color, sw(a, 18),
-                   sx(a, 255), sy(a, 220),
-                   sx(a, 355), sy(a, 300));
-    draw_rect_fill(layer, color, sw(a, 18),
-                   sx(a, 645), sy(a, 220),
-                   sx(a, 745), sy(a, 300));
+    /* Bornes supérieures */
+    draw_rect_fill(layer, color, sw(a, 15),
+                   sx(a, 240), sy(a, 230),
+                   sx(a, 370), sy(a, 320));
+    draw_rect_fill(layer, color, sw(a, 15),
+                   sx(a, 630), sy(a, 230),
+                   sx(a, 760), sy(a, 320));
 
-    /* - */
+    /* Symbole négatif (-) à gauche */
     draw_line(layer, color, lw,
-              sx(a, 260), sy(a, 510),
-              sx(a, 390), sy(a, 510));
+              sx(a, 270), sy(a, 550),
+              sx(a, 420), sy(a, 550));
 
-    /* + */
+    /* Symbole positif (+) à droite */
     draw_line(layer, color, lw,
-              sx(a, 610), sy(a, 510),
-              sx(a, 750), sy(a, 510));
+              sx(a, 580), sy(a, 550),
+              sx(a, 730), sy(a, 550));
     draw_line(layer, color, lw,
-              sx(a, 680), sy(a, 440),
-              sx(a, 680), sy(a, 580));
+              sx(a, 655), sy(a, 475),
+              sx(a, 655), sy(a, 625));
 }
 
-/* -------------------- OIL -------------------- */
+/* -------------------- 3. OIL (Burette d'huile automobile) ------------------ */
 
 static void draw_oil(lv_layer_t * layer,
                      const lv_area_t * a,
@@ -188,63 +176,63 @@ static void draw_oil(lv_layer_t * layer,
 {
     const lv_coord_t lw = sw(a, 55);
 
-    /* corps de la burette */
-    draw_line(layer, color, lw,
-              sx(a, 255), sy(a, 420),
-              sx(a, 575), sy(a, 420));
-    draw_line(layer, color, lw,
-              sx(a, 575), sy(a, 420),
-              sx(a, 685), sy(a, 540));
-    draw_line(layer, color, lw,
-              sx(a, 685), sy(a, 540),
-              sx(a, 560), sy(a, 700));
-    draw_line(layer, color, lw,
-              sx(a, 560), sy(a, 700),
-              sx(a, 255), sy(a, 700));
-    draw_line(layer, color, lw,
-              sx(a, 255), sy(a, 700),
-              sx(a, 255), sy(a, 420));
+    /* Base plate et corps */
+    draw_line(layer, color, lw, sx(a, 280), sy(a, 720), sx(a, 620), sy(a, 720)); // bas
+    draw_line(layer, color, lw, sx(a, 280), sy(a, 720), sx(a, 280), sy(a, 500)); // flanc gauche
+    draw_line(layer, color, lw, sx(a, 280), sy(a, 500), sx(a, 490), sy(a, 500)); // épaule haute
+    draw_line(layer, color, lw, sx(a, 490), sy(a, 500), sx(a, 620), sy(a, 610)); // pente vers le bec
+    draw_line(layer, color, lw, sx(a, 620), sy(a, 610), sx(a, 620), sy(a, 720)); // flanc droit
 
-    /* poignée */
-    draw_line(layer, color, lw,
-              sx(a, 255), sy(a, 430),
-              sx(a, 120), sy(a, 350));
-    draw_line(layer, color, lw,
-              sx(a, 120), sy(a, 350),
-              sx(a, 165), sy(a, 220));
-    draw_line(layer, color, lw,
-              sx(a, 165), sy(a, 220),
-              sx(a, 335), sy(a, 305));
-    draw_line(layer, color, lw,
-              sx(a, 335), sy(a, 305),
-              sx(a, 335), sy(a, 420));
+    /* Anse arrière (poignée) */
+    draw_line(layer, color, lw, sx(a, 280), sy(a, 520), sx(a, 150), sy(a, 440));
+    draw_line(layer, color, lw, sx(a, 150), sy(a, 440), sx(a, 150), sy(a, 610));
+    draw_line(layer, color, lw, sx(a, 150), sy(a, 610), sx(a, 280), sy(a, 670));
 
-    /* bouchon */
-    draw_line(layer, color, lw,
-              sx(a, 380), sy(a, 290),
-              sx(a, 380), sy(a, 205));
-    draw_line(layer, color, lw,
-              sx(a, 325), sy(a, 205),
-              sx(a, 440), sy(a, 205));
+    /* Bouchon de remplissage en T */
+    draw_line(layer, color, lw, sx(a, 390), sy(a, 500), sx(a, 390), sy(a, 390)); // tige
+    draw_line(layer, color, lw, sx(a, 330), sy(a, 390), sx(a, 450), sy(a, 390)); // chapeau
 
-    /* bec */
-    draw_line(layer, color, lw,
-              sx(a, 685), sy(a, 540),
-              sx(a, 845), sy(a, 395));
-    draw_line(layer, color, lw,
-              sx(a, 845), sy(a, 395),
-              sx(a, 920), sy(a, 365));
+    /* Long bec verseur */
+    draw_line(layer, color, lw, sx(a, 600), sy(a, 590), sx(a, 830), sy(a, 400));
+    draw_line(layer, color, lw, sx(a, 830), sy(a, 400), sx(a, 885), sy(a, 415)); // pointe
 
-    /* goutte */
-    draw_circle_fill(layer, color,
-                     sx(a, 875), sy(a, 610),
-                     sw(a, 58));
-    draw_line(layer, color, lw,
-              sx(a, 875), sy(a, 525),
-              sx(a, 875), sy(a, 585));
+    /* Goutte d'huile sous le bec */
+    draw_circle_fill(layer, color, sx(a, 865), sy(a, 570), sw(a, 42));
+    draw_line(layer, color, lw, sx(a, 865), sy(a, 520), sx(a, 865), sy(a, 560));
 }
 
-/* -------------------- ENGINE -------------------- */
+/* -------------------- 4. OBD LINK (Maillons de chaîne) -------------------- */
+
+static void draw_obd_link(lv_layer_t * layer,
+                          const lv_area_t * a,
+                          lv_color_t color)
+{
+    const lv_coord_t lw = sw(a, 60);
+
+    /*
+     * Deux capsules/stades arrondis horizontaux (radius = LV_RADIUS_CIRCLE)
+     * traversés par une barre centrale pour former les maillons entrelacés.
+     */
+    const lv_coord_t y1 = sy(a, 360);
+    const lv_coord_t y2 = sy(a, 640);
+
+    /* Maillon gauche (capsule creuse) */
+    draw_rect_outline(layer, color, lw, LV_RADIUS_CIRCLE,
+                      sx(a, 110), y1,
+                      sx(a, 520), y2);
+
+    /* Maillon droit (capsule creuse) */
+    draw_rect_outline(layer, color, lw, LV_RADIUS_CIRCLE,
+                      sx(a, 480), y1,
+                      sx(a, 890), y2);
+
+    /* Barre de jonction centrale */
+    draw_line(layer, color, lw,
+              sx(a, 340), sy(a, 500),
+              sx(a, 660), sy(a, 500));
+}
+
+/* -------------------- 5. ENGINE (Check engine optionnel) ------------------- */
 
 static void draw_engine(lv_layer_t * layer,
                         const lv_area_t * a,
@@ -252,7 +240,6 @@ static void draw_engine(lv_layer_t * layer,
 {
     const lv_coord_t lw = sw(a, 55);
 
-    /* contour moteur */
     const int pts[][2] = {
         {230, 350}, {320, 350}, {390, 265}, {665, 265},
         {750, 350}, {845, 350}, {845, 665}, {760, 665},
@@ -266,91 +253,19 @@ static void draw_engine(lv_layer_t * layer,
                   sx(a, pts[i+1][0]), sy(a, pts[i+1][1]));
     }
 
-    /* bouchon supérieur */
-    draw_line(layer, color, lw,
-              sx(a, 470), sy(a, 265),
-              sx(a, 470), sy(a, 175));
-    draw_line(layer, color, lw,
-              sx(a, 400), sy(a, 175),
-              sx(a, 545), sy(a, 175));
+    draw_line(layer, color, lw, sx(a, 470), sy(a, 265), sx(a, 470), sy(a, 175));
+    draw_line(layer, color, lw, sx(a, 400), sy(a, 175), sx(a, 545), sy(a, 175));
 
-    /* connecteur gauche */
-    draw_line(layer, color, lw,
-              sx(a, 230), sy(a, 430),
-              sx(a, 145), sy(a, 430));
-    draw_line(layer, color, lw,
-              sx(a, 145), sy(a, 350),
-              sx(a, 145), sy(a, 575));
-    draw_line(layer, color, lw,
-              sx(a, 145), sy(a, 575),
-              sx(a, 230), sy(a, 575));
+    draw_line(layer, color, lw, sx(a, 230), sy(a, 430), sx(a, 145), sy(a, 430));
+    draw_line(layer, color, lw, sx(a, 145), sy(a, 350), sx(a, 145), sy(a, 575));
+    draw_line(layer, color, lw, sx(a, 145), sy(a, 575), sx(a, 230), sy(a, 575));
 
-    /* connecteur droit */
-    draw_line(layer, color, lw,
-              sx(a, 845), sy(a, 445),
-              sx(a, 915), sy(a, 445));
-    draw_line(layer, color, lw,
-              sx(a, 915), sy(a, 445),
-              sx(a, 915), sy(a, 575));
-    draw_line(layer, color, lw,
-              sx(a, 915), sy(a, 575),
-              sx(a, 845), sy(a, 575));
+    draw_line(layer, color, lw, sx(a, 845), sy(a, 445), sx(a, 915), sy(a, 445));
+    draw_line(layer, color, lw, sx(a, 915), sy(a, 445), sx(a, 915), sy(a, 575));
+    draw_line(layer, color, lw, sx(a, 915), sy(a, 575), sx(a, 845), sy(a, 575));
 }
 
-/* -------------------- OBD LINK -------------------- */
-
-static void draw_obd_link(lv_layer_t * layer,
-                          const lv_area_t * a,
-                          lv_color_t color)
-{
-    const lv_coord_t lw = sw(a, 65);
-
-    /*
-     * Deux maillons horizontaux simplifiés.
-     * Le dessin est volontairement géométrique pour rester net à 20-40 px.
-     */
-
-    /* maillon gauche */
-    draw_line(layer, color, lw,
-              sx(a, 200), sy(a, 350),
-              sx(a, 420), sy(a, 350));
-    draw_line(layer, color, lw,
-              sx(a, 200), sy(a, 350),
-              sx(a, 130), sy(a, 420));
-    draw_line(layer, color, lw,
-              sx(a, 130), sy(a, 420),
-              sx(a, 130), sy(a, 580));
-    draw_line(layer, color, lw,
-              sx(a, 130), sy(a, 580),
-              sx(a, 200), sy(a, 650));
-    draw_line(layer, color, lw,
-              sx(a, 200), sy(a, 650),
-              sx(a, 430), sy(a, 650));
-
-    /* maillon droit */
-    draw_line(layer, color, lw,
-              sx(a, 580), sy(a, 350),
-              sx(a, 800), sy(a, 350));
-    draw_line(layer, color, lw,
-              sx(a, 800), sy(a, 350),
-              sx(a, 870), sy(a, 420));
-    draw_line(layer, color, lw,
-              sx(a, 870), sy(a, 420),
-              sx(a, 870), sy(a, 580));
-    draw_line(layer, color, lw,
-              sx(a, 870), sy(a, 580),
-              sx(a, 800), sy(a, 650));
-    draw_line(layer, color, lw,
-              sx(a, 800), sy(a, 650),
-              sx(a, 570), sy(a, 650));
-
-    /* liaison centrale */
-    draw_line(layer, color, lw,
-              sx(a, 350), sy(a, 500),
-              sx(a, 650), sy(a, 500));
-}
-
-/* -------------------- LVGL WIDGET -------------------- */
+/* -------------------- GESTION DU WIDGET LVGL -------------------- */
 
 static void dash_icon_draw_event(lv_event_t * e)
 {
@@ -365,8 +280,8 @@ static void dash_icon_draw_event(lv_event_t * e)
     lv_area_t a;
     lv_obj_get_coords(obj, &a);
 
-    /* petite marge interne pour éviter de couper les traits */
-    lv_coord_t pad = sw(&a, 70);
+    /* Marge interne pour éviter tout écornage lors de l'anti-aliasing */
+    lv_coord_t pad = sw(&a, 50);
     a.x1 += pad;
     a.y1 += pad;
     a.x2 -= pad;
@@ -426,10 +341,8 @@ lv_obj_t * dash_icon_create(lv_obj_t * parent,
 
     lv_obj_set_user_data(obj, data);
 
-    lv_obj_add_event_cb(obj, dash_icon_draw_event,
-                        LV_EVENT_DRAW_MAIN, NULL);
-    lv_obj_add_event_cb(obj, dash_icon_delete_event,
-                        LV_EVENT_DELETE, NULL);
+    lv_obj_add_event_cb(obj, dash_icon_draw_event, LV_EVENT_DRAW_MAIN, NULL);
+    lv_obj_add_event_cb(obj, dash_icon_delete_event, LV_EVENT_DELETE, NULL);
 
     lv_obj_invalidate(obj);
     return obj;

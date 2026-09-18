@@ -12,7 +12,7 @@
 #include "ecu_data.h"
 
 #ifndef TTF_PATH
-#define TTF_PATH "../main/fonts/JetBrainsMono-Bold.ttf"
+#define TTF_PATH "../main/fonts/Michroma-Regular.ttf"
 #endif
 
 #include <stdio.h>
