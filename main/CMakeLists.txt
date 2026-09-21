@@ -28,6 +28,7 @@ idf_component_register(
         "ui/screens/admission_screen.c"
         "ui/themes/ui_theme.c"
         "ui/widgets/amber_value.c"
+        "ui/widgets/amber_draw.c"
         "ui/fonts/ui_fonts.c"
     INCLUDE_DIRS "." "app" "domain" "infrastructure" "ui" "ui/screens" "ui/widgets" "ui/icons" "ui/fonts" "ui/themes"
     REQUIRES

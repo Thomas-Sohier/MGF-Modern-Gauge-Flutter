@@ -31,7 +31,7 @@ UI_SRCS=(
     "$MAIN/ui/screens/faults_screen.c" "$MAIN/ui/screens/temps_screen.c" "$MAIN/ui/screens/injection_screen.c"
     "$MAIN/ui/screens/lambda_screen.c" "$MAIN/ui/screens/ignition_screen.c"
     "$MAIN/ui/screens/idle_screen.c" "$MAIN/ui/screens/admission_screen.c"
-    "$MAIN/ui/widgets/amber_value.c" "$MAIN/ui/fonts/ui_fonts.c"
+    "$MAIN/ui/widgets/amber_value.c" "$MAIN/ui/widgets/amber_draw.c" "$MAIN/ui/fonts/ui_fonts.c"
 )
 
 if [ "${1:-}" = "clean" ]; then
