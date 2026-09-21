@@ -13,6 +13,7 @@ idf_component_register(
         "infrastructure/kline_uart_esp32.c"
         "infrastructure/mems_ecu.c"
         "ui/icons/dash_icons.c"
+        "ui/navigation/dashboard_navigator.c"
         "ui/screens/style_amber.c"
         "ui/screens/boot_screen.c"
         "ui/themes/ui_theme.c"

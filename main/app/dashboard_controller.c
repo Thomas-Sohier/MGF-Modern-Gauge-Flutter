@@ -3,7 +3,7 @@
 #include "lvgl.h"
 
 struct dashboard_controller_s {
-    amber_screen_t *screen;
+    dashboard_navigator_t *navigator;
     ecu_source_t ecu_source;
     uint32_t period_ms;
     ecu_data_t snapshot;
@@ -31,12 +31,12 @@ static void dashboard_controller_tick(lv_timer_t *timer) {
     controller->snapshot = next;
     controller->state = next.connected ? DASHBOARD_STATE_CONNECTED
                                        : DASHBOARD_STATE_DISCONNECTED;
-    amber_screen_update(controller->screen, &controller->snapshot);
+    dashboard_navigator_update(controller->navigator, &controller->snapshot);
 }
 
 dashboard_controller_t *dashboard_controller_create(
     const dashboard_controller_config_t *config) {
-    if (config == NULL || config->screen == NULL || config->ecu_source.read == NULL ||
+    if (config == NULL || config->navigator == NULL || config->ecu_source.read == NULL ||
         config->period_ms == 0) {
         return NULL;
     }
@@ -44,7 +44,7 @@ dashboard_controller_t *dashboard_controller_create(
     dashboard_controller_t *controller = lv_malloc(sizeof(*controller));
     if (controller == NULL) return NULL;
 
-    controller->screen = config->screen;
+    controller->navigator = config->navigator;
     controller->ecu_source = config->ecu_source;
     controller->period_ms = config->period_ms;
     controller->snapshot = (ecu_data_t){0};

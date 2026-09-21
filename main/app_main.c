@@ -7,6 +7,7 @@
 #include "infrastructure/board_display.h"
 #include "ui/screens/style_amber.h"
 #include "ui/screens/boot_screen.h"
+#include "ui/navigation/dashboard_navigator.h"
 #include "ui/fonts/ui_fonts.h"
 #include "infrastructure/fake_ecu.h"
 #include "app/dashboard_controller.h"
@@ -39,6 +40,14 @@ static const char *TAG = "mgf_gauge";
 // TTF Michroma embarqué (cf. EMBED_FILES dans main/CMakeLists.txt).
 extern const uint8_t michroma_start[] asm("_binary_fonts_Michroma_Regular_ttf_start");
 extern const uint8_t michroma_end[]   asm("_binary_fonts_Michroma_Regular_ttf_end");
+
+static void rpm_page_update(void *context, const ecu_data_t *data) {
+    amber_screen_update(context, data);
+}
+
+static void rpm_page_destroy(void *context) {
+    amber_screen_destroy(context);
+}
 
 void app_main(void) {
     ESP_LOGI(TAG, "MGF Gauge LVGL — ecran RPM ambre (ESP32-S3-Touch-LCD-2.1)");
@@ -80,10 +89,20 @@ void app_main(void) {
     }
     lv_refr_now(NULL);
 
-    // L'écran ambre est carré/centré ; il occupe le disque 480x480.
-    amber_screen_t *ui = amber_screen_create(screen);
-    if (ui == NULL) {
-        ESP_LOGE(TAG, "impossible de créer l'écran ambre");
+    dashboard_navigator_t *navigator = dashboard_navigator_create(screen);
+    lv_obj_t *rpm_page = dashboard_navigator_create_page(navigator);
+    amber_screen_t *ui = amber_screen_create(rpm_page);
+    const dashboard_page_t rpm_descriptor = {
+        .name = "RPM",
+        .context = ui,
+        .update = rpm_page_update,
+        .destroy = rpm_page_destroy,
+    };
+    if (navigator == NULL || rpm_page == NULL || ui == NULL ||
+        !dashboard_navigator_register_page(navigator, rpm_page, &rpm_descriptor)) {
+        ESP_LOGE(TAG, "impossible de créer la navigation du dashboard");
+        if (navigator != NULL) dashboard_navigator_destroy(navigator);
+        else amber_screen_destroy(ui);
         boot_screen_destroy(boot);
         board_display_unlock();
         board_display_backlight_off();
@@ -111,7 +130,7 @@ void app_main(void) {
     if (mems_ecu == NULL || !mems_ecu_start(mems_ecu)) {
         ESP_LOGE(TAG, "impossible de démarrer la source MEMS K-line");
         mems_ecu_destroy(mems_ecu);
-        amber_screen_destroy(ui);
+        dashboard_navigator_destroy(navigator);
         boot_screen_destroy(boot);
         board_display_unlock();
         board_display_backlight_off();
@@ -123,7 +142,7 @@ void app_main(void) {
     if (fake_ecu == NULL || !fake_ecu_start(fake_ecu)) {
         ESP_LOGE(TAG, "impossible de démarrer la source ECU factice");
         fake_ecu_destroy(fake_ecu);
-        amber_screen_destroy(ui);
+        dashboard_navigator_destroy(navigator);
         boot_screen_destroy(boot);
         board_display_unlock();
         board_display_backlight_off();
@@ -132,7 +151,7 @@ void app_main(void) {
     ecu_source = fake_ecu_source(fake_ecu);
 #endif
     const dashboard_controller_config_t controller_config = {
-        .screen = ui,
+        .navigator = navigator,
         .ecu_source = ecu_source,
         .period_ms = 40,
     };
@@ -146,7 +165,7 @@ void app_main(void) {
 #else
         fake_ecu_destroy(fake_ecu);
 #endif
-        amber_screen_destroy(ui);
+        dashboard_navigator_destroy(navigator);
         boot_screen_destroy(boot);
         board_display_unlock();
         board_display_backlight_off();

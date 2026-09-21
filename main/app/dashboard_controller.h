@@ -5,17 +5,17 @@
 
 #include "app/app_state.h"
 #include "domain/ecu_source.h"
-#include "ui/screens/style_amber.h"
+#include "ui/navigation/dashboard_navigator.h"
 
 typedef struct {
-    amber_screen_t *screen;
+    dashboard_navigator_t *navigator;
     ecu_source_t ecu_source;
     uint32_t period_ms;
 } dashboard_controller_config_t;
 
 typedef struct dashboard_controller_s dashboard_controller_t;
 
-// Construit le contrôleur. La source et l'écran sont empruntés (ils doivent
+// Construit le contrôleur. La source et le navigateur sont empruntés (ils doivent
 // rester valides jusqu'à dashboard_controller_destroy()). Ils sont utilisés par
 // le callback d'un timer LVGL, donc dans le thread LVGL.
 dashboard_controller_t *dashboard_controller_create(

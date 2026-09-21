@@ -1,0 +1,134 @@
+#include "ui/navigation/dashboard_navigator.h"
+
+#define DASHBOARD_MAX_PAGES 12
+
+typedef struct {
+    lv_obj_t *object;
+    dashboard_page_t descriptor;
+} page_entry_t;
+
+struct dashboard_navigator_s {
+    lv_obj_t *root;
+    page_entry_t pages[DASHBOARD_MAX_PAGES];
+    size_t count;
+    size_t current;
+};
+
+static void show_current(dashboard_navigator_t *navigator) {
+    for (size_t i = 0; i < navigator->count; i++) {
+        if (i == navigator->current) lv_obj_remove_flag(navigator->pages[i].object, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(navigator->pages[i].object, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void dashboard_navigator_next(dashboard_navigator_t *navigator) {
+    if (navigator == NULL || navigator->count < 2) return;
+    navigator->current = (navigator->current + 1) % navigator->count;
+    show_current(navigator);
+}
+
+void dashboard_navigator_previous(dashboard_navigator_t *navigator) {
+    if (navigator == NULL || navigator->count < 2) return;
+    navigator->current = (navigator->current + navigator->count - 1) % navigator->count;
+    show_current(navigator);
+}
+
+static void navigation_event_cb(lv_event_t *event) {
+    dashboard_navigator_t *navigator = lv_event_get_user_data(event);
+    if (navigator == NULL) return;
+
+    if (lv_event_get_code(event) == LV_EVENT_GESTURE) {
+        const lv_dir_t direction = lv_indev_get_gesture_dir(lv_indev_active());
+        if (direction == LV_DIR_LEFT) dashboard_navigator_next(navigator);
+        else if (direction == LV_DIR_RIGHT) dashboard_navigator_previous(navigator);
+        return;
+    }
+
+    if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
+        lv_point_t point;
+        lv_indev_get_point(lv_event_get_indev(event), &point);
+        const int32_t width = lv_obj_get_width(navigator->root);
+        if (point.x < width / 3) dashboard_navigator_previous(navigator);
+        else if (point.x >= (width * 2) / 3) dashboard_navigator_next(navigator);
+    }
+}
+
+dashboard_navigator_t *dashboard_navigator_create(lv_obj_t *parent) {
+    if (parent == NULL) return NULL;
+    dashboard_navigator_t *navigator = lv_malloc(sizeof(*navigator));
+    if (navigator == NULL) return NULL;
+    lv_memzero(navigator, sizeof(*navigator));
+
+    navigator->root = lv_obj_create(parent);
+    if (navigator->root == NULL) {
+        lv_free(navigator);
+        return NULL;
+    }
+    lv_obj_remove_style_all(navigator->root);
+    lv_obj_set_size(navigator->root, LV_PCT(100), LV_PCT(100));
+    lv_obj_center(navigator->root);
+    lv_obj_clear_flag(navigator->root, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(navigator->root, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_GESTURE, navigator);
+    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_CLICKED, navigator);
+    return navigator;
+}
+
+lv_obj_t *dashboard_navigator_create_page(dashboard_navigator_t *navigator) {
+    if (navigator == NULL || navigator->count >= DASHBOARD_MAX_PAGES) return NULL;
+    lv_obj_t *page = lv_obj_create(navigator->root);
+    if (page == NULL) return NULL;
+    lv_obj_remove_style_all(page);
+    lv_obj_set_size(page, LV_PCT(100), LV_PCT(100));
+    lv_obj_center(page);
+    lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
+    return page;
+}
+
+bool dashboard_navigator_register_page(dashboard_navigator_t *navigator,
+                                       lv_obj_t *page,
+                                       const dashboard_page_t *descriptor) {
+    if (navigator == NULL || page == NULL || descriptor == NULL ||
+        descriptor->name == NULL || navigator->count >= DASHBOARD_MAX_PAGES ||
+        lv_obj_get_parent(page) != navigator->root) return false;
+
+    navigator->pages[navigator->count] = (page_entry_t){
+        .object = page,
+        .descriptor = *descriptor,
+    };
+    if (navigator->count != 0) lv_obj_add_flag(page, LV_OBJ_FLAG_HIDDEN);
+    navigator->count++;
+    return true;
+}
+
+size_t dashboard_navigator_current(const dashboard_navigator_t *navigator) {
+    return navigator == NULL ? 0 : navigator->current;
+}
+
+size_t dashboard_navigator_count(const dashboard_navigator_t *navigator) {
+    return navigator == NULL ? 0 : navigator->count;
+}
+
+const char *dashboard_navigator_current_name(const dashboard_navigator_t *navigator) {
+    if (navigator == NULL || navigator->count == 0) return NULL;
+    return navigator->pages[navigator->current].descriptor.name;
+}
+
+void dashboard_navigator_update(dashboard_navigator_t *navigator,
+                                const ecu_data_t *data) {
+    if (navigator == NULL || data == NULL) return;
+    for (size_t i = 0; i < navigator->count; i++) {
+        dashboard_page_update_cb_t update = navigator->pages[i].descriptor.update;
+        if (update != NULL) update(navigator->pages[i].descriptor.context, data);
+    }
+}
+
+void dashboard_navigator_destroy(dashboard_navigator_t *navigator) {
+    if (navigator == NULL) return;
+    for (size_t i = 0; i < navigator->count; i++) {
+        dashboard_page_destroy_cb_t destroy = navigator->pages[i].descriptor.destroy;
+        if (destroy != NULL) destroy(navigator->pages[i].descriptor.context);
+    }
+    if (navigator->root != NULL) lv_obj_delete(navigator->root);
+    lv_free(navigator);
+}
