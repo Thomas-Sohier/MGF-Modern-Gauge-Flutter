@@ -1,0 +1,290 @@
+#include "ui/screens/style_amber.h"
+#include "ui/icons/dash_icons.h"
+#include "ui/fonts/ui_fonts.h"
+#include "ui/themes/ui_theme.h"
+#include "ui/widgets/amber_value.h"
+#include "ui/ui_layout.h"
+
+#include <math.h>
+#include <stdio.h>
+
+// ── 1. CONSTANTES : géométrie (repère partagé 320 px) ───────────────────────
+
+// Compte-tours
+#define DIAL_CX       (UI_REFERENCE_SIZE * 0.5f)
+#define DIAL_CY       DIAL_CX
+#define DIAL_R_OUT    (DIAL_CX - UI_EDGE_MARGIN)
+#define DIAL_R_IN     (DIAL_R_OUT - 31.0f)
+
+#define SEG_COUNT     26       // 26 barres
+#define SEG_GAP_DEG   1.80f    // espacement angulaire constant entre chaque barre
+
+#define DIAL_START    180.0f   // 9h (horizontale gauche)
+#define DIAL_SWEEP    180.0f   // demi-cercle jusqu'à 3h (horizontale droite)
+
+// Plage régime
+#define RPM_MIN       0.0f
+#define RPM_MAX       8000.0f
+
+// Traits de séparation
+#define SEP_W         0.8f
+#define SEP_GAP       3.5f
+
+// Ligne horizontale
+#define HSEP_Y        190.0f
+#define HSEP_X1       30.0f
+#define HSEP_X2       290.0f
+
+// Séparateurs verticaux
+#define VSEP_TOP_OUT  160.0f
+#define VSEP_TOP_MID  (HSEP_Y + SEP_GAP)
+static const float kVSep[3][3] = {
+    {95.0f, VSEP_TOP_OUT, 280.0f},
+    {160.0f, VSEP_TOP_MID, 288.0f},
+    {225.0f, VSEP_TOP_OUT, 280.0f},
+};
+
+// Valeur centrale
+#define RPM_VAL_X     162.0f
+#define RPM_VAL_Y     142.0f
+#define RPM_UNIT_Y    180.0f
+
+// ── 1. CONSTANTES : indicateurs bas ──────────────────────────────────────────
+enum { M_COOLANT = 0, M_BATTERY, M_OIL, M_OBD, M_COUNT };
+typedef struct {
+    dash_icon_type_t icon;
+    float x, icon_y, label_y;
+} ind_def_t;
+
+static const ind_def_t kInd[M_COUNT] = {
+    {DASH_ICON_COOLANT,  62.5f,  187.0f, 222.0f},
+    {DASH_ICON_BATTERY,  127.5f, 217.0f, 252.0f},
+    {DASH_ICON_OIL,      192.5f, 217.0f, 252.0f},
+    {DASH_ICON_OBD_LINK, 257.5f,  187.0f, 222.0f},
+};
+#define IND_ICON_SZ   40.0f
+
+// ── État / mise à l'échelle ──────────────────────────────────────────────────
+struct amber_screen_s {
+    lv_obj_t *root;
+    lv_obj_t *canvas;
+    amber_value_widget_t *value;
+    amber_value_widget_t *unit;
+    amber_value_widget_t *ind_value[M_COUNT];
+    lv_obj_t *icons[M_COUNT];
+    float rpm;
+};
+
+// Michroma n'existe qu'en une graisse : on simule le gras en superposant un
+// second calque décalé (spread px de part et d'autre). L'écart dépend de la
+// taille (trop d'écart sur un petit texte le ferait « doubler »).
+#define BOLD_XL 2   // grande valeur (« 800 »)
+#define BOLD_SM 1   // RPM / valeurs des indicateurs
+
+static ui_layout_t layout_of(const lv_area_t *area) {
+    ui_layout_t layout = ui_layout_fit(lv_area_get_width(area),
+                                        lv_area_get_height(area));
+    layout.ox += area->x1;
+    layout.oy += area->y1;
+    return layout;
+}
+
+// ── 3. DESSIN : primitives ───────────────────────────────────────────────────
+
+static void draw_line(lv_layer_t *l, float x1, float y1, float x2, float y2,
+                      float w, lv_color_t c) {
+    lv_draw_line_dsc_t d;
+    lv_draw_line_dsc_init(&d);
+    d.color = c;
+    d.opa = LV_OPA_COVER;
+    d.width = LV_MAX(1, (int32_t)lroundf(w));
+    d.round_start = 0;
+    d.round_end = 0;
+    d.p1.x = x1; d.p1.y = y1;
+    d.p2.x = x2; d.p2.y = y2;
+    lv_draw_line(l, &d);
+}
+
+// Dessine un segment annulaire en une seule passe via lv_draw_arc
+static void draw_arc_bar(lv_layer_t *l, int32_t cx, int32_t cy,
+                         int32_t r_out, int32_t thickness,
+                         float a0, float a1, lv_color_t c) {
+    lv_draw_arc_dsc_t d;
+    lv_draw_arc_dsc_init(&d);
+    d.center.x = cx;
+    d.center.y = cy;
+    d.radius = r_out;
+    d.width = thickness;
+    d.start_angle = a0;
+    d.end_angle = a1;
+    d.color = c;
+    d.opa = LV_OPA_COVER;
+    d.rounded = 0; // Extrémités coupées radialement droites
+    lv_draw_arc(l, &d);
+}
+
+static void canvas_draw_cb(lv_event_t *e) {
+    lv_obj_t *obj = lv_event_get_target(e);
+    lv_layer_t *layer = lv_event_get_layer(e);
+
+    lv_area_t a;
+    lv_obj_get_coords(obj, &a);
+    const ui_layout_t t = layout_of(&a);
+
+    const int32_t cx = (int32_t)lroundf(ui_layout_x(&t, DIAL_CX));
+    const int32_t cy = (int32_t)lroundf(ui_layout_y(&t, DIAL_CY));
+    const int32_t r_in  = (int32_t)lroundf(DIAL_R_IN * t.scale);
+    const int32_t r_out = (int32_t)lroundf(DIAL_R_OUT * t.scale);
+    const int32_t bar_thickness = r_out - r_in;
+
+    // Répartition uniforme stricte : 26 barres et 25 interstices égaux
+    const float total_gaps = (float)(SEG_COUNT - 1) * SEG_GAP_DEG;
+    const float bar_deg = (DIAL_SWEEP - total_gaps) / (float)SEG_COUNT;
+    const float pitch_deg = bar_deg + SEG_GAP_DEG;
+
+    amber_screen_t *scr = lv_obj_get_user_data(obj);
+    if (scr == NULL) return;
+
+    const float prog = LV_CLAMP(0.0f, (scr->rpm - RPM_MIN) / (RPM_MAX - RPM_MIN), 1.0f);
+    const int bright = (int)lroundf(prog * SEG_COUNT);
+
+    // Dessin direct des 26 barres
+    for (int i = 0; i < SEG_COUNT; i++) {
+        const float a0 = DIAL_START + (float)i * pitch_deg;
+        const float a1 = a0 + bar_deg;
+        const lv_color_t col = (i < bright) ? ui_theme_amber_bright() : ui_theme_amber_dim();
+        draw_arc_bar(layer, cx, cy, r_out, bar_thickness, a0, a1, col);
+    }
+
+    // (Pas d'aiguille : les barres allumées suffisent à indiquer le régime.)
+
+    // Séparateur horizontal
+    const float hy_out = ui_layout_y(&t, VSEP_TOP_OUT);
+    const float hy_mid = ui_layout_y(&t, HSEP_Y);
+    draw_line(layer, ui_layout_x(&t, HSEP_X1), hy_out,
+              ui_layout_x(&t, 95.0f - SEP_GAP), hy_out,
+              SEP_W * t.scale, ui_theme_amber_separator());
+    draw_line(layer, ui_layout_x(&t, 95.0f + SEP_GAP), hy_mid,
+              ui_layout_x(&t, 225.0f - SEP_GAP), hy_mid,
+              SEP_W * t.scale, ui_theme_amber_separator());
+    draw_line(layer, ui_layout_x(&t, 225.0f + SEP_GAP), hy_out,
+              ui_layout_x(&t, HSEP_X2), hy_out,
+              SEP_W * t.scale, ui_theme_amber_separator());
+
+    // Séparateurs verticaux
+    for (int i = 0; i < 3; i++) {
+        draw_line(layer, ui_layout_x(&t, kVSep[i][0]), ui_layout_y(&t, kVSep[i][1]),
+                  ui_layout_x(&t, kVSep[i][0]), ui_layout_y(&t, kVSep[i][2]),
+                  SEP_W * t.scale, ui_theme_amber_separator());
+    }
+}
+
+// ── 2. CRÉATION ──────────────────────────────────────────────────────────────
+
+static void place(lv_obj_t *o, lv_obj_t *parent, float rx, float ry) {
+    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
+                                              lv_obj_get_height(parent));
+    lv_obj_align(o, LV_ALIGN_TOP_LEFT,
+                 (int32_t)lroundf(ui_layout_x(&layout, rx)),
+                 (int32_t)lroundf(ui_layout_y(&layout, ry)));
+}
+
+amber_screen_t *amber_screen_create(lv_obj_t *parent) {
+    if (parent == NULL) return NULL;
+
+    amber_screen_t *scr = lv_malloc(sizeof(*scr));
+    if (scr == NULL) return NULL;
+    lv_memzero(scr, sizeof(*scr));
+
+    lv_obj_set_style_bg_color(parent, ui_theme_amber_bg(), 0);
+    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
+
+    lv_obj_update_layout(parent);
+    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
+                               lv_obj_get_content_height(parent));
+    if (side <= 0) goto fail;
+
+    scr->root = lv_obj_create(parent);
+    if (scr->root == NULL) goto fail;
+    lv_obj_remove_style_all(scr->root);
+    lv_obj_set_size(scr->root, side, side);
+    lv_obj_center(scr->root);
+    lv_obj_clear_flag(scr->root, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_update_layout(scr->root);
+    parent = scr->root;
+    const ui_layout_t layout = ui_layout_fit(side, side);
+    const float k = layout.scale;
+
+    scr->canvas = lv_obj_create(parent);
+    if (scr->canvas == NULL) goto fail;
+    lv_obj_remove_style_all(scr->canvas);
+    lv_obj_set_size(scr->canvas, LV_PCT(100), LV_PCT(100));
+    lv_obj_clear_flag(scr->canvas, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_user_data(scr->canvas, scr);
+    lv_obj_add_event_cb(scr->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
+
+    scr->value = amber_value_widget_create(
+        parent, ui_font_or(ui_font_xl, &lv_font_montserrat_48),
+        RPM_VAL_X, RPM_VAL_Y, BOLD_XL, "0");
+    if (scr->value == NULL) goto fail;
+
+    scr->unit = amber_value_widget_create(
+        parent, ui_font_or(ui_font_m, &lv_font_montserrat_20),
+        DIAL_CX, RPM_UNIT_Y, BOLD_SM, "RPM");
+    if (scr->unit == NULL) goto fail;
+
+    for (int i = 0; i < M_COUNT; i++) {
+        const int32_t isz = (int32_t)lroundf(IND_ICON_SZ * k);
+        scr->icons[i] = dash_icon_create(parent, kInd[i].icon, isz,
+                                         ui_theme_amber_bright());
+        if (scr->icons[i] == NULL) goto fail;
+        place(scr->icons[i], parent, kInd[i].x - IND_ICON_SZ * 0.5f,
+              kInd[i].icon_y - IND_ICON_SZ * 0.5f);
+
+        scr->ind_value[i] = amber_value_widget_create(
+            parent, ui_font_or(ui_font_m, &lv_font_montserrat_20),
+            kInd[i].x, kInd[i].label_y, BOLD_SM, "");
+        if (scr->ind_value[i] == NULL) goto fail;
+    }
+
+    return scr;
+
+fail:
+    amber_screen_destroy(scr);
+    return NULL;
+}
+
+// ── 5. SETTERS ───────────────────────────────────────────────────────────────
+
+void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
+    if (scr == NULL || d == NULL || scr->canvas == NULL || scr->value == NULL) return;
+
+    scr->rpm = d->rpm;
+    lv_obj_invalidate(scr->canvas);
+
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%.0f", d->rpm);
+    amber_value_widget_set(scr->value, buf);
+
+    snprintf(buf, sizeof(buf), "%.0f°C", d->coolant_temp);
+    amber_value_widget_set(scr->ind_value[M_COOLANT], buf);
+    snprintf(buf, sizeof(buf), "%.1fV", d->battery_voltage);
+    amber_value_widget_set(scr->ind_value[M_BATTERY], buf);
+    snprintf(buf, sizeof(buf), "%.0f°C", d->oil_temp);
+    amber_value_widget_set(scr->ind_value[M_OIL], buf);
+    amber_value_widget_set(scr->ind_value[M_OBD], d->connected ? "OBD" : "--");
+}
+
+void amber_screen_destroy(amber_screen_t *scr) {
+    if (scr == NULL) return;
+
+    amber_value_widget_destroy(scr->value);
+    amber_value_widget_destroy(scr->unit);
+    for (int i = 0; i < M_COUNT; i++) {
+        amber_value_widget_destroy(scr->ind_value[i]);
+        if (scr->icons[i] != NULL) lv_obj_delete(scr->icons[i]);
+    }
+    // The root owns the drawing object; wrappers above own their labels.
+    if (scr->root != NULL) lv_obj_delete(scr->root);
+    lv_free(scr);
+}

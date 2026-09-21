@@ -1,0 +1,40 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "driver/uart.h"
+
+#include "domain/kline_transport.h"
+
+// Transport K-line pour ESP32-S3 au-dessus du pilote UART ESP-IDF.
+//
+// ⚠️ Matériel requis : la carte Waveshare n'embarque PAS de transceiver K-line.
+// La K-line (ISO-9141, 12 V, un seul fil bidirectionnel) doit passer par un
+// transceiver dédié (ex. ST L9637D) qui expose deux lignes 3.3 V TX/RX vers le
+// S3. Câbler K-line <-> transceiver <-> (tx_gpio, rx_gpio).
+//
+// Écho local : selon le montage, l'UART peut relire ses propres octets émis
+// (fil unique bouclé). Mettre `local_echo = true` pour que le transport rejette
+// cet écho local après chaque écriture ; la couche session ne voit alors que
+// l'écho de commande renvoyé par l'ECU, comme attendu par le protocole MEMS.
+
+typedef struct {
+    uart_port_t uart_num;   // ex. UART_NUM_1
+    int tx_gpio;            // GPIO relié au TX du transceiver
+    int rx_gpio;            // GPIO relié au RX du transceiver
+    int baud_rate;          // 0 => 9600 (défaut MEMS)
+    bool local_echo;        // rejeter l'écho local des octets émis
+} kline_uart_config_t;
+
+typedef struct kline_uart_s kline_uart_t;
+
+// Installe le pilote UART (9600 8N1) et prépare le transport. Renvoie NULL en
+// cas d'échec.
+kline_uart_t *kline_uart_create(const kline_uart_config_t *config);
+
+// Libère le pilote UART et l'instance.
+void kline_uart_destroy(kline_uart_t *k);
+
+// Vue `kline_transport_t` de cette instance (à passer à la session MEMS).
+kline_transport_t kline_uart_transport(kline_uart_t *k);

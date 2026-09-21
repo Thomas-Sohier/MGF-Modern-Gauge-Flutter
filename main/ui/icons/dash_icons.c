@@ -1,4 +1,4 @@
-#include "dash_icons.h"
+#include "ui/icons/dash_icons.h"
 
 typedef struct {
     dash_icon_type_t type;

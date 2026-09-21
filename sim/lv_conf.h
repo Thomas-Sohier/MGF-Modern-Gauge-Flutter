@@ -17,10 +17,15 @@
 
 #define LV_USE_OS LV_OS_NONE
 
+// Boot screen vectoriel (LVGL 9).
+#define LV_USE_VECTOR_GRAPHIC 1
+#define LV_USE_MATRIX 1
+#define LV_USE_FLOAT 1
+
 // Snapshot d'objet -> buffer image (utilisé pour exporter le golden).
 #define LV_USE_SNAPSHOT 1
 
-// Rendu de police TTF à la volée (JetBrains Mono, monospace old-school).
+// Rendu de la police Michroma à la volée.
 #define LV_USE_TINY_TTF 1
 #define LV_TINY_TTF_FILE_SUPPORT 0
 

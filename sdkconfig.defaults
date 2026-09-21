@@ -24,6 +24,9 @@ CONFIG_LCD_RGB_ISR_IRAM_SAFE=y
 # ── LVGL ──────────────────────────────────────────────────────────────────────
 CONFIG_LV_COLOR_DEPTH_16=y            # RGB565, cohérent avec le panneau
 CONFIG_LV_USE_TINY_TTF=y              # rendu Michroma à la volée (style ambre)
+CONFIG_LV_USE_VECTOR_GRAPHIC=y         # logo vectoriel de l'écran de boot
+CONFIG_LV_USE_MATRIX=y                 # dépendance du rendu vectoriel
+CONFIG_LV_USE_FLOAT=y                  # dépendance du rendu vectoriel
 CONFIG_LV_DEF_REFR_PERIOD=30          # ~30 Hz (régime moteur simulé)
 CONFIG_LV_FONT_MONTSERRAT_20=y        # fallback si le TTF échoue
 CONFIG_LV_FONT_MONTSERRAT_48=y

@@ -1,4 +1,4 @@
-#include "board_display.h"
+#include "infrastructure/board_display.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -234,6 +234,10 @@ lv_display_t *board_display_start(void) {
     ESP_ERROR_CHECK(panel_init(&io, &panel));
 
     lv_display_t *disp = lvgl_bringup(io, panel);
+    if (disp == NULL) {
+        ESP_LOGE(TAG, "impossible de créer l'affichage LVGL");
+        return NULL;
+    }
     touch_bringup(disp);
     return disp;
 }

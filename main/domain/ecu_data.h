@@ -13,11 +13,3 @@ typedef struct {
     float battery_voltage;// tension batterie (V)
     float oil_temp;       // température huile (°C)
 } ecu_data_t;
-
-// Source de données factice pour le test de faisabilité : un modèle de montée/
-// descente de régime pilote rpm + throttle, les autres champs restent réalistes.
-// Démarre un timer LVGL qui met à jour l'instantané et le pousse à l'écran RPM.
-void fake_ecu_start(void);
-
-// Instantané courant (thread LVGL uniquement).
-const ecu_data_t *fake_ecu_current(void);

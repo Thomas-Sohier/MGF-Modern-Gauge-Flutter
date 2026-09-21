@@ -1,15 +1,17 @@
-// Harnais de simulation hôte : compile la MÊME UI que la cible ESP32-P4
-// (dual_arc_dial.c + rpm_screen.c) contre LVGL, rend une frame offscreen avec
-// des données ECU mock, et exporte le rendu en PNG (golden test).
+// Harnais de simulation hôte : compile la même UI LVGL que la cible ESP32-S3,
+// ainsi que les variantes legacy dual/cream, rend une frame offscreen avec des
+// données ECU mock et exporte le rendu en PNG (golden test).
 //
 // Usage : gen_golden <chemin_png>
 
 #include "lvgl.h"
-#include "rpm_screen.h"
-#include "style_amber.h"
-#include "style_cream.h"
-#include "ui_fonts.h"
-#include "ecu_data.h"
+#include "ui/screens/rpm_screen.h"
+#include "ui/screens/boot_screen.h"
+#include "ui/screens/style_amber.h"
+#include "ui/screens/style_cream.h"
+#include "ui/fonts/ui_fonts.h"
+#include "domain/ecu_data.h"
+#include "ui/ui_layout.h"
 
 #ifndef TTF_PATH
 #define TTF_PATH "../main/fonts/Michroma-Regular.ttf"
@@ -91,7 +93,7 @@ static void *load_file(const char *path, size_t *out_size) {
 }
 
 int main(int argc, char **argv) {
-    // Usage : gen_golden [dual|amber|cream] <chemin_png>
+    // Usage : gen_golden [dual|amber|cream|boot] <chemin_png>
     const char *style = (argc > 1) ? argv[1] : "dual";
     const char *out = (argc > 2) ? argv[2] : "rpm_screen.png";
 
@@ -100,13 +102,15 @@ int main(int argc, char **argv) {
     // avec masque circulaire. Les styles legacy (dual/cream) restent en
     // 1024x600 (ancienne cible P4 paysage), non masqués.
     const int is_amber = (strcmp(style, "amber") == 0);
-    const int32_t W = is_amber ? 480 : 1024;
-    const int32_t H = is_amber ? 480 : 600;
+    const int is_boot = (strcmp(style, "boot") == 0);
+    const int is_round = is_amber || is_boot;
+    const int32_t W = is_round ? UI_DISPLAY_SIZE_PX : 1024;
+    const int32_t H = is_round ? UI_DISPLAY_SIZE_PX : 600;
 
     lv_init();
     lv_tick_set_cb(tick_cb);
 
-    // Polices monospace JetBrains Mono (sinon repli Montserrat).
+    // Police Michroma (sinon repli Montserrat).
     size_t ttf_size = 0;
     void *ttf = load_file(TTF_PATH, &ttf_size);
     if (ttf) ui_fonts_init(ttf, ttf_size);
@@ -121,7 +125,9 @@ int main(int argc, char **argv) {
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
 
-    if (strcmp(style, "amber") == 0) {
+    if (strcmp(style, "boot") == 0) {
+        boot_screen_create(screen);
+    } else if (strcmp(style, "amber") == 0) {
         // Ralenti, valeurs de la photo 1.
         const ecu_data_t mock = {.connected = true, .rpm = 800, .throttle = 6,
                                  .coolant_temp = 89, .battery_voltage = 14.2f,
@@ -152,7 +158,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (!write_png(snap, out, is_amber)) {
+    if (!write_png(snap, out, is_round)) {
         fprintf(stderr, "ecriture PNG echouee: %s\n", out);
         lv_draw_buf_destroy(snap);
         return 1;

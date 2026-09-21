@@ -1,4 +1,4 @@
-#include "gauge_icons.h"
+#include "ui/icons/gauge_icons.h"
 
 #include <math.h>
 

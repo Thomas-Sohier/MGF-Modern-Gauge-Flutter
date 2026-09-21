@@ -3,7 +3,7 @@
 ## (pilote CST816S) + expander TCA9554, portés à LVGL 9 via esp_lvgl_port.
 ##
 ## Pas de BSP tout-en-un pour cette carte : le bring-up est fait dans
-## main/board_display.c à partir des composants esp_lcd standard et du brochage
+## main/infrastructure/board_display.c à partir des composants esp_lcd standard et du brochage
 ## officiel (cf. CLAUDE.md).
 dependencies:
   idf:

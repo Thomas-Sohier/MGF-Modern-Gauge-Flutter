@@ -3,12 +3,22 @@
 idf_component_register(
     SRCS
         "app_main.c"
-        "board_display.c"
-        "fake_ecu.c"
-        "dash_icons.c"
-        "style_amber.c"
-        "ui_fonts.c"
-    INCLUDE_DIRS "."
+        "app/dashboard_controller.c"
+        "domain/mems_protocol.c"
+        "domain/mems_reader.c"
+        "domain/mems19_reader.c"
+        "domain/mems_session.c"
+        "infrastructure/board_display.c"
+        "infrastructure/fake_ecu.c"
+        "infrastructure/kline_uart_esp32.c"
+        "infrastructure/mems_ecu.c"
+        "ui/icons/dash_icons.c"
+        "ui/screens/style_amber.c"
+        "ui/screens/boot_screen.c"
+        "ui/themes/ui_theme.c"
+        "ui/widgets/amber_value.c"
+        "ui/fonts/ui_fonts.c"
+    INCLUDE_DIRS "." "app" "domain" "infrastructure" "ui" "ui/screens" "ui/widgets" "ui/icons" "ui/fonts" "ui/themes"
     REQUIRES
         driver                        # I²C (legacy) + GPIO
         esp_lcd

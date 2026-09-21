@@ -19,7 +19,7 @@ piloté par des données ECU simulées. Le style de référence est **« amber �
 | Autres | IMU QMI8658, RTC PCF85063, slot TF, USB-C (CH343P), WiFi + BLE5 |
 | Variantes | `-2.1` (dalle plate, SKU 28169) / `-2.1B` (2.5D incurvée, 30697) |
 
-> Le bring-up matériel S3 est fait dans `main/board_display.c` (pas de BSP
+> Le bring-up matériel S3 est fait dans `main/infrastructure/board_display.c` (pas de BSP
 > tout-en-un pour cette carte) à partir des composants esp_lcd standard et du
 > **brochage officiel Waveshare** (repris en tête du fichier). `idf_component.yml`,
 > `sdkconfig.defaults`, `main/CMakeLists.txt` et `app_main.c` ciblent le S3.
@@ -56,7 +56,7 @@ L'ambre est rendu en **480×480 avec masque circulaire** (voir `write_png` dans
 **Cible ESP-IDF** (non buildable dans cet environnement, ESP-IDF absent) :
 
 ```bash
-idf.py set-target esp32s3   # (P4 aujourd'hui — à migrer)
+idf.py set-target esp32s3
 idf.py build
 ```
 
@@ -64,10 +64,14 @@ idf.py build
 
 ```
 main/
-  app_main.c        # init BSP/LVGL + timers (embarque le TTF via EMBED_FILES)
-  gauge_theme.h     # palette + géométrie (thème sombre Flutter)
+  app_main.c        # composition matériel/police/UI + démarrage du contrôleur
+  gauge_theme.h     # palette + géométrie (thème sombre Flutter, legacy)
   ecu_data.h        # struct ecu_data_t (instantané ECU)
-  fake_ecu.c        # source de données simulée
+  domain/ecu_source.h # abstraction de lecture par copie
+  fake_ecu.[ch]     # source de données simulée + adaptateur ECU
+  app/dashboard_controller.[ch] # orchestration source -> écran
+  ui_theme.[ch]     # palette ambre partagée
+  ui/widgets/       # widgets de valeurs/indicateurs ambre
   dual_arc_dial.*   # widget jauge double arc (dessin custom) — style de base
   rpm_screen.*      # écran RPM de base
   style_amber.*     # ★ écran ambre (cible) — cadran rond vectoriel
@@ -81,7 +85,7 @@ test/golden/        # captures de référence (PNG)
 specs/              # image de réf (amber/cream) + fiche matériel
 ```
 
-## Écran ambre — système de conception (`main/style_amber.c`)
+## Écran ambre — système de conception (`main/ui/screens/style_amber.c`)
 
 - **Repère de référence 320 px** : toute la géométrie est en coordonnées 320,
   mises à l'échelle `k = min(w,h)/320` et centrées (`xform_of`, `PX`/`PY`).
@@ -96,8 +100,9 @@ specs/              # image de réf (amber/cream) + fiche matériel
   cellules d'extrémité (eau/OBD) relevées pour suivre la courbe du cadran.
 - **Texte** : police **Michroma** (OFL, esprit Microgramma — substitut libre à la
   police propriétaire). Une seule graisse -> **faux-gras** par calque dupliqué
-  décalé (`make_bold`/`set_bold`, écart `BOLD_XL`/`BOLD_SM` selon la taille).
-- **API** : `amber_screen_create(parent)` / `amber_screen_update(scr, ecu_data_t*)`.
+  décalé (`amber_value_widget`, écart `BOLD_XL`/`BOLD_SM` selon la taille).
+- **API** : `amber_screen_create(parent)` / `amber_screen_update(scr, ecu_data_t*)` /
+  `amber_screen_destroy(scr)`.
 
 ### Gotchas
 

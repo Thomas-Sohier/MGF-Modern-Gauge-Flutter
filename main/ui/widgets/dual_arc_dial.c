@@ -1,5 +1,5 @@
-#include "dual_arc_dial.h"
-#include "gauge_theme.h"
+#include "ui/widgets/dual_arc_dial.h"
+#include "ui/themes/gauge_theme.h"
 
 #include <math.h>
 

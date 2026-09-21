@@ -20,7 +20,9 @@ lv_display_t *board_display_start(void);
 void board_display_backlight_on(void);
 void board_display_backlight_off(void);
 
-// Verrou du thread LVGL : toute manipulation d'objets LVGL doit se faire entre
-// lock() et unlock(). `timeout_ms` = 0 -> attente infinie.
+// Verrou du thread LVGL pour les contextes externes : toute manipulation
+// d'objets LVGL doit se faire entre lock() et unlock(). Depuis un callback LVGL
+// (timer, événement…), le thread détient déjà le verrou : ne pas le reprendre.
+// `timeout_ms` = 0 -> attente infinie.
 bool board_display_lock(uint32_t timeout_ms);
 void board_display_unlock(void);

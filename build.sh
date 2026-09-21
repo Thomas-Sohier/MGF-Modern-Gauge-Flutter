@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Compilation + régénération des goldens en une commande.
 #
-#   ./build.sh          compile l'UI et régénère test/golden/{rpm_screen,rpm_amber,rpm_cream}.png
+#   ./build.sh          compile l'UI et régénère test/golden/{rpm_screen,rpm_amber,rpm_cream,boot_amber}.png
 #   ./build.sh clean    repart de zéro (efface le cache sim/build/)
 #
 # LVGL n'est compilé qu'UNE fois (objets mis en cache dans sim/build/lvgl_obj/) ;
@@ -20,12 +20,14 @@ JOBS="$(nproc 2>/dev/null || echo 4)"
 
 CFLAGS=(-O2 -w -I"$SIM" -I"$MAIN" -I"$LVGL_DIR" -DLV_CONF_INCLUDE_SIMPLE)
 
-# Sources UI (mêmes fichiers que la cible ESP32-P4 ; ne dépendent que de LVGL).
+# Sources UI partagées avec la cible ESP32-S3 ; elles ne dépendent que de LVGL.
 UI_SRCS=(
     "$SIM/main_sim.c"
-    "$MAIN/dual_arc_dial.c" "$MAIN/rpm_screen.c" "$MAIN/fake_ecu.c"
-    "$MAIN/gauge_icons.c" "$MAIN/dash_icons.c"
-    "$MAIN/style_amber.c" "$MAIN/style_cream.c" "$MAIN/ui_fonts.c"
+    "$MAIN/app/dashboard_controller.c"
+    "$MAIN/ui/widgets/dual_arc_dial.c" "$MAIN/ui/screens/rpm_screen.c" "$MAIN/ui/screens/boot_screen.c" "$MAIN/infrastructure/fake_ecu.c"
+    "$MAIN/ui/icons/gauge_icons.c" "$MAIN/ui/icons/dash_icons.c"
+    "$MAIN/ui/screens/style_amber.c" "$MAIN/ui/screens/style_cream.c" "$MAIN/ui/themes/ui_theme.c"
+    "$MAIN/ui/widgets/amber_value.c" "$MAIN/ui/fonts/ui_fonts.c"
 )
 
 if [ "${1:-}" = "clean" ]; then
@@ -80,4 +82,5 @@ echo ">> génération des goldens..."
 "$BUILD/gen_golden" dual  "$GDIR/rpm_screen.png"
 "$BUILD/gen_golden" amber "$GDIR/rpm_amber.png"
 "$BUILD/gen_golden" cream "$GDIR/rpm_cream.png"
+"$BUILD/gen_golden" boot  "$GDIR/boot_amber.png"
 echo ">> OK — goldens régénérés dans test/golden/"

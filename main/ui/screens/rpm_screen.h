@@ -1,7 +1,7 @@
 #pragma once
 
 #include "lvgl.h"
-#include "ecu_data.h"
+#include "domain/ecu_data.h"
 
 // Construit l'écran RPM principal (jauge double arc + valeur centrale +
 // indicateurs de métriques en arc) dans `parent`. Reproduit rpm_screen.dart.

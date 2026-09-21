@@ -1,4 +1,4 @@
-# MGF Gauge LVGL — ESP32-P4
+# MGF Gauge LVGL — ESP32-S3
 
 Portage **de faisabilité** de l'écran RPM principal du projet Flutter
 [`MGF-Modern-Gauge-Flutter`](../MGF-Modern-Gauge-Flutter) vers **LVGL 9 / ESP-IDF**,
@@ -15,14 +15,15 @@ sont simulées.
 
 ## Rendu reproduit
 
-- Demi-cercle supérieur segmenté (**20 segments**, gap 3°) — arc primaire RPM.
-- **Zone de danger** rouge au-delà de 7000 tr/min (segments éteints atténués).
-- Arc **papillon** continu intérieur (angle d'accélérateur).
-- Disque de fond + valeur centrale (grand nombre + « RPM »).
-- **Indicateurs de métriques en arc** en bas : OBD, RPM, LDR, BATT, HUILE,
-  la métrique primaire (RPM) mise en évidence.
+Le style ambre cible le panneau rond :
 
-Palette et géométrie reprises à l'identique du thème sombre Flutter.
+- Demi-cercle supérieur segmenté (**26 barres**, espacées régulièrement) — arc RPM.
+- Palette monochrome ambre, fond brun-noir et séparateurs fins.
+- Disque de fond + valeur centrale (grand nombre + « RPM »).
+- Quatre indicateurs vectoriels en bas : température LDR, batterie, huile et OBD.
+
+Les variantes dual/cream legacy restent disponibles dans le simulateur pour
+conserver les goldens historiques.
 
 ## Correspondance Flutter → LVGL
 
@@ -35,7 +36,7 @@ Palette et géométrie reprises à l'identique du thème sombre Flutter.
 | `MetricPrimaryDisplay` / `MetricIndicator` | labels de `rpm_screen.c` | valeur centrale + indicateurs |
 | `AppColors` / `GaugeTheme` (dark) | macros `MGF_COL_*` de `gauge_theme.h` | palette |
 | `EcuInfos` / `DialData` | `ecu_data_t` (`ecu_data.h`) | instantané ECU |
-| WebSocket `EcuService` | `fake_ecu.c` | source de données (ici simulée) |
+| WebSocket `EcuService` | `fake_ecu.c` (simulée) / `mems_ecu.c` (K-line MEMS réelle, cf. [`docs/kline-mems.md`](docs/kline-mems.md)) | source de données |
 
 ## Matériel cible
 
@@ -44,7 +45,7 @@ Palette et géométrie reprises à l'identique du thème sombre Flutter.
 interface RGB), tactile capacitif **CST820** (I²C), expander **TCA9554**.
 
 Pas de BSP tout-en-un pour cette carte : le bring-up (ST7701 RGB + CST820 +
-TCA9554 + port LVGL) est fait dans `main/board_display.c` à partir des composants
+TCA9554 + port LVGL) est fait dans `main/infrastructure/board_display.c` à partir des composants
 `esp_lcd` standard et du brochage officiel Waveshare.
 
 ## Build & flash
@@ -69,10 +70,14 @@ esp_io_expander_tca9554…) sont téléchargées au premier `build` dans
 
 ```
 main/
-  app_main.c        # init écran/LVGL + timer de rafraîchissement (écran ambre)
+  app_main.c        # composition matériel/police/UI + démarrage du contrôleur
   board_display.c   # bring-up ST7701 RGB + CST820 + TCA9554 + port LVGL (S3)
-  ecu_data.h        # struct ecu_data_t
-  fake_ecu.c        # source de données simulée
+  ui_theme.[ch]     # palette ambre partagée
+  ui/widgets/       # widgets de valeurs/indicateurs ambre
+  ecu_data.h        # modèle ecu_data_t uniquement
+  domain/ecu_source.h # abstraction de lecture par copie
+  fake_ecu.[ch]      # source de données simulée
+  app/dashboard_controller.[ch] # orchestration source -> écran
   style_amber.*     # écran ambre (cible) — cadran rond vectoriel
   dash_icons.*      # icônes vectorielles (eau, batterie, huile, OBD)
   ui_fonts.*        # police Michroma via tiny_ttf
@@ -81,9 +86,10 @@ main/
 
 ## Simulateur hôte & golden
 
-La même UI (`main/dual_arc_dial.c`, `main/rpm_screen.c`, `main/fake_ecu.c` ne
-dépendent que de LVGL) se compile sur PC pour un rendu hors-écran. Utile pour
-itérer sans matériel et produire une capture de référence :
+La même UI ambre (`style_amber.c`, ses widgets et `fake_ecu.c`) se compile sur
+PC pour un rendu hors-écran. Les variantes dual/cream legacy sont générées dans
+la même passe, ce qui permet d'itérer sans matériel et de produire les captures
+de référence :
 
 ```bash
 sim/build_golden.sh          # -> test/golden/{rpm_screen,rpm_amber,rpm_cream}.png
@@ -91,13 +97,27 @@ sim/build_golden.sh          # -> test/golden/{rpm_screen,rpm_amber,rpm_cream}.p
 
 Trois variantes de style sont rendues (sombre de base, ambre, crème — d'après
 `specs/image/`). Voir `sim/` (harnais + `lv_conf.h`) et `test/golden/` (images +
-données mock). Icônes vectorielles : `main/gauge_icons.c` ; styles :
-`main/style_amber.c`, `main/style_cream.c`.
+données mock). Les icônes ambre sont dans `main/ui/icons/dash_icons.c`; les icônes et
+styles legacy sont dans `main/ui/icons/gauge_icons.c`, `main/ui/screens/style_cream.c`.
 
-Le style ambre utilise une police **monospace JetBrains Mono** rendue à la volée
-par tiny_ttf (`main/ui_fonts.c`, TTF dans `main/fonts/`, embarqué côté cible via
+Le style ambre utilise **Michroma** rendue à la volée par tiny_ttf
+(`main/ui/fonts/ui_fonts.c`, TTF dans `main/fonts/`, embarqué côté cible via
 `EMBED_FILES`). Remplacer le `.ttf` suffit pour changer de fonte (ex. une fonte
 plus « rétro »).
+
+## Socle graphique 480×480
+
+- `main/ui/ui_layout.h` : taille cible 480 px, repère logique 320 unités,
+  échelle uniforme et centrage communs aux composants.
+- Le cadran ambre utilise un rayon extérieur de 237 px à la résolution cible :
+  marge nominale de **3 px** sur le disque, sans padding supplémentaire.
+- Chaque écran ambre possède une racine carrée centrée ; cadran, icônes et
+  valeurs utilisent le même repère. La racine et ses composants sont détruits
+  ensemble via `amber_screen_destroy()`.
+- La géométrie s'adapte à la taille disponible **à la création**. Recréer
+  l'écran après un redimensionnement ; les polices restent calibrées pour
+  480 px (pas de redimensionnement typographique automatique).
+- `./test/run_tests.sh` vérifie aussi échelle, marge et centrage, sans LVGL.
 
 ## Statut
 

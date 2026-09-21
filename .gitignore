@@ -8,3 +8,4 @@ dependencies.lock
 # Simulateur hôte (golden)
 sim/build/
 sim/.lvgl/
+test/.build/

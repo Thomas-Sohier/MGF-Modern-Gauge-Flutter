@@ -1,4 +1,4 @@
-#include "ui_fonts.h"
+#include "ui/fonts/ui_fonts.h"
 
 const lv_font_t *ui_font_xl = NULL;
 const lv_font_t *ui_font_l = NULL;

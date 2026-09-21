@@ -1,0 +1,122 @@
+# Interface K-line / Rover MEMS
+
+Lecture des données OBD réelles de la MG F depuis son calculateur **Rover MEMS
+1.6** (ROSCO), en remplacement du simulateur `fake_ecu`. Portage C de la partie
+décodage du projet Go de référence [`andrewdjackson/rosco`](https://github.com/andrewdjackson/rosco)
+(ex-`readmems`), documenté par [MEMS FCR](https://memsfcr.co.uk/rover-service-communications-protocol-rosco/).
+
+## Chaîne de couches
+
+```
+K-line (12 V, 1 fil)
+  └─ transceiver externe (ex. ST L9637D)  ── TX/RX 3.3 V ──┐
+                                                            ▼
+  infrastructure/kline_uart_esp32.c   UART 9600 8N1 + réveil 5 bauds → kline_transport_t
+  domain/ecu_reader.h                 interface (connect / send_and_receive / disconnect)
+  domain/mems_reader.c                impl COMMUNE (handshake + échange à écho)
+  domain/mems19_reader.c              décorateur 1.9 (réveil puis délégation)
+  domain/mems_session.c               poll 0x80/0x7D + décodage  (via ecu_reader_t)
+  domain/mems_protocol.c              trames → ecu_data_t
+  infrastructure/mems_ecu.c           tâche FreeRTOS + snapshot mutex → ecu_source_t
+  app/dashboard_controller.c          lit une copie non bloquante → écran ambre
+```
+
+Deux abstractions clés :
+
+- **`ecu_reader_t`** (`domain/ecu_reader.h`) — interface bas niveau du dialogue
+  ECU, calquée sur `ECUReader` du projet Go. Implémentée une seule fois
+  (`mems_reader`, commune 1.6/1.9) et décorée pour la 1.9 (`mems19_reader`).
+  `mems_session` pilote cette interface sans connaître la variante.
+- **`ecu_source_t`** (`domain/ecu_source.h`) — contrat de lecture par copie du
+  snapshot, identique à celui de `fake_ecu` : la source MEMS est donc
+  **interchangeable** dans `app_main` sans toucher au contrôleur ni à l'UI.
+
+Correspondance avec le projet Go de référence : `ecu_reader_t` ↔ `ECUReader`,
+`mems_reader` ↔ `MEMSReader`, `mems19_reader` ↔ `MEMS19Reader`, `mems_session`
+↔ `ECUReaderInstance`.
+
+## MEMS 1.6 vs 1.9
+
+Les deux calculateurs partagent **le même jeu de commandes et les mêmes trames**
+`0x80`/`0x7D` : d'où une **implémentation commune** (`mems_reader`). Seule
+différence : MEMS 1.9 exige un **réveil « slow init » 5 bauds** sur la K-line
+avant le handshake standard (émission de l'adresse ECU `0x16` bit à bit,
+~200 ms/bit). Ce réveil n'est pas un `if` dans le code commun mais un
+**décorateur** (`mems19_reader`) qui, sur `connect`, déclenche le réveil puis
+délègue tout le reste à l'impl commune.
+
+La variante se choisit via `mems_variant_t` (`infrastructure/mems_ecu.h`) ;
+`mems_ecu_create` construit la chaîne de lecteurs en conséquence :
+
+- `MEMS_VARIANT_1_6` — `mems_reader` seul.
+- `MEMS_VARIANT_1_9` — `mems_reader` enveloppé dans `mems19_reader`.
+
+Le réveil est une primitive **matérielle** : le décorateur l'invoque via
+`transport.wake_up`, et l'UART ESP32 le réalise en pilotant le GPIO TX à la main
+(`kline_uart_esp32.c::kline_wake_up`), puis rend le brochage au pilote UART.
+
+## Protocole (résumé)
+
+- **Liaison** : UART 9600 bps, 8 bits, sans parité, 1 stop, half-duplex. L'ECU
+  ré-émet (« echo ») chaque octet de commande en tête de sa réponse.
+- **Réveil (1.9 uniquement)** : slow init 5 bauds, adresse ECU `0x16`.
+- **Handshake** : `CA` → `75` → `F4` (heartbeat) → `D0` (renvoie l'ID ECU,
+  ex. `D0 99 00 03 03`).
+- **Polling** : commande `0x80` (trame 29 o : RPM, températures, batterie,
+  potentiomètre papillon, codes défaut…) puis `0x7D` (trame 33 o : angle
+  papillon, lambda, boucle de régulation…).
+- **Conversions clés** : RPM = 16 bits big-endian ; température = brut − 55 °C ;
+  batterie = brut ÷ 10 ; potentiomètre papillon = brut × 0,02 V.
+
+Tables complètes des octets : `domain/mems_protocol.c`.
+
+## Câblage (à confirmer sur la carte)
+
+La carte Waveshare **n'a pas** de transceiver K-line. Il faut un module externe
+(L9637D ou équivalent) entre la K-line du connecteur diagnostic et deux GPIO du
+S3. Brochage par défaut dans `app_main.c` :
+
+| Signal | GPIO (défaut) |
+|---|---|
+| UART TX → transceiver | `MGF_KLINE_TX_GPIO` = 17 |
+| UART RX ← transceiver | `MGF_KLINE_RX_GPIO` = 18 |
+| UART | `UART_NUM_1` |
+
+Si le montage boucle le TX sur le RX (fil unique), mettre `local_echo = true`
+dans la config (`kline_uart_config_t`) pour que le transport rejette l'écho
+local ; la couche session ne voit alors que l'écho renvoyé par l'ECU.
+
+## Activation
+
+Source ECU choisie à la compilation par `MGF_USE_MEMS_KLINE` (défaut `0` =
+simulateur) :
+
+```bash
+idf.py build -DMGF_USE_MEMS_KLINE=1   # via CMake cache, ou éditer app_main.c
+```
+
+Variante ECU par `MGF_MEMS_VARIANT` (`MEMS_VARIANT_1_6` par défaut,
+`MEMS_VARIANT_1_9` pour le réveil 5 bauds).
+
+À la connexion, `mems_ecu` lance une tâche FreeRTOS qui :
+1. tente le handshake, retente toutes `reconnect_delay_ms` en cas d'échec ;
+2. une fois connectée, interroge l'ECU toutes `poll_period_ms` (200 ms) ;
+3. publie le dernier instantané derrière un mutex ; `connected` reflète l'état
+   réel (une perte de trame repasse en reconnexion et affiche « -- » sur l'OBD).
+
+## Limites connues
+
+- **Température d'huile** : MEMS 1.6 n'a pas ce capteur → `ecu_data_t.oil_temp`
+  reste à 0. La cellule « huile » de l'écran devra être repensée (autre capteur,
+  ou remplacée par une donnée MEMS réelle : pression collecteur, temp. air…).
+- **% de gaz** : MEMS ne fournit pas de pourcentage ; estimé linéairement depuis
+  la tension du potentiomètre papillon (0,6 V fermé → 4,6 V plein gaz).
+- **Non validé sur matériel** : ESP-IDF absent de l'environnement de build. Le
+  décodage et l'enchaînement réveil/handshake sont en revanche testés sur hôte
+  (`test/test_mems.c`) contre les trames de référence du projet Go.
+- **Slow init 5 bauds (1.9)** : le timing (200 ms/bit) est bit-bangé via le GPIO
+  TX ; à vérifier à l'oscilloscope sur la carte, et selon le transceiver
+  (inversion éventuelle des niveaux). Les octets de synchro renvoyés par l'ECU
+  (`55 76 83`) sont purgés, pas vérifiés — à renforcer si nécessaire.
+- **Init 0x7C** : la variante d'init alternative (`0x7C`/`0xE9`) présente dans le
+  projet Go n'est pas portée (chemin non utilisé par leur `Connect`).

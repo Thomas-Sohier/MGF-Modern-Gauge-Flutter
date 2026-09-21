@@ -1,5 +1,5 @@
-#include "style_cream.h"
-#include "gauge_icons.h"
+#include "ui/screens/style_cream.h"
+#include "ui/icons/gauge_icons.h"
 
 #include <math.h>
 #include <stdio.h>

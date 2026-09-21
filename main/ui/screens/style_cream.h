@@ -1,7 +1,7 @@
 #pragma once
 
 #include "lvgl.h"
-#include "ecu_data.h"
+#include "domain/ecu_data.h"
 
 // Variante visuelle « crème » de l'écran RPM (cf. specs/image, photo 2) :
 // fond crème analogique, texte sombre, arc en graduations avec zone rouge en

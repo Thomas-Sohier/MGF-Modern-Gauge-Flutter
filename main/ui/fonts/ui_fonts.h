@@ -3,7 +3,7 @@
 #include "lvgl.h"
 #include <stddef.h>
 
-// Polices monospace (JetBrains Mono) rendues à la volée via tiny_ttf.
+// Police Michroma rendue à la volée via tiny_ttf.
 // Restent NULL tant que ui_fonts_init() n'a pas reçu les données TTF ; les
 // écrans retombent alors sur Montserrat.
 extern const lv_font_t *ui_font_xl; // grande valeur (RPM)
