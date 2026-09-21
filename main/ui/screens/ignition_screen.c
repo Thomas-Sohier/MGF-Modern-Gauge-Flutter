@@ -24,16 +24,17 @@
 #define ADVANCE_RADIUS    140.0f
 #define ADVANCE_TICKS     25
 
-#define GRID_Y             226.0f
+#define GRID_Y             224.0f
 #define LINE_W             0.8f
 #define TICK_W             1.2f
 #define BOLD_SPREAD_PX     1
 
-// Positions des quatre indicateurs secondaires : le cadran garde une vraie
-// respiration centrale et les deux rangées restent dans le disque intérieur.
-static const float k_metric_x[4] = {82.0f, 238.0f, 82.0f, 238.0f};
-static const float k_metric_value_y[4] = {240.0f, 240.0f, 278.0f, 278.0f};
-static const float k_metric_name_y[4] = {253.0f, 253.0f, 294.0f, 294.0f};
+// Zone sûre du disque : les deux colonnes restent dans le cercle intérieur,
+// même à la ligne basse. Les libellés courts laissent une vraie gouttière au
+// séparateur central ; aucune largeur de valeur ne peut donc créer de collision.
+static const float k_metric_x[4] = {100.0f, 220.0f, 110.0f, 210.0f};
+static const float k_metric_value_y[4] = {237.0f, 237.0f, 264.0f, 264.0f};
+static const float k_metric_name_y[4] = {251.0f, 251.0f, 277.0f, 277.0f};
 
 struct ignition_screen_s {
     lv_obj_t *root;
@@ -203,14 +204,12 @@ static void draw_panel_lines(lv_layer_t *layer, const ui_layout_t *layout) {
 
     // Séparateurs ouverts : aucun trait ne vient fermer artificiellement le
     // cercle ni couper les valeurs centrales.
-    draw_line(layer, layout, 37.0f, GRID_Y, 125.0f, GRID_Y, LINE_W,
+    draw_line(layer, layout, 44.0f, GRID_Y, 127.0f, GRID_Y, LINE_W,
               separator, false);
-    draw_line(layer, layout, 195.0f, GRID_Y, 283.0f, GRID_Y, LINE_W,
+    draw_line(layer, layout, 193.0f, GRID_Y, 276.0f, GRID_Y, LINE_W,
               separator, false);
-    draw_line(layer, layout, SCREEN_CX, 233.0f, SCREEN_CX, 267.0f, LINE_W,
-              separator, false);
-    draw_line(layer, layout, SCREEN_CX, 285.0f, SCREEN_CX, 306.0f, LINE_W,
-              separator, false);
+    // Aucun trait vertical dans la zone des métriques : la gouttière centrale
+    // reste vide, y compris lorsque les valeurs affichent leurs unités.
 
     // Petits repères latéraux, inspirés des cellules relevées du cadran RPM.
     draw_line(layer, layout, 47.0f, GRID_Y + 5.0f, 47.0f, GRID_Y + 12.0f,
@@ -266,6 +265,11 @@ static void update_label(lv_obj_t *label, char *buffer, size_t buffer_size,
                          const char *format, float value) {
     if (label == NULL || buffer == NULL || buffer_size == 0) return;
     snprintf(buffer, buffer_size, format, value);
+    // Les libellés sont français : la virgule décimale reste déterministe,
+    // sans dépendre de la locale globale de l'ESP-IDF.
+    for (char *cursor = buffer; *cursor != '\0'; cursor++) {
+        if (*cursor == '.') *cursor = ',';
+    }
     lv_label_set_text_static(label, buffer);
 }
 
@@ -330,7 +334,7 @@ ignition_screen_t *ignition_screen_create(lv_obj_t *parent) {
                                    screen->advance_text);
     screen->advance_caption = label_create(screen->root, font_caption,
                                            ui_theme_amber_dim(),
-                                           "AVANCE ALLUMAGE");
+                                           "AVANCE D'ALLUMAGE");
     screen->metric_value[0] = label_create(screen->root, font_value,
                                            ui_theme_amber_bright(),
                                            screen->offset_text);
@@ -344,13 +348,13 @@ ignition_screen_t *ignition_screen_create(lv_obj_t *parent) {
                                            ui_theme_amber_bright(),
                                            screen->coil_total_text);
     screen->metric_name[0] = label_create(screen->root, font_caption,
-                                          ui_theme_amber_dim(), "OFFSET");
+                                          ui_theme_amber_dim(), "CORRECTION");
     screen->metric_name[1] = label_create(screen->root, font_caption,
                                           ui_theme_amber_dim(), "BOBINE 1");
     screen->metric_name[2] = label_create(screen->root, font_caption,
                                           ui_theme_amber_dim(), "BOBINE 2");
     screen->metric_name[3] = label_create(screen->root, font_caption,
-                                          ui_theme_amber_dim(), "DUREE");
+                                          ui_theme_amber_dim(), "DURÉE");
 
     if (screen->advance_shadow == NULL || screen->advance == NULL ||
         screen->advance_caption == NULL || screen->metric_value[0] == NULL ||
@@ -398,8 +402,8 @@ void ignition_screen_update(ignition_screen_t *screen, const ecu_data_t *data) {
                  sizeof(screen->coil_2_text), "%.2f ms",
                  data->coil_2_charge_time);
     update_label(screen->metric_value[3], screen->coil_total_text,
-                 sizeof(screen->coil_total_text), "%.0fµs",
-                 data->coil_time_microseconds);
+                 sizeof(screen->coil_total_text), "%.2f ms",
+                 data->coil_time_microseconds / 1000.0f);
 
     // Les largeurs changent avec les chiffres : le repositionnement est purement
     // géométrique et n'alloue rien, tandis que le canvas redessine l'arc.
