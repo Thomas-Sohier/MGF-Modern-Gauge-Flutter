@@ -3,6 +3,7 @@
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/widgets/amber_draw.h"
+#include "ui/widgets/amber_ui.h"
 
 #include <math.h>
 
@@ -143,31 +144,6 @@ static void canvas_draw_cb(lv_event_t *event) {
     draw_connector(layer, &layout, scr->connected);
 }
 
-static void place_center(lv_obj_t *obj, lv_obj_t *parent, float x, float y) {
-    lv_obj_update_layout(obj);
-    const lv_area_t area = {
-        0, 0, lv_obj_get_width(parent) - 1, lv_obj_get_height(parent) - 1
-    };
-    const ui_layout_t layout = amber_draw_layout(&area);
-    const int32_t w = lv_obj_get_width(obj);
-    const int32_t h = lv_obj_get_height(obj);
-    lv_obj_set_pos(obj,
-                   lroundf(ui_layout_x(&layout, x)) - w / 2,
-                   lroundf(ui_layout_y(&layout, y)) - h / 2);
-}
-
-static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font,
-                            const char *text, lv_color_t color) {
-    lv_obj_t *label = lv_label_create(parent);
-    if (label == NULL) return NULL;
-    lv_obj_set_style_text_font(label, font, 0);
-    lv_obj_set_style_text_color(label, color, 0);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-    // Les textes sont constants : aucune mise à jour ne recopie de chaîne.
-    lv_label_set_text(label, text);
-    return label;
-}
-
 static void set_state_visibility(faults_screen_t *scr, bool connected) {
     if (connected) {
         lv_obj_clear_flag(scr->connected_head, LV_OBJ_FLAG_HIDDEN);
@@ -197,56 +173,56 @@ faults_screen_t *faults_screen_create(lv_obj_t *parent) {
     lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
     lv_obj_update_layout(parent);
 
-    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
-                                lv_obj_get_content_height(parent));
-    if (side <= 0) goto fail;
-
-    scr->root = lv_obj_create(parent);
+    scr->root = amber_ui_root_create(parent);
     if (scr->root == NULL) goto fail;
-    lv_obj_remove_style_all(scr->root);
-    lv_obj_set_size(scr->root, side, side);
-    lv_obj_center(scr->root);
-    lv_obj_clear_flag(scr->root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_update_layout(scr->root);
-
-    scr->canvas = lv_obj_create(scr->root);
+    lv_obj_set_style_radius(scr->root, 0, 0);
+    lv_obj_set_style_clip_corner(scr->root, false, 0);
+    scr->canvas = amber_ui_canvas_create(scr->root, scr, canvas_draw_cb);
     if (scr->canvas == NULL) goto fail;
-    lv_obj_remove_style_all(scr->canvas);
-    lv_obj_set_size(scr->canvas, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(scr->canvas, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_user_data(scr->canvas, scr);
-    lv_obj_add_event_cb(scr->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
     const lv_font_t *title_font = ui_font_or(ui_font_l, &lv_font_montserrat_20);
     const lv_font_t *body_font = ui_font_or(ui_font_m, &lv_font_montserrat_20);
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
 
-    scr->title = make_label(scr->root, title_font, "CODES ERREURS", bright);
-    scr->subtitle = make_label(scr->root, body_font, "DIAGNOSTIC ECU", dim);
-    scr->connected_head = make_label(scr->root, body_font, "LIAISON ACTIVE", bright);
-    scr->connected_body = make_label(scr->root, body_font, "DIAGNOSTIC PRET", bright);
-    scr->connected_foot = make_label(scr->root, body_font,
-                                     "CODES NON LUS", dim);
-    scr->offline_head = make_label(scr->root, body_font, "LIAISON ABSENTE", dim);
-    scr->offline_body = make_label(scr->root, body_font,
-                                   "ECU NON CONNECTE", dim);
-    scr->offline_foot = make_label(scr->root, body_font,
-                                   "RECONNECTER L ECU", bright);
+    scr->title = amber_ui_label_create(scr->root, title_font, bright,
+                                        "CODES ERREURS", 0.0f);
+    scr->subtitle = amber_ui_label_create(scr->root, body_font, dim,
+                                          "DIAGNOSTIC ECU", 0.0f);
+    scr->connected_head = amber_ui_label_create(
+        scr->root, body_font, bright, "LIAISON ACTIVE", 0.0f);
+    scr->connected_body = amber_ui_label_create(
+        scr->root, body_font, bright, "DIAGNOSTIC PRET", 0.0f);
+    scr->connected_foot = amber_ui_label_create(
+        scr->root, body_font, dim, "CODES NON LUS", 0.0f);
+    scr->offline_head = amber_ui_label_create(
+        scr->root, body_font, dim, "LIAISON ABSENTE", 0.0f);
+    scr->offline_body = amber_ui_label_create(
+        scr->root, body_font, dim, "ECU NON CONNECTE", 0.0f);
+    scr->offline_foot = amber_ui_label_create(
+        scr->root, body_font, bright, "RECONNECTER L ECU", 0.0f);
 
     if (scr->title == NULL || scr->subtitle == NULL ||
         scr->connected_head == NULL || scr->connected_body == NULL ||
         scr->connected_foot == NULL || scr->offline_head == NULL ||
         scr->offline_body == NULL || scr->offline_foot == NULL) goto fail;
 
-    place_center(scr->title, scr->root, SCREEN_CX, 35.0f);
-    place_center(scr->subtitle, scr->root, SCREEN_CX, 59.0f);
-    place_center(scr->connected_head, scr->root, SCREEN_CX, 176.0f);
-    place_center(scr->connected_body, scr->root, SCREEN_CX, 201.0f);
-    place_center(scr->connected_foot, scr->root, SCREEN_CX, 264.0f);
-    place_center(scr->offline_head, scr->root, SCREEN_CX, 176.0f);
-    place_center(scr->offline_body, scr->root, SCREEN_CX, 201.0f);
-    place_center(scr->offline_foot, scr->root, SCREEN_CX, 264.0f);
+    amber_ui_place_centered(scr->title, scr->root, SCREEN_CX, 35.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(scr->subtitle, scr->root, SCREEN_CX, 59.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(scr->connected_head, scr->root, SCREEN_CX, 176.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(scr->connected_body, scr->root, SCREEN_CX, 201.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(scr->connected_foot, scr->root, SCREEN_CX, 264.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(scr->offline_head, scr->root, SCREEN_CX, 176.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(scr->offline_body, scr->root, SCREEN_CX, 201.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(scr->offline_foot, scr->root, SCREEN_CX, 264.0f,
+                            0.0f, 0.0f);
 
     scr->connected = false;
     set_state_visibility(scr, false);

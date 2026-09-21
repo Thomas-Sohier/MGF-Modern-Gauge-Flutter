@@ -3,6 +3,7 @@
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/widgets/amber_draw.h"
+#include "ui/widgets/amber_ui.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -144,41 +145,6 @@ static void canvas_draw_cb(lv_event_t *event) {
                     ui_theme_amber_separator(), false);
 }
 
-static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font,
-                            lv_color_t color, const char *text,
-                            int32_t width) {
-    lv_obj_t *label = lv_label_create(parent);
-    if (label == NULL) return NULL;
-
-    lv_obj_set_style_text_font(label, font, 0);
-    lv_obj_set_style_text_color(label, color, 0);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_width(label, width);
-    lv_label_set_text_static(label, text != NULL ? text : "");
-    return label;
-}
-
-static void place_label(lv_obj_t *label, lv_obj_t *parent, float x, float y,
-                        int32_t width, int spread) {
-    const lv_area_t area = {
-        0, 0, lv_obj_get_width(parent) - 1, lv_obj_get_height(parent) - 1
-    };
-    const ui_layout_t layout = amber_draw_layout(&area);
-    lv_obj_set_width(label, lroundf(width * layout.scale));
-    lv_obj_update_layout(label);
-    lv_obj_set_pos(label,
-                   lroundf(ui_layout_x(&layout, x)) - lv_obj_get_width(label) / 2
-                       + lroundf(spread * layout.scale * UI_REFERENCE_SIZE /
-                                 UI_DISPLAY_SIZE_PX),
-                   lroundf(ui_layout_y(&layout, y)) - lv_obj_get_height(label) / 2);
-}
-
-static void place_pair(lv_obj_t *front, lv_obj_t *shadow, lv_obj_t *parent,
-                       float x, float y, int32_t width, int spread) {
-    place_label(shadow, parent, x, y, width, spread);
-    place_label(front, parent, x, y, width, -spread);
-}
-
 static void set_pair_text(injection_screen_t *scr, int index, const char *text) {
     lv_label_set_text_static(scr->metric_front[index], text);
     lv_label_set_text_static(scr->metric_shadow[index], text);
@@ -218,29 +184,10 @@ injection_screen_t *injection_screen_create(lv_obj_t *parent) {
     lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
     lv_obj_update_layout(parent);
 
-    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
-                                lv_obj_get_content_height(parent));
-    if (side <= 0) goto fail;
-
-    scr->root = lv_obj_create(parent);
+    scr->root = amber_ui_root_create(parent);
     if (scr->root == NULL) goto fail;
-    lv_obj_remove_style_all(scr->root);
-    lv_obj_set_size(scr->root, side, side);
-    lv_obj_center(scr->root);
-    lv_obj_set_style_bg_color(scr->root, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(scr->root, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(scr->root, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_clip_corner(scr->root, true, 0);
-    lv_obj_clear_flag(scr->root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_update_layout(scr->root);
-
-    scr->canvas = lv_obj_create(scr->root);
+    scr->canvas = amber_ui_canvas_create(scr->root, scr, canvas_draw_cb);
     if (scr->canvas == NULL) goto fail;
-    lv_obj_remove_style_all(scr->canvas);
-    lv_obj_set_size(scr->canvas, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(scr->canvas, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_user_data(scr->canvas, scr);
-    lv_obj_add_event_cb(scr->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
     const lv_font_t *font_xl = ui_font_or(ui_font_xl, &lv_font_montserrat_48);
     const lv_font_t *font_l = ui_font_or(ui_font_l, &lv_font_montserrat_20);
@@ -248,28 +195,31 @@ injection_screen_t *injection_screen_create(lv_obj_t *parent) {
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
 
-    lv_obj_t *header = make_label(scr->root, font_l, bright, "INJECTION", 180);
-    lv_obj_t *subheader = make_label(scr->root, font_m, dim,
-                                     "GESTION\nCARBURANT", 300);
-    lv_obj_t *hero_label = make_label(scr->root, font_m, bright,
-                                      "CORRECTION", 180);
-    lv_obj_t *trim_short_label = make_label(scr->root, font_m, dim,
-                                            "COURT\nTERME", 130);
-    lv_obj_t *trim_long_label = make_label(scr->root, font_m, dim,
-                                           "LONG\nTERME", 130);
-    lv_obj_t *inj_one_label = make_label(scr->root, font_m, dim,
-                                         "INJECT. 1", 130);
-    lv_obj_t *inj_two_label = make_label(scr->root, font_m, dim,
-                                         "INJECT. 2", 130);
+    lv_obj_t *header = amber_ui_label_create(scr->root, font_l, bright,
+                                              "INJECTION", 180.0f);
+    lv_obj_t *subheader = amber_ui_label_create(scr->root, font_m, dim,
+                                                "GESTION\nCARBURANT", 220.0f);
+    lv_obj_t *hero_label = amber_ui_label_create(scr->root, font_m, bright,
+                                                 "CORRECTION", 150.0f);
+    lv_obj_t *trim_short_label = amber_ui_label_create(
+        scr->root, font_m, dim, "COURT\nTERME", 130.0f);
+    lv_obj_t *trim_long_label = amber_ui_label_create(
+        scr->root, font_m, dim, "LONG\nTERME", 130.0f);
+    lv_obj_t *inj_one_label = amber_ui_label_create(
+        scr->root, font_m, dim, "INJECT. 1", 130.0f);
+    lv_obj_t *inj_two_label = amber_ui_label_create(
+        scr->root, font_m, dim, "INJECT. 2", 130.0f);
 
     set_unavailable_text(scr);
-    scr->hero_front = make_label(scr->root, font_xl, bright, scr->hero_text, 190);
-    scr->hero_shadow = make_label(scr->root, font_xl, bright, scr->hero_text, 190);
+    scr->hero_front = amber_ui_label_create(scr->root, font_xl, bright,
+                                             scr->hero_text, 190.0f);
+    scr->hero_shadow = amber_ui_label_create(scr->root, font_xl, bright,
+                                              scr->hero_text, 190.0f);
     for (int i = 0; i < METRIC_COUNT; i++) {
-        scr->metric_front[i] = make_label(scr->root, font_l, bright,
-                                          scr->metric_text[i], 116);
-        scr->metric_shadow[i] = make_label(scr->root, font_l, bright,
-                                           scr->metric_text[i], 116);
+        scr->metric_front[i] = amber_ui_label_create(
+            scr->root, font_l, bright, scr->metric_text[i], 108.0f);
+        scr->metric_shadow[i] = amber_ui_label_create(
+            scr->root, font_l, bright, scr->metric_text[i], 108.0f);
     }
 
     if (header == NULL || subheader == NULL || hero_label == NULL ||
@@ -280,29 +230,52 @@ injection_screen_t *injection_screen_create(lv_obj_t *parent) {
         if (scr->metric_front[i] == NULL || scr->metric_shadow[i] == NULL) goto fail;
     }
 
-    place_label(header, scr->root, SCREEN_CX, HEADER_Y, 180, 0);
-    place_label(subheader, scr->root, SCREEN_CX, SUBHEADER_Y, 220, 0);
-    place_pair(scr->hero_front, scr->hero_shadow, scr->root,
-               SCREEN_CX, HERO_Y, 190, 2);
-    place_label(hero_label, scr->root, SCREEN_CX, HERO_LABEL_Y, 150, 0);
+    amber_ui_place_centered(header, scr->root, SCREEN_CX, HEADER_Y,
+                            180.0f, 0.0f);
+    amber_ui_place_centered(subheader, scr->root, SCREEN_CX, SUBHEADER_Y,
+                            220.0f, 0.0f);
+    amber_ui_place_centered(scr->hero_shadow, scr->root, SCREEN_CX, HERO_Y,
+                            190.0f, 2.0f * UI_REFERENCE_SIZE /
+                                     UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(scr->hero_front, scr->root, SCREEN_CX, HERO_Y,
+                            190.0f, -2.0f * UI_REFERENCE_SIZE /
+                                     UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(hero_label, scr->root, SCREEN_CX, HERO_LABEL_Y,
+                            150.0f, 0.0f);
 
-    place_label(trim_short_label, scr->root, 96.0f, TRIM_LABEL_Y, 130, 0);
-    place_label(trim_long_label, scr->root, 224.0f, TRIM_LABEL_Y, 130, 0);
-    place_pair(scr->metric_front[METRIC_SHORT_TRIM],
-               scr->metric_shadow[METRIC_SHORT_TRIM], scr->root,
-               96.0f, TRIM_VALUE_Y, 108, 1);
-    place_pair(scr->metric_front[METRIC_LONG_TRIM],
-               scr->metric_shadow[METRIC_LONG_TRIM], scr->root,
-               224.0f, TRIM_VALUE_Y, 108, 1);
+    amber_ui_place_centered(trim_short_label, scr->root, 96.0f, TRIM_LABEL_Y,
+                            130.0f, 0.0f);
+    amber_ui_place_centered(trim_long_label, scr->root, 224.0f, TRIM_LABEL_Y,
+                            130.0f, 0.0f);
+    amber_ui_place_centered(scr->metric_shadow[METRIC_SHORT_TRIM], scr->root,
+                            96.0f, TRIM_VALUE_Y, 108.0f,
+                            UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(scr->metric_front[METRIC_SHORT_TRIM], scr->root,
+                            96.0f, TRIM_VALUE_Y, 108.0f,
+                            -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(scr->metric_shadow[METRIC_LONG_TRIM], scr->root,
+                            224.0f, TRIM_VALUE_Y, 108.0f,
+                            UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(scr->metric_front[METRIC_LONG_TRIM], scr->root,
+                            224.0f, TRIM_VALUE_Y, 108.0f,
+                            -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
 
-    place_label(inj_one_label, scr->root, 96.0f, INJ_LABEL_Y, 130, 0);
-    place_label(inj_two_label, scr->root, 224.0f, INJ_LABEL_Y, 130, 0);
-    place_pair(scr->metric_front[METRIC_INJECTOR_1],
-               scr->metric_shadow[METRIC_INJECTOR_1], scr->root,
-               96.0f, INJ_VALUE_Y, 108, 1);
-    place_pair(scr->metric_front[METRIC_INJECTOR_2],
-               scr->metric_shadow[METRIC_INJECTOR_2], scr->root,
-               224.0f, INJ_VALUE_Y, 108, 1);
+    amber_ui_place_centered(inj_one_label, scr->root, 96.0f, INJ_LABEL_Y,
+                            130.0f, 0.0f);
+    amber_ui_place_centered(inj_two_label, scr->root, 224.0f, INJ_LABEL_Y,
+                            130.0f, 0.0f);
+    amber_ui_place_centered(scr->metric_shadow[METRIC_INJECTOR_1], scr->root,
+                            96.0f, INJ_VALUE_Y, 108.0f,
+                            UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(scr->metric_front[METRIC_INJECTOR_1], scr->root,
+                            96.0f, INJ_VALUE_Y, 108.0f,
+                            -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(scr->metric_shadow[METRIC_INJECTOR_2], scr->root,
+                            224.0f, INJ_VALUE_Y, 108.0f,
+                            UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(scr->metric_front[METRIC_INJECTOR_2], scr->root,
+                            224.0f, INJ_VALUE_Y, 108.0f,
+                            -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
 
     return scr;
 

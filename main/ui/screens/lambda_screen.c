@@ -3,6 +3,7 @@
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/widgets/amber_draw.h"
+#include "ui/widgets/amber_ui.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -41,9 +42,6 @@
 typedef struct {
     lv_obj_t *shadow;
     lv_obj_t *front;
-    float x;
-    float y;
-    int spread;
 } amber_text_t;
 
 struct lambda_screen_s {
@@ -202,78 +200,6 @@ static void text_style(amber_text_t *text, lv_color_t front,
     lv_obj_set_style_text_color(text->shadow, shadow, 0);
 }
 
-static void text_place(amber_text_t *text, lv_obj_t *parent) {
-    const lv_area_t area = {
-        0, 0, lv_obj_get_width(parent) - 1, lv_obj_get_height(parent) - 1
-    };
-    const ui_layout_t layout = amber_draw_layout(&area);
-    const int32_t dx = lroundf(text->spread * layout.scale * UI_REFERENCE_SIZE /
-                               UI_DISPLAY_SIZE_PX);
-
-    lv_obj_update_layout(text->shadow);
-    lv_obj_update_layout(text->front);
-    const int32_t w_shadow = lv_obj_get_width(text->shadow);
-    const int32_t h_shadow = lv_obj_get_height(text->shadow);
-    const int32_t w_front = lv_obj_get_width(text->front);
-    const int32_t h_front = lv_obj_get_height(text->front);
-
-    lv_obj_set_pos(text->shadow,
-                   lroundf(ui_layout_x(&layout, text->x)) - w_shadow / 2 + dx,
-                   lroundf(ui_layout_y(&layout, text->y)) - h_shadow / 2);
-    lv_obj_set_pos(text->front,
-                   lroundf(ui_layout_x(&layout, text->x)) - w_front / 2 - dx,
-                   lroundf(ui_layout_y(&layout, text->y)) - h_front / 2);
-}
-
-static amber_text_t text_create(lv_obj_t *parent, const lv_font_t *font,
-                                float x, float y, int spread,
-                                const char *initial, lv_color_t front,
-                                lv_color_t shadow) {
-    amber_text_t text = {0};
-    text.x = x;
-    text.y = y;
-    text.spread = spread;
-
-    text.shadow = lv_label_create(parent);
-    if (text.shadow == NULL) return text;
-    text.front = lv_label_create(parent);
-    if (text.front == NULL) {
-        lv_obj_delete(text.shadow);
-        text.shadow = NULL;
-        return text;
-    }
-
-    lv_obj_set_style_text_font(text.shadow, font, 0);
-    lv_obj_set_style_text_align(text.shadow, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_pad_all(text.shadow, 0, 0);
-    lv_label_set_text_static(text.shadow, initial);
-
-    lv_obj_set_style_text_font(text.front, font, 0);
-    lv_obj_set_style_text_align(text.front, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_pad_all(text.front, 0, 0);
-    lv_label_set_text_static(text.front, initial);
-    text_style(&text, front, shadow);
-    text_place(&text, parent);
-    return text;
-}
-
-static bool text_valid(const amber_text_t *text) {
-    return text->shadow != NULL && text->front != NULL;
-}
-
-static void text_set(amber_text_t *text, lv_obj_t *parent, const char *value) {
-    if (!text_valid(text)) return;
-    lv_label_set_text_static(text->shadow, value);
-    lv_label_set_text_static(text->front, value);
-    text_place(text, parent);
-}
-
-static void text_destroy(amber_text_t *text) {
-    // Les labels sont enfants de root ; root est supprimé en une seule fois.
-    text->shadow = NULL;
-    text->front = NULL;
-}
-
 lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
     if (parent == NULL) return NULL;
 
@@ -285,26 +211,13 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
     lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
     lv_obj_update_layout(parent);
 
-    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
-                                lv_obj_get_content_height(parent));
-    if (side <= 0) goto fail;
-
-    screen->root = lv_obj_create(parent);
+    screen->root = amber_ui_root_create(parent);
     if (screen->root == NULL) goto fail;
-    lv_obj_remove_style_all(screen->root);
-    lv_obj_set_size(screen->root, side, side);
-    lv_obj_center(screen->root);
-    lv_obj_clear_flag(screen->root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_update_layout(screen->root);
-
-    screen->canvas = lv_obj_create(screen->root);
+    lv_obj_set_style_radius(screen->root, 0, 0);
+    lv_obj_set_style_clip_corner(screen->root, false, 0);
+    screen->canvas = amber_ui_canvas_create(screen->root, screen,
+                                            canvas_draw_cb);
     if (screen->canvas == NULL) goto fail;
-    lv_obj_remove_style_all(screen->canvas);
-    lv_obj_set_size(screen->canvas, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(screen->canvas, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_user_data(screen->canvas, screen);
-    lv_obj_add_event_cb(screen->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN,
-                        NULL);
 
     const lv_font_t *title_font = ui_font_or(ui_font_m, &lv_font_montserrat_20);
     const lv_font_t *body_font = ui_font_or(ui_font_l, &lv_font_montserrat_20);
@@ -314,47 +227,148 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
     const lv_color_t dim = ui_theme_amber_dim();
     const lv_color_t separator = ui_theme_amber_separator();
 
-    screen->title = text_create(screen->root, title_font, CX, 30.0f, 1,
-                                 "WIDEBAND / AFR", bright, separator);
-    screen->subtitle = text_create(screen->root, caption_font, CX, 48.0f, 0,
-                                   "SENSOR ARRAY", dim, dim);
-    screen->signal = text_create(screen->root, caption_font, CX, 65.0f, 0,
-                                 "SIGNAL LIVE", bright, separator);
+    screen->title.shadow = amber_ui_label_create(
+        screen->root, title_font, separator, "WIDEBAND / AFR", 0.0f);
+    screen->title.front = amber_ui_label_create(
+        screen->root, title_font, bright, "WIDEBAND / AFR", 0.0f);
+    amber_ui_place_centered(screen->title.shadow, screen->root, CX, 30.0f,
+                            0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->title.front, screen->root, CX, 30.0f,
+                            0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
 
-    screen->afr = text_create(screen->root, hero_font, CX, 141.0f, 2, "0.00",
-                              bright, dim);
-    screen->afr_unit = text_create(screen->root, body_font, CX, 177.0f, 1,
-                                   "AIR / FUEL", bright, separator);
+    screen->subtitle.shadow = amber_ui_label_create(
+        screen->root, caption_font, dim, "SENSOR ARRAY", 0.0f);
+    screen->subtitle.front = amber_ui_label_create(
+        screen->root, caption_font, dim, "SENSOR ARRAY", 0.0f);
+    amber_ui_place_centered(screen->subtitle.shadow, screen->root, CX, 48.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(screen->subtitle.front, screen->root, CX, 48.0f,
+                            0.0f, 0.0f);
 
-    screen->lambda_value = text_create(screen->root, body_font, 67.0f, 95.0f,
-                                       1, "0", bright, separator);
-    screen->lambda_unit = text_create(screen->root, caption_font, 67.0f, 111.0f,
-                                      0, "mV", dim, dim);
-    screen->lambda_label = text_create(screen->root, caption_font, 67.0f, 130.0f,
-                                       0, "LAMBDA", dim, dim);
+    screen->signal.shadow = amber_ui_label_create(
+        screen->root, caption_font, separator, "SIGNAL LIVE", 0.0f);
+    screen->signal.front = amber_ui_label_create(
+        screen->root, caption_font, bright, "SIGNAL LIVE", 0.0f);
+    amber_ui_place_centered(screen->signal.shadow, screen->root, CX, 65.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(screen->signal.front, screen->root, CX, 65.0f,
+                            0.0f, 0.0f);
 
-    screen->o2_value = text_create(screen->root, body_font, 253.0f, 95.0f,
-                                   1, "0", bright, separator);
-    screen->o2_unit = text_create(screen->root, caption_font, 253.0f, 111.0f,
-                                  0, "mV", dim, dim);
-    screen->o2_label = text_create(screen->root, caption_font, 253.0f, 130.0f,
-                                   0, "O2 SENSOR", dim, dim);
+    screen->afr.shadow = amber_ui_label_create(
+        screen->root, hero_font, dim, "0.00", 0.0f);
+    screen->afr.front = amber_ui_label_create(
+        screen->root, hero_font, bright, "0.00", 0.0f);
+    amber_ui_place_centered(screen->afr.shadow, screen->root, CX, 141.0f,
+                            0.0f, 2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->afr.front, screen->root, CX, 141.0f,
+                            0.0f, -2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
 
-    screen->duty_value = text_create(screen->root, body_font, CX, 230.0f, 1,
-                                     "0", bright, separator);
-    screen->duty_unit = text_create(screen->root, caption_font, CX, 247.0f, 0,
-                                    "%", dim, dim);
-    screen->duty_label = text_create(screen->root, caption_font, CX, 266.0f, 0,
-                                     "HEATER DUTY", dim, dim);
+    screen->afr_unit.shadow = amber_ui_label_create(
+        screen->root, body_font, separator, "AIR / FUEL", 0.0f);
+    screen->afr_unit.front = amber_ui_label_create(
+        screen->root, body_font, bright, "AIR / FUEL", 0.0f);
+    amber_ui_place_centered(screen->afr_unit.shadow, screen->root, CX, 177.0f,
+                            0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->afr_unit.front, screen->root, CX, 177.0f,
+                            0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
 
-    if (!text_valid(&screen->title) || !text_valid(&screen->subtitle) ||
-        !text_valid(&screen->signal) || !text_valid(&screen->afr) ||
-        !text_valid(&screen->afr_unit) || !text_valid(&screen->lambda_value) ||
-        !text_valid(&screen->lambda_unit) ||
-        !text_valid(&screen->lambda_label) || !text_valid(&screen->o2_value) ||
-        !text_valid(&screen->o2_unit) || !text_valid(&screen->o2_label) ||
-        !text_valid(&screen->duty_value) || !text_valid(&screen->duty_unit) ||
-        !text_valid(&screen->duty_label)) {
+    screen->lambda_value.shadow = amber_ui_label_create(
+        screen->root, body_font, separator, "0", 0.0f);
+    screen->lambda_value.front = amber_ui_label_create(
+        screen->root, body_font, bright, "0", 0.0f);
+    amber_ui_place_centered(screen->lambda_value.shadow, screen->root, 67.0f,
+                            95.0f, 0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->lambda_value.front, screen->root, 67.0f,
+                            95.0f, 0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+
+    screen->lambda_unit.shadow = amber_ui_label_create(
+        screen->root, caption_font, dim, "mV", 0.0f);
+    screen->lambda_unit.front = amber_ui_label_create(
+        screen->root, caption_font, dim, "mV", 0.0f);
+    amber_ui_place_centered(screen->lambda_unit.shadow, screen->root, 67.0f,
+                            111.0f, 0.0f, 0.0f);
+    amber_ui_place_centered(screen->lambda_unit.front, screen->root, 67.0f,
+                            111.0f, 0.0f, 0.0f);
+
+    screen->lambda_label.shadow = amber_ui_label_create(
+        screen->root, caption_font, dim, "LAMBDA", 0.0f);
+    screen->lambda_label.front = amber_ui_label_create(
+        screen->root, caption_font, dim, "LAMBDA", 0.0f);
+    amber_ui_place_centered(screen->lambda_label.shadow, screen->root, 67.0f,
+                            130.0f, 0.0f, 0.0f);
+    amber_ui_place_centered(screen->lambda_label.front, screen->root, 67.0f,
+                            130.0f, 0.0f, 0.0f);
+
+    screen->o2_value.shadow = amber_ui_label_create(
+        screen->root, body_font, separator, "0", 0.0f);
+    screen->o2_value.front = amber_ui_label_create(
+        screen->root, body_font, bright, "0", 0.0f);
+    amber_ui_place_centered(screen->o2_value.shadow, screen->root, 253.0f,
+                            95.0f, 0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->o2_value.front, screen->root, 253.0f,
+                            95.0f, 0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+
+    screen->o2_unit.shadow = amber_ui_label_create(
+        screen->root, caption_font, dim, "mV", 0.0f);
+    screen->o2_unit.front = amber_ui_label_create(
+        screen->root, caption_font, dim, "mV", 0.0f);
+    amber_ui_place_centered(screen->o2_unit.shadow, screen->root, 253.0f,
+                            111.0f, 0.0f, 0.0f);
+    amber_ui_place_centered(screen->o2_unit.front, screen->root, 253.0f,
+                            111.0f, 0.0f, 0.0f);
+
+    screen->o2_label.shadow = amber_ui_label_create(
+        screen->root, caption_font, dim, "O2 SENSOR", 0.0f);
+    screen->o2_label.front = amber_ui_label_create(
+        screen->root, caption_font, dim, "O2 SENSOR", 0.0f);
+    amber_ui_place_centered(screen->o2_label.shadow, screen->root, 253.0f,
+                            130.0f, 0.0f, 0.0f);
+    amber_ui_place_centered(screen->o2_label.front, screen->root, 253.0f,
+                            130.0f, 0.0f, 0.0f);
+
+    screen->duty_value.shadow = amber_ui_label_create(
+        screen->root, body_font, separator, "0", 0.0f);
+    screen->duty_value.front = amber_ui_label_create(
+        screen->root, body_font, bright, "0", 0.0f);
+    amber_ui_place_centered(screen->duty_value.shadow, screen->root, CX, 230.0f,
+                            0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->duty_value.front, screen->root, CX, 230.0f,
+                            0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+
+    screen->duty_unit.shadow = amber_ui_label_create(
+        screen->root, caption_font, dim, "%", 0.0f);
+    screen->duty_unit.front = amber_ui_label_create(
+        screen->root, caption_font, dim, "%", 0.0f);
+    amber_ui_place_centered(screen->duty_unit.shadow, screen->root, CX, 247.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(screen->duty_unit.front, screen->root, CX, 247.0f,
+                            0.0f, 0.0f);
+
+    screen->duty_label.shadow = amber_ui_label_create(
+        screen->root, caption_font, dim, "HEATER DUTY", 0.0f);
+    screen->duty_label.front = amber_ui_label_create(
+        screen->root, caption_font, dim, "HEATER DUTY", 0.0f);
+    amber_ui_place_centered(screen->duty_label.shadow, screen->root, CX, 266.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(screen->duty_label.front, screen->root, CX, 266.0f,
+                            0.0f, 0.0f);
+
+    if (screen->title.shadow == NULL || screen->title.front == NULL ||
+        screen->subtitle.shadow == NULL || screen->subtitle.front == NULL ||
+        screen->signal.shadow == NULL || screen->signal.front == NULL ||
+        screen->afr.shadow == NULL || screen->afr.front == NULL ||
+        screen->afr_unit.shadow == NULL || screen->afr_unit.front == NULL ||
+        screen->lambda_value.shadow == NULL ||
+        screen->lambda_value.front == NULL ||
+        screen->lambda_unit.shadow == NULL || screen->lambda_unit.front == NULL ||
+        screen->lambda_label.shadow == NULL ||
+        screen->lambda_label.front == NULL ||
+        screen->o2_value.shadow == NULL || screen->o2_value.front == NULL ||
+        screen->o2_unit.shadow == NULL || screen->o2_unit.front == NULL ||
+        screen->o2_label.shadow == NULL || screen->o2_label.front == NULL ||
+        screen->duty_value.shadow == NULL || screen->duty_value.front == NULL ||
+        screen->duty_unit.shadow == NULL || screen->duty_unit.front == NULL ||
+        screen->duty_label.shadow == NULL || screen->duty_label.front == NULL) {
         goto fail;
     }
 
@@ -389,12 +403,41 @@ void lambda_screen_update(lambda_screen_t *screen, const ecu_data_t *data) {
     snprintf(screen->o2_buf, sizeof(screen->o2_buf), "%.0f", screen->o2_mv);
     snprintf(screen->duty_buf, sizeof(screen->duty_buf), "%.0f", screen->duty);
 
-    text_set(&screen->afr, screen->root, screen->afr_buf);
-    text_set(&screen->lambda_value, screen->root, screen->lambda_buf);
-    text_set(&screen->o2_value, screen->root, screen->o2_buf);
-    text_set(&screen->duty_value, screen->root, screen->duty_buf);
-    text_set(&screen->signal, screen->root,
-             screen->connected ? "SIGNAL LIVE" : "SIGNAL LOST");
+    lv_label_set_text_static(screen->afr.shadow, screen->afr_buf);
+    lv_label_set_text_static(screen->afr.front, screen->afr_buf);
+    amber_ui_place_centered(screen->afr.shadow, screen->root, CX, 141.0f,
+                            0.0f, 2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->afr.front, screen->root, CX, 141.0f,
+                            0.0f, -2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+
+    lv_label_set_text_static(screen->lambda_value.shadow, screen->lambda_buf);
+    lv_label_set_text_static(screen->lambda_value.front, screen->lambda_buf);
+    amber_ui_place_centered(screen->lambda_value.shadow, screen->root, 67.0f,
+                            95.0f, 0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->lambda_value.front, screen->root, 67.0f,
+                            95.0f, 0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+
+    lv_label_set_text_static(screen->o2_value.shadow, screen->o2_buf);
+    lv_label_set_text_static(screen->o2_value.front, screen->o2_buf);
+    amber_ui_place_centered(screen->o2_value.shadow, screen->root, 253.0f,
+                            95.0f, 0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->o2_value.front, screen->root, 253.0f,
+                            95.0f, 0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+
+    lv_label_set_text_static(screen->duty_value.shadow, screen->duty_buf);
+    lv_label_set_text_static(screen->duty_value.front, screen->duty_buf);
+    amber_ui_place_centered(screen->duty_value.shadow, screen->root, CX, 230.0f,
+                            0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->duty_value.front, screen->root, CX, 230.0f,
+                            0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+
+    const char *signal = screen->connected ? "SIGNAL LIVE" : "SIGNAL LOST";
+    lv_label_set_text_static(screen->signal.shadow, signal);
+    lv_label_set_text_static(screen->signal.front, signal);
+    amber_ui_place_centered(screen->signal.shadow, screen->root, CX, 65.0f,
+                            0.0f, 0.0f);
+    amber_ui_place_centered(screen->signal.front, screen->root, CX, 65.0f,
+                            0.0f, 0.0f);
 
     text_style(&screen->signal,
                screen->connected ? ui_theme_amber_bright()
@@ -405,21 +448,6 @@ void lambda_screen_update(lambda_screen_t *screen, const ecu_data_t *data) {
 
 void lambda_screen_destroy(lambda_screen_t *screen) {
     if (screen == NULL) return;
-
-    text_destroy(&screen->title);
-    text_destroy(&screen->subtitle);
-    text_destroy(&screen->signal);
-    text_destroy(&screen->afr);
-    text_destroy(&screen->afr_unit);
-    text_destroy(&screen->lambda_value);
-    text_destroy(&screen->lambda_unit);
-    text_destroy(&screen->lambda_label);
-    text_destroy(&screen->o2_value);
-    text_destroy(&screen->o2_unit);
-    text_destroy(&screen->o2_label);
-    text_destroy(&screen->duty_value);
-    text_destroy(&screen->duty_unit);
-    text_destroy(&screen->duty_label);
 
     if (screen->root != NULL) lv_obj_delete(screen->root);
     lv_free(screen);

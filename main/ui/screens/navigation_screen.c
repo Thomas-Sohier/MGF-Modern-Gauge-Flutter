@@ -3,6 +3,7 @@
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/widgets/amber_draw.h"
+#include "ui/widgets/amber_ui.h"
 #include "ui/widgets/amber_value.h"
 
 #include <math.h>
@@ -101,32 +102,6 @@ static void canvas_draw_cb(lv_event_t *event) {
                     NAV_SEPARATOR_Y, NAV_LINE_W, ui_theme_amber_separator(), false);
 }
 
-static lv_obj_t *label_create(lv_obj_t *parent, const lv_font_t *font,
-                              lv_color_t color, const char *text) {
-    lv_obj_t *label = lv_label_create(parent);
-    if (label == NULL) return NULL;
-
-    lv_obj_set_style_text_font(label, font, 0);
-    lv_obj_set_style_text_color(label, color, 0);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(label, text);
-    return label;
-}
-
-static void place_centered(lv_obj_t *label, lv_obj_t *parent,
-                           float ref_x, float ref_y) {
-    lv_obj_update_layout(label);
-    const lv_area_t area = {
-        0, 0, lv_obj_get_width(parent) - 1, lv_obj_get_height(parent) - 1
-    };
-    const ui_layout_t layout = amber_draw_layout(&area);
-    const int32_t width = lv_obj_get_width(label);
-    const int32_t height = lv_obj_get_height(label);
-    lv_obj_align(label, LV_ALIGN_TOP_LEFT,
-                 lroundf(ui_layout_x(&layout, ref_x)) - width / 2,
-                 lroundf(ui_layout_y(&layout, ref_y)) - height / 2);
-}
-
 navigation_screen_t *navigation_screen_create(lv_obj_t *parent) {
     if (parent == NULL) return NULL;
 
@@ -138,44 +113,27 @@ navigation_screen_t *navigation_screen_create(lv_obj_t *parent) {
     lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
     lv_obj_update_layout(parent);
 
-    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
-                                lv_obj_get_content_height(parent));
-    if (side <= 0) goto fail;
-
-    scr->root = lv_obj_create(parent);
+    scr->root = amber_ui_root_create(parent);
     if (scr->root == NULL) goto fail;
-    lv_obj_remove_style_all(scr->root);
-    lv_obj_set_size(scr->root, side, side);
-    lv_obj_center(scr->root);
-    lv_obj_set_style_bg_color(scr->root, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(scr->root, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(scr->root, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_clip_corner(scr->root, true, 0);
-    lv_obj_clear_flag(scr->root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_update_layout(scr->root);
-
-    scr->canvas = lv_obj_create(scr->root);
+    scr->canvas = amber_ui_canvas_create(scr->root, scr, canvas_draw_cb);
     if (scr->canvas == NULL) goto fail;
-    lv_obj_remove_style_all(scr->canvas);
-    lv_obj_set_size(scr->canvas, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(scr->canvas, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_user_data(scr->canvas, scr);
-    lv_obj_add_event_cb(scr->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
     const lv_font_t *font_m = ui_font_or(ui_font_m, &lv_font_montserrat_20);
     const lv_font_t *font_xl = ui_font_or(ui_font_xl, &lv_font_montserrat_48);
     const lv_font_t *font_small = ui_font_or(ui_font_l, &lv_font_montserrat_14);
 
-    scr->header = label_create(scr->root, font_small,
-                               ui_theme_amber_dim(), "NAVIGATION");
+    scr->header = amber_ui_label_create(scr->root, font_small,
+                                        ui_theme_amber_dim(), "NAVIGATION",
+                                        0.0f);
     if (scr->header == NULL) goto fail;
-    place_centered(scr->header, scr->root, NAV_CX, 27.0f);
+    amber_ui_place_centered(scr->header, scr->root, NAV_CX, 27.0f,
+                            0.0f, 0.0f);
 
-    scr->instruction = label_create(scr->root, font_m,
-                                    ui_theme_amber_bright(),
-                                    "TOURNEZ A DROITE");
+    scr->instruction = amber_ui_label_create(
+        scr->root, font_m, ui_theme_amber_bright(), "TOURNEZ A DROITE", 0.0f);
     if (scr->instruction == NULL) goto fail;
-    place_centered(scr->instruction, scr->root, NAV_CX, 177.0f);
+    amber_ui_place_centered(scr->instruction, scr->root, NAV_CX, 177.0f,
+                            0.0f, 0.0f);
 
     scr->distance = amber_value_widget_create(
         scr->root, font_xl, 137.0f, 218.0f, 2, "300");
@@ -185,16 +143,17 @@ navigation_screen_t *navigation_screen_create(lv_obj_t *parent) {
         scr->root, font_m, 213.0f, 228.0f, 1, "M");
     if (scr->distance_unit == NULL) goto fail;
 
-    scr->street = label_create(scr->root, font_small,
-                                ui_theme_amber_bright(), "RUE DES LILAS");
+    scr->street = amber_ui_label_create(
+        scr->root, font_small, ui_theme_amber_bright(), "RUE DES LILAS", 0.0f);
     if (scr->street == NULL) goto fail;
-    place_centered(scr->street, scr->root, NAV_CX, 274.0f);
+    amber_ui_place_centered(scr->street, scr->root, NAV_CX, 274.0f,
+                            0.0f, 0.0f);
 
-    scr->arrival = label_create(scr->root, font_small,
-                                ui_theme_amber_dim(),
-                                "ETA 14:32");
+    scr->arrival = amber_ui_label_create(
+        scr->root, font_small, ui_theme_amber_dim(), "ETA 14:32", 0.0f);
     if (scr->arrival == NULL) goto fail;
-    place_centered(scr->arrival, scr->root, NAV_CX, 298.0f);
+    amber_ui_place_centered(scr->arrival, scr->root, NAV_CX, 298.0f,
+                            0.0f, 0.0f);
 
     return scr;
 
