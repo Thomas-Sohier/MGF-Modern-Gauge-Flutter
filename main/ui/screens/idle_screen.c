@@ -22,22 +22,28 @@
 #define RPM_SEGMENTS 28
 #define RPM_SEGMENT_GAP 1.8f
 
-#define SIDE_METER_X_LEFT 35.0f
-#define SIDE_METER_X_RIGHT 285.0f
-#define SIDE_METER_Y0 94.0f
-#define SIDE_METER_Y1 169.0f
-#define SIDE_METER_SEGMENTS 9
-#define SIDE_METER_W 5.0f
+// Rails latéraux très courts : ils donnent le contexte de régulation sans
+// concurrencer la valeur RPM ni les quatre cartes de télémétrie.
+#define SIDE_METER_X_LEFT 45.0f
+#define SIDE_METER_X_RIGHT 275.0f
+#define SIDE_METER_Y0 105.0f
+#define SIDE_METER_Y1 147.0f
+#define SIDE_METER_SEGMENTS 6
+#define SIDE_METER_W 3.0f
 
-#define TITLE_Y 22.0f
-#define SUBTITLE_Y 37.0f
-#define HERO_Y 137.0f
-#define HERO_UNIT_Y 171.0f
-#define ERROR_Y 188.0f
-#define GRID_Y 204.0f
-#define METRIC_VALUE_Y 228.0f
-#define METRIC_NAME_Y 246.0f
-#define STATUS_Y 278.0f
+// La grille est volontairement en deux rangées. Chaque libellé dispose ainsi
+// d'une largeur réelle, et aucun texte ne vient toucher la couronne ronde.
+#define TITLE_Y 42.0f
+#define SUBTITLE_Y 58.0f
+#define HERO_Y 119.0f
+#define HERO_UNIT_Y 148.0f
+#define ERROR_Y 169.0f
+#define GRID_Y 187.0f
+#define METRIC_VALUE_TOP_Y 207.0f
+#define METRIC_NAME_TOP_Y 222.0f
+#define METRIC_VALUE_BOTTOM_Y 242.0f
+#define METRIC_NAME_BOTTOM_Y 257.0f
+#define STATUS_Y 289.0f
 
 #define LINE_W 0.8f
 #define TICK_W 1.1f
@@ -51,7 +57,15 @@ enum {
     METRIC_ADJUSTER,
 };
 
-static const float kMetricX[METRIC_COUNT] = {57.0f, 125.0f, 195.0f, 263.0f};
+static const float kMetricX[METRIC_COUNT] = {100.0f, 220.0f, 100.0f, 220.0f};
+static const float kMetricValueY[METRIC_COUNT] = {
+    METRIC_VALUE_TOP_Y, METRIC_VALUE_TOP_Y,
+    METRIC_VALUE_BOTTOM_Y, METRIC_VALUE_BOTTOM_Y,
+};
+static const float kMetricNameY[METRIC_COUNT] = {
+    METRIC_NAME_TOP_Y, METRIC_NAME_TOP_Y,
+    METRIC_NAME_BOTTOM_Y, METRIC_NAME_BOTTOM_Y,
+};
 
 // Les buffers vivent dans l'écran et sont toujours passés à
 // lv_label_set_text_static(). Une mise à jour ECU ne crée donc ni label, ni
@@ -183,9 +197,6 @@ static void draw_segment_meter(lv_layer_t *layer, const ui_layout_t *layout,
                   2.5f, color, false);
     }
 
-    draw_line(layer, layout, x - SIDE_METER_W - 4.0f, SIDE_METER_Y0,
-              x - SIDE_METER_W - 4.0f, SIDE_METER_Y1, 0.7f,
-              ui_theme_amber_separator(), false);
 }
 
 static void draw_rpm_ring(lv_layer_t *layer, const ui_layout_t *layout,
@@ -245,45 +256,29 @@ static void draw_rpm_ring(lv_layer_t *layer, const ui_layout_t *layout,
 static void draw_panel_lines(lv_layer_t *layer, const ui_layout_t *layout) {
     const lv_color_t separator = ui_theme_amber_separator();
 
-    // Lignes ouvertes : elles structurent les quatre télémétries sans enfermer
-    // la valeur centrale dans une boîte rectangulaire.
-    draw_line(layer, layout, 24.0f, 46.0f, 112.0f, 46.0f, LINE_W,
+    // Les repères restent ouverts : ils structurent l'information sans créer
+    // de cadres qui viendraient toucher les textes ou la couronne.
+    draw_line(layer, layout, 58.0f, 70.0f, 116.0f, 70.0f, LINE_W,
               separator, false);
-    draw_line(layer, layout, 208.0f, 46.0f, 296.0f, 46.0f, LINE_W,
+    draw_line(layer, layout, 204.0f, 70.0f, 262.0f, 70.0f, LINE_W,
               separator, false);
-    draw_line(layer, layout, 24.0f, GRID_Y, 101.0f, GRID_Y, LINE_W,
+
+    draw_line(layer, layout, 56.0f, GRID_Y, 123.0f, GRID_Y, LINE_W,
               separator, false);
-    draw_line(layer, layout, 219.0f, GRID_Y, 296.0f, GRID_Y, LINE_W,
+    draw_line(layer, layout, 197.0f, GRID_Y, 264.0f, GRID_Y, LINE_W,
               separator, false);
-    draw_line(layer, layout, 106.0f, GRID_Y, 214.0f, GRID_Y, 0.55f,
+    draw_line(layer, layout, 128.0f, GRID_Y, 192.0f, GRID_Y, 0.55f,
               ui_theme_amber_dim(), false);
 
-    for (int i = 0; i < METRIC_COUNT - 1; i++) {
-        const float x = (kMetricX[i] + kMetricX[i + 1]) * 0.5f;
-        draw_line(layer, layout, x, GRID_Y + 5.0f, x, 257.0f, LINE_W,
-                  separator, false);
-    }
-
-    draw_line(layer, layout, 52.0f, 260.0f, 268.0f, 260.0f, LINE_W,
+    // Deux colonnes, deux rangées : la séparation tombe dans les espaces,
+    // jamais au travers d'un nombre ou d'un libellé.
+    draw_line(layer, layout, 160.0f, GRID_Y + 6.0f, 160.0f, 268.0f,
+              LINE_W, separator, false);
+    draw_line(layer, layout, 61.0f, 232.0f, 259.0f, 232.0f, LINE_W,
               separator, false);
-    draw_line(layer, layout, 93.0f, STATUS_Y - 9.0f, 132.0f,
-              STATUS_Y - 9.0f, 0.7f, ui_theme_amber_dim(), false);
-    draw_line(layer, layout, 188.0f, STATUS_Y - 9.0f, 227.0f,
-              STATUS_Y - 9.0f, 0.7f, ui_theme_amber_dim(), false);
 
-    // Deux mini-repères évoquent les deux butées de la vanne de ralenti.
-    draw_line(layer, layout, SIDE_METER_X_LEFT - 5.0f, SIDE_METER_Y0,
-              SIDE_METER_X_LEFT + 5.0f, SIDE_METER_Y0, LINE_W, separator,
-              false);
-    draw_line(layer, layout, SIDE_METER_X_LEFT - 5.0f, SIDE_METER_Y1,
-              SIDE_METER_X_LEFT + 5.0f, SIDE_METER_Y1, LINE_W, separator,
-              false);
-    draw_line(layer, layout, SIDE_METER_X_RIGHT - 5.0f, SIDE_METER_Y0,
-              SIDE_METER_X_RIGHT + 5.0f, SIDE_METER_Y0, LINE_W, separator,
-              false);
-    draw_line(layer, layout, SIDE_METER_X_RIGHT - 5.0f, SIDE_METER_Y1,
-              SIDE_METER_X_RIGHT + 5.0f, SIDE_METER_Y1, LINE_W, separator,
-              false);
+    draw_line(layer, layout, 67.0f, 274.0f, 253.0f, 274.0f, LINE_W,
+              separator, false);
 }
 
 static void canvas_draw_cb(lv_event_t *event) {
@@ -398,7 +393,6 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
     const lv_font_t *font_caption = ui_font_or(ui_font_m, &lv_font_montserrat_14);
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
-    const lv_color_t separator = ui_theme_amber_separator();
 
     screen->hero_text[0] = '0';
     screen->hero_text[1] = '\0';
@@ -417,10 +411,10 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
         screen->metric_text[i][1] = '\0';
     }
 
-    screen->title = label_create(screen->root, font_caption, bright,
-                                 "IDLE CONTROL");
+    screen->title = label_create(screen->root, font_value, bright,
+                                 "GESTION DU RALENTI");
     screen->subtitle = label_create(screen->root, font_caption, dim,
-                                    "CLOSED LOOP / LIVE");
+                                    "BOUCLE FERMEE");
 
     // Le décalage du calque dim simule le faux-gras Michroma sans modifier la
     // police, comme sur le cadran RPM ambre de référence.
@@ -444,22 +438,18 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
         screen->root, font_value, bright, screen->metric_text[METRIC_ADJUSTER]);
 
     screen->metric_name[METRIC_SETPOINT] = label_create(
-        screen->root, font_caption, dim, "SETPOINT");
+        screen->root, font_caption, dim, "CONSIGNE");
     screen->metric_name[METRIC_VALVE] = label_create(
-        screen->root, font_caption, dim, "VALVE");
+        screen->root, font_caption, dim, "VANNE");
     screen->metric_name[METRIC_BASE] = label_create(
         screen->root, font_caption, dim, "BASE");
     screen->metric_name[METRIC_ADJUSTER] = label_create(
-        screen->root, font_caption, dim, "ADJ. RPM");
-
-    // Libellés des jauges latérales, très courts pour préserver l'espace utile.
-    lv_obj_t *left_name = label_create(screen->root, font_caption, separator, "IAC");
-    lv_obj_t *right_name = label_create(screen->root, font_caption, separator, "BASE");
+        screen->root, font_caption, dim, "AJUSTEUR");
 
     if (screen->title == NULL || screen->subtitle == NULL ||
         screen->hero_shadow == NULL || screen->hero == NULL ||
         screen->hero_unit == NULL || screen->error == NULL ||
-        screen->status == NULL || left_name == NULL || right_name == NULL) {
+        screen->status == NULL) {
         goto fail;
     }
     for (int i = 0; i < METRIC_COUNT; i++) {
@@ -471,8 +461,6 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
     place_centered(screen->title, screen->root, SCREEN_CX, TITLE_Y, 0.0f);
     place_centered(screen->subtitle, screen->root, SCREEN_CX, SUBTITLE_Y,
                    0.0f);
-    place_centered(left_name, screen->root, SIDE_METER_X_LEFT, 82.0f, 0.0f);
-    place_centered(right_name, screen->root, SIDE_METER_X_RIGHT, 82.0f, 0.0f);
     place_centered(screen->hero_shadow, screen->root, SCREEN_CX, HERO_Y,
                    BOLD_SPREAD_PX);
     place_centered(screen->hero, screen->root, SCREEN_CX, HERO_Y,
@@ -483,9 +471,9 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
     place_centered(screen->status, screen->root, SCREEN_CX, STATUS_Y, 0.0f);
     for (int i = 0; i < METRIC_COUNT; i++) {
         place_centered(screen->metric_value[i], screen->root, kMetricX[i],
-                       METRIC_VALUE_Y, 0.0f);
+                       kMetricValueY[i], 0.0f);
         place_centered(screen->metric_name[i], screen->root, kMetricX[i],
-                       METRIC_NAME_Y, 0.0f);
+                       kMetricNameY[i], 0.0f);
     }
 
     return screen;
@@ -509,9 +497,9 @@ void idle_screen_update(idle_screen_t *screen, const ecu_data_t *data) {
     set_pair_text(screen->hero, screen->hero_shadow, screen->hero_text,
                   sizeof(screen->hero_text), "%.0f", screen->rpm);
     set_text(screen->error, screen->error_text, sizeof(screen->error_text),
-             "ERR %+.0f RPM", screen->error_value);
+             "ERREUR %+.0f RPM", screen->error_value);
     snprintf(screen->status_text, sizeof(screen->status_text),
-             data->connected ? "LOOP / ACTIVE" : "NO LINK");
+             data->connected ? "BOUCLE ACTIVE" : "PAS DE LIEN");
     lv_label_set_text_static(screen->status, screen->status_text);
 
     set_text(screen->metric_value[METRIC_SETPOINT],
@@ -540,7 +528,7 @@ void idle_screen_update(idle_screen_t *screen, const ecu_data_t *data) {
     place_centered(screen->status, screen->root, SCREEN_CX, STATUS_Y, 0.0f);
     for (int i = 0; i < METRIC_COUNT; i++) {
         place_centered(screen->metric_value[i], screen->root, kMetricX[i],
-                       METRIC_VALUE_Y, 0.0f);
+                       kMetricValueY[i], 0.0f);
     }
     lv_obj_invalidate(screen->canvas);
 }
