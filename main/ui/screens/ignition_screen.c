@@ -1,0 +1,421 @@
+#include "ui/screens/ignition_screen.h"
+
+#include "ui/fonts/ui_fonts.h"
+#include "ui/themes/ui_theme.h"
+#include "ui/ui_layout.h"
+
+#include <math.h>
+#include <stdio.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+// Toutes les coordonnées sont exprimées dans le repère ambre partagé 320 x
+// 320. Le contenu est ensuite inscrit dans le plus grand carré disponible.
+#define SCREEN_CX 160.0f
+#define SCREEN_CY 160.0f
+#define OUTER_R  156.0f
+
+#define ADVANCE_MIN       (-10.0f)
+#define ADVANCE_MAX       50.0f
+#define ADVANCE_START     210.0f
+#define ADVANCE_SWEEP     120.0f
+#define ADVANCE_RADIUS    140.0f
+#define ADVANCE_TICKS     25
+
+#define GRID_Y             226.0f
+#define LINE_W             0.8f
+#define TICK_W             1.2f
+#define BOLD_SPREAD_PX     1
+
+// Positions des quatre indicateurs secondaires : le cadran garde une vraie
+// respiration centrale et les deux rangées restent dans le disque intérieur.
+static const float k_metric_x[4] = {82.0f, 238.0f, 82.0f, 238.0f};
+static const float k_metric_value_y[4] = {240.0f, 240.0f, 278.0f, 278.0f};
+static const float k_metric_name_y[4] = {253.0f, 253.0f, 294.0f, 294.0f};
+
+struct ignition_screen_s {
+    lv_obj_t *root;
+    lv_obj_t *canvas;
+
+    lv_obj_t *advance_shadow;
+    lv_obj_t *advance;
+    lv_obj_t *advance_caption;
+    lv_obj_t *metric_value[4];
+    lv_obj_t *metric_name[4];
+
+    // Les labels dynamiques pointent toujours vers ces buffers. Ainsi
+    // lv_label_set_text_static() ne crée rien pendant une mise à jour ECU.
+    char advance_text[16];
+    char offset_text[20];
+    char coil_1_text[20];
+    char coil_2_text[20];
+    char coil_total_text[20];
+
+    float advance_value;
+};
+
+static ui_layout_t layout_of(const lv_area_t *area) {
+    ui_layout_t layout = ui_layout_fit(lv_area_get_width(area),
+                                       lv_area_get_height(area));
+    layout.ox += area->x1;
+    layout.oy += area->y1;
+    return layout;
+}
+
+static void draw_line(lv_layer_t *layer, const ui_layout_t *layout,
+                      float x1, float y1, float x2, float y2, float width,
+                      lv_color_t color, bool rounded) {
+    lv_draw_line_dsc_t dsc;
+    lv_draw_line_dsc_init(&dsc);
+    dsc.color = color;
+    dsc.opa = LV_OPA_COVER;
+    dsc.width = LV_MAX(1, (int32_t)lroundf(width * layout->scale));
+    dsc.round_start = rounded;
+    dsc.round_end = rounded;
+    dsc.p1.x = lroundf(ui_layout_x(layout, x1));
+    dsc.p1.y = lroundf(ui_layout_y(layout, y1));
+    dsc.p2.x = lroundf(ui_layout_x(layout, x2));
+    dsc.p2.y = lroundf(ui_layout_y(layout, y2));
+    lv_draw_line(layer, &dsc);
+}
+
+static void draw_arc(lv_layer_t *layer, const ui_layout_t *layout,
+                     float radius, float width, float start, float end,
+                     lv_color_t color) {
+    lv_draw_arc_dsc_t dsc;
+    lv_draw_arc_dsc_init(&dsc);
+    dsc.center.x = lroundf(ui_layout_x(layout, SCREEN_CX));
+    dsc.center.y = lroundf(ui_layout_y(layout, SCREEN_CY));
+    dsc.radius = LV_MAX(1, (int32_t)lroundf(radius * layout->scale));
+    dsc.width = LV_MAX(1, (int32_t)lroundf(width * layout->scale));
+    dsc.start_angle = (uint16_t)lroundf(start);
+    dsc.end_angle = (uint16_t)lroundf(end);
+    dsc.color = color;
+    dsc.opa = LV_OPA_COVER;
+    dsc.rounded = 0;
+    lv_draw_arc(layer, &dsc);
+}
+
+static void draw_ring(lv_layer_t *layer, const ui_layout_t *layout,
+                      float radius, float width, lv_color_t color) {
+    draw_arc(layer, layout, radius, width, 0.0f, 360.0f, color);
+}
+
+static void draw_tick(lv_layer_t *layer, const ui_layout_t *layout,
+                      float angle, float inner, float outer, float width,
+                      lv_color_t color) {
+    const float radians = angle * (float)M_PI / 180.0f;
+    const float c = cosf(radians);
+    const float s = sinf(radians);
+    draw_line(layer, layout, SCREEN_CX + c * inner, SCREEN_CY + s * inner,
+              SCREEN_CX + c * outer, SCREEN_CY + s * outer, width, color,
+              false);
+}
+
+static float clamp01(float value) {
+    if (value < 0.0f) return 0.0f;
+    if (value > 1.0f) return 1.0f;
+    return value;
+}
+
+static void draw_spark_symbol(lv_layer_t *layer, const ui_layout_t *layout) {
+    const lv_color_t bright = ui_theme_amber_bright();
+    const lv_color_t dim = ui_theme_amber_dim();
+
+    // Éclair central : deux épaisseurs ambre donnent un relief net sans
+    // introduire de bitmap ni d'icône externe.
+    draw_line(layer, layout, 154.0f, 91.0f, 165.0f, 91.0f, 2.6f, dim,
+              true);
+    draw_line(layer, layout, 165.0f, 91.0f, 157.0f, 101.0f, 2.6f, dim,
+              true);
+    draw_line(layer, layout, 157.0f, 101.0f, 166.0f, 101.0f, 2.6f, dim,
+              true);
+    draw_line(layer, layout, 166.0f, 101.0f, 153.0f, 116.0f, 2.6f, dim,
+              true);
+
+    draw_line(layer, layout, 154.0f, 89.0f, 165.0f, 89.0f, 1.2f, bright,
+              true);
+    draw_line(layer, layout, 165.0f, 89.0f, 157.0f, 99.0f, 1.2f, bright,
+              true);
+    draw_line(layer, layout, 157.0f, 99.0f, 166.0f, 99.0f, 1.2f, bright,
+              true);
+    draw_line(layer, layout, 166.0f, 99.0f, 153.0f, 114.0f, 1.2f, bright,
+              true);
+
+    // Trois rayons courts évoquent l'étincelle et équilibrent le motif dans le
+    // vide entre l'arc de mesure et la valeur principale.
+    draw_line(layer, layout, 143.0f, 98.0f, 137.0f, 95.0f, 0.9f, dim, true);
+    draw_line(layer, layout, 174.0f, 98.0f, 180.0f, 95.0f, 0.9f, dim, true);
+    draw_line(layer, layout, 160.0f, 78.0f, 160.0f, 71.0f, 0.9f, dim, true);
+}
+
+static void draw_advance_gauge(lv_layer_t *layer, const ui_layout_t *layout,
+                               float advance) {
+    const lv_color_t bright = ui_theme_amber_bright();
+    const lv_color_t dim = ui_theme_amber_dim();
+    const lv_color_t separator = ui_theme_amber_separator();
+    const float progress = clamp01((advance - ADVANCE_MIN) /
+                                   (ADVANCE_MAX - ADVANCE_MIN));
+
+    // Anneau extérieur discret, puis couronne segmentée : le cadran reste
+    // lisible même quand la valeur est proche de zéro.
+    draw_ring(layer, layout, OUTER_R, 0.8f, separator);
+    draw_ring(layer, layout, OUTER_R - 4.0f, 0.55f, dim);
+
+    const float segment_gap = 2.4f;
+    const float segment_step = 360.0f / 32.0f;
+    for (int i = 0; i < 32; i++) {
+        const float start = (float)i * segment_step + segment_gap * 0.5f;
+        draw_arc(layer, layout, OUTER_R - 8.0f, 1.4f, start,
+                 start + segment_step - segment_gap, separator);
+    }
+
+    // Piste principale d'avance, avec extrémités droites comme le cadran RPM.
+    draw_arc(layer, layout, ADVANCE_RADIUS, 7.0f, ADVANCE_START,
+             ADVANCE_START + ADVANCE_SWEEP, dim);
+    if (progress > 0.0f) {
+        draw_arc(layer, layout, ADVANCE_RADIUS, 7.0f, ADVANCE_START,
+                 ADVANCE_START + ADVANCE_SWEEP * progress, bright);
+    }
+
+    // Graduations principales et secondaires alignées sur la plage -10..50°.
+    for (int i = 0; i < ADVANCE_TICKS; i++) {
+        const float fraction = (float)i / (float)(ADVANCE_TICKS - 1);
+        const float angle = ADVANCE_START + ADVANCE_SWEEP * fraction;
+        const bool major = (i % 4) == 0 || i == ADVANCE_TICKS - 1;
+        const bool active = fraction <= progress;
+        draw_tick(layer, layout, angle, major ? 127.0f : 130.0f,
+                  major ? 136.0f : 134.0f, major ? 1.5f : TICK_W,
+                  active ? bright : dim);
+    }
+
+    // Repères d'extrémité : ils donnent une référence physique à la plage
+    // sans multiplier les textes sur le cadran rond.
+    draw_tick(layer, layout, ADVANCE_START, 121.0f, 137.0f, 1.8f, separator);
+    draw_tick(layer, layout, ADVANCE_START + ADVANCE_SWEEP, 121.0f, 137.0f,
+              1.8f, separator);
+}
+
+static void draw_panel_lines(lv_layer_t *layer, const ui_layout_t *layout) {
+    const lv_color_t separator = ui_theme_amber_separator();
+
+    // Séparateurs ouverts : aucun trait ne vient fermer artificiellement le
+    // cercle ni couper les valeurs centrales.
+    draw_line(layer, layout, 37.0f, GRID_Y, 125.0f, GRID_Y, LINE_W,
+              separator, false);
+    draw_line(layer, layout, 195.0f, GRID_Y, 283.0f, GRID_Y, LINE_W,
+              separator, false);
+    draw_line(layer, layout, SCREEN_CX, 233.0f, SCREEN_CX, 267.0f, LINE_W,
+              separator, false);
+    draw_line(layer, layout, SCREEN_CX, 285.0f, SCREEN_CX, 306.0f, LINE_W,
+              separator, false);
+
+    // Petits repères latéraux, inspirés des cellules relevées du cadran RPM.
+    draw_line(layer, layout, 47.0f, GRID_Y + 5.0f, 47.0f, GRID_Y + 12.0f,
+              LINE_W, separator, false);
+    draw_line(layer, layout, 273.0f, GRID_Y + 5.0f, 273.0f, GRID_Y + 12.0f,
+              LINE_W, separator, false);
+}
+
+static void canvas_draw_cb(lv_event_t *event) {
+    if (lv_event_get_code(event) != LV_EVENT_DRAW_MAIN) return;
+
+    lv_obj_t *canvas = lv_event_get_target(event);
+    lv_layer_t *layer = lv_event_get_layer(event);
+    ignition_screen_t *screen = lv_obj_get_user_data(canvas);
+    if (layer == NULL || screen == NULL) return;
+
+    lv_area_t area;
+    lv_obj_get_coords(canvas, &area);
+    const ui_layout_t layout = layout_of(&area);
+
+    draw_advance_gauge(layer, &layout, screen->advance_value);
+    draw_spark_symbol(layer, &layout);
+    draw_panel_lines(layer, &layout);
+}
+
+static void place_centered(lv_obj_t *object, lv_obj_t *parent, float x,
+                           float y, float x_offset) {
+    lv_obj_update_layout(object);
+    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
+                                             lv_obj_get_height(parent));
+    const float offset = x_offset * layout.scale * UI_REFERENCE_SIZE /
+                         UI_DISPLAY_SIZE_PX;
+    lv_obj_set_pos(object,
+                   lroundf(ui_layout_x(&layout, x)) -
+                       lv_obj_get_width(object) / 2 + lroundf(offset),
+                   lroundf(ui_layout_y(&layout, y)) -
+                       lv_obj_get_height(object) / 2);
+}
+
+static lv_obj_t *label_create(lv_obj_t *parent, const lv_font_t *font,
+                              lv_color_t color, const char *text) {
+    lv_obj_t *label = lv_label_create(parent);
+    if (label == NULL) return NULL;
+
+    lv_obj_set_style_text_font(label, font, 0);
+    lv_obj_set_style_text_color(label, color, 0);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text_static(label, text != NULL ? text : "");
+    return label;
+}
+
+static void update_label(lv_obj_t *label, char *buffer, size_t buffer_size,
+                         const char *format, float value) {
+    if (label == NULL || buffer == NULL || buffer_size == 0) return;
+    snprintf(buffer, buffer_size, format, value);
+    lv_label_set_text_static(label, buffer);
+}
+
+ignition_screen_t *ignition_screen_create(lv_obj_t *parent) {
+    if (parent == NULL) return NULL;
+
+    ignition_screen_t *screen = lv_malloc(sizeof(*screen));
+    if (screen == NULL) return NULL;
+    lv_memzero(screen, sizeof(*screen));
+
+    lv_obj_set_style_bg_color(parent, ui_theme_amber_bg(), 0);
+    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
+    lv_obj_update_layout(parent);
+
+    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
+                                lv_obj_get_content_height(parent));
+    if (side <= 0) goto fail;
+
+    screen->root = lv_obj_create(parent);
+    if (screen->root == NULL) goto fail;
+    lv_obj_remove_style_all(screen->root);
+    lv_obj_set_size(screen->root, side, side);
+    lv_obj_center(screen->root);
+    lv_obj_set_style_bg_color(screen->root, ui_theme_amber_bg(), 0);
+    lv_obj_set_style_bg_opa(screen->root, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(screen->root, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_clip_corner(screen->root, true, 0);
+    lv_obj_clear_flag(screen->root, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_update_layout(screen->root);
+
+    screen->canvas = lv_obj_create(screen->root);
+    if (screen->canvas == NULL) goto fail;
+    lv_obj_remove_style_all(screen->canvas);
+    lv_obj_set_size(screen->canvas, LV_PCT(100), LV_PCT(100));
+    lv_obj_clear_flag(screen->canvas, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_user_data(screen->canvas, screen);
+    lv_obj_add_event_cb(screen->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN,
+                        NULL);
+
+    const lv_font_t *font_xl = ui_font_or(ui_font_xl, &lv_font_montserrat_48);
+    const lv_font_t *font_value = ui_font_or(ui_font_l, &lv_font_montserrat_20);
+    const lv_font_t *font_caption = ui_font_or(ui_font_m, &lv_font_montserrat_14);
+
+    screen->advance_text[0] = '0';
+    screen->advance_text[1] = '\0';
+    screen->offset_text[0] = '0';
+    screen->offset_text[1] = '\0';
+    screen->coil_1_text[0] = '0';
+    screen->coil_1_text[1] = '\0';
+    screen->coil_2_text[0] = '0';
+    screen->coil_2_text[1] = '\0';
+    screen->coil_total_text[0] = '0';
+    screen->coil_total_text[1] = '\0';
+
+    // Le calque d'ombre est créé avant la valeur pour simuler le faux-gras
+    // Michroma sans seconde graisse de police.
+    screen->advance_shadow = label_create(screen->root, font_xl,
+                                          ui_theme_amber_dim(),
+                                          screen->advance_text);
+    screen->advance = label_create(screen->root, font_xl,
+                                   ui_theme_amber_bright(),
+                                   screen->advance_text);
+    screen->advance_caption = label_create(screen->root, font_caption,
+                                           ui_theme_amber_dim(),
+                                           "AVANCE ALLUMAGE");
+    screen->metric_value[0] = label_create(screen->root, font_value,
+                                           ui_theme_amber_bright(),
+                                           screen->offset_text);
+    screen->metric_value[1] = label_create(screen->root, font_value,
+                                           ui_theme_amber_bright(),
+                                           screen->coil_1_text);
+    screen->metric_value[2] = label_create(screen->root, font_value,
+                                           ui_theme_amber_bright(),
+                                           screen->coil_2_text);
+    screen->metric_value[3] = label_create(screen->root, font_value,
+                                           ui_theme_amber_bright(),
+                                           screen->coil_total_text);
+    screen->metric_name[0] = label_create(screen->root, font_caption,
+                                          ui_theme_amber_dim(), "OFFSET");
+    screen->metric_name[1] = label_create(screen->root, font_caption,
+                                          ui_theme_amber_dim(), "BOBINE 1");
+    screen->metric_name[2] = label_create(screen->root, font_caption,
+                                          ui_theme_amber_dim(), "BOBINE 2");
+    screen->metric_name[3] = label_create(screen->root, font_caption,
+                                          ui_theme_amber_dim(), "DUREE");
+
+    if (screen->advance_shadow == NULL || screen->advance == NULL ||
+        screen->advance_caption == NULL || screen->metric_value[0] == NULL ||
+        screen->metric_value[1] == NULL || screen->metric_value[2] == NULL ||
+        screen->metric_value[3] == NULL || screen->metric_name[0] == NULL ||
+        screen->metric_name[1] == NULL || screen->metric_name[2] == NULL ||
+        screen->metric_name[3] == NULL) goto fail;
+
+    place_centered(screen->advance_shadow, screen->root, SCREEN_CX, 143.0f,
+                   BOLD_SPREAD_PX);
+    place_centered(screen->advance, screen->root, SCREEN_CX, 143.0f,
+                   -BOLD_SPREAD_PX);
+    place_centered(screen->advance_caption, screen->root, SCREEN_CX, 181.0f,
+                   0.0f);
+
+    for (int i = 0; i < 4; i++) {
+        place_centered(screen->metric_value[i], screen->root, k_metric_x[i],
+                       k_metric_value_y[i], 0.0f);
+        place_centered(screen->metric_name[i], screen->root, k_metric_x[i],
+                       k_metric_name_y[i], 0.0f);
+    }
+
+    return screen;
+
+fail:
+    ignition_screen_destroy(screen);
+    return NULL;
+}
+
+void ignition_screen_update(ignition_screen_t *screen, const ecu_data_t *data) {
+    if (screen == NULL || data == NULL || screen->canvas == NULL) return;
+
+    screen->advance_value = data->ignition_advance;
+    update_label(screen->advance, screen->advance_text,
+                 sizeof(screen->advance_text), "%.0f°", data->ignition_advance);
+    update_label(screen->advance_shadow, screen->advance_text,
+                 sizeof(screen->advance_text), "%.0f°", data->ignition_advance);
+    update_label(screen->metric_value[0], screen->offset_text,
+                 sizeof(screen->offset_text), "%.1f°",
+                 data->ignition_advance_offset);
+    update_label(screen->metric_value[1], screen->coil_1_text,
+                 sizeof(screen->coil_1_text), "%.2f ms",
+                 data->coil_1_charge_time);
+    update_label(screen->metric_value[2], screen->coil_2_text,
+                 sizeof(screen->coil_2_text), "%.2f ms",
+                 data->coil_2_charge_time);
+    update_label(screen->metric_value[3], screen->coil_total_text,
+                 sizeof(screen->coil_total_text), "%.0fµs",
+                 data->coil_time_microseconds);
+
+    // Les largeurs changent avec les chiffres : le repositionnement est purement
+    // géométrique et n'alloue rien, tandis que le canvas redessine l'arc.
+    place_centered(screen->advance_shadow, screen->root, SCREEN_CX, 143.0f,
+                   BOLD_SPREAD_PX);
+    place_centered(screen->advance, screen->root, SCREEN_CX, 143.0f,
+                   -BOLD_SPREAD_PX);
+    for (int i = 0; i < 4; i++) {
+        place_centered(screen->metric_value[i], screen->root, k_metric_x[i],
+                       k_metric_value_y[i], 0.0f);
+    }
+    lv_obj_invalidate(screen->canvas);
+}
+
+void ignition_screen_destroy(ignition_screen_t *screen) {
+    if (screen == NULL) return;
+    if (screen->root != NULL) lv_obj_delete(screen->root);
+    lv_free(screen);
+}
