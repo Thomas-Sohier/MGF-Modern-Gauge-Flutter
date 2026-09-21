@@ -21,26 +21,28 @@
 #define MAP_RING_SWEEP       270.0f
 #define MAP_TICK_COUNT       10
 
-#define HEADER_Y             20.0f
-#define SUBHEADER_Y          35.0f
-#define STATUS_Y             50.0f
-#define HEADER_LINE_Y        59.0f
+// Zones fixes dans le disque de 320 px : en-tête, valeur principale,
+// schéma de flux, puis deux rangées de mesures. Les libellés ne partagent
+// jamais la ligne de base d'une autre information.
+#define HEADER_Y             28.0f
+#define STATUS_Y             45.0f
+#define HEADER_LINE_Y        57.0f
 
-#define HERO_Y              107.0f
-#define HERO_UNIT_Y         136.0f
-#define HERO_LABEL_Y        150.0f
+#define HERO_Y               86.0f
+#define HERO_UNIT_Y         109.0f
+#define HERO_LABEL_Y        126.0f
 
 #define AIRFLOW_CY          180.0f
 #define AIRFLOW_LINE_W        0.8f
 #define AIRFLOW_ICON_W        1.4f
 
 #define MATRIX_LINE_Y        216.0f
-#define MATRIX_SPLIT_Y       252.0f
+#define MATRIX_SPLIT_Y       257.0f
 #define MATRIX_BOTTOM_Y      294.0f
-#define VALUE_TOP_Y          231.0f
-#define VALUE_BOTTOM_Y       263.0f
-#define LABEL_TOP_Y          245.0f
-#define LABEL_BOTTOM_Y       279.0f
+#define VALUE_TOP_Y          229.0f
+#define VALUE_BOTTOM_Y       265.0f
+#define LABEL_TOP_Y          244.0f
+#define LABEL_BOTTOM_Y       280.0f
 
 #define METRIC_COUNT 4
 enum {
@@ -53,7 +55,9 @@ enum {
 // Les quatre indicateurs du modèle Flutter sont répartis en deux niveaux.
 // MAP est volontairement héroïque au centre et reste disponible dans la bande
 // télémétrique basse, comme dans le sélecteur multi-métrique d'origine.
-static const float kMetricX[METRIC_COUNT] = {78.0f, 242.0f, 88.0f, 232.0f};
+// Les rangées inférieures sont resserrées vers le centre pour rester dans la
+// safe area circulaire, surtout aux deux coins bas du panneau.
+static const float kMetricX[METRIC_COUNT] = {90.0f, 230.0f, 96.0f, 224.0f};
 static const float kMetricY[METRIC_COUNT] = {
     VALUE_TOP_Y, VALUE_TOP_Y, VALUE_BOTTOM_Y, VALUE_BOTTOM_Y
 };
@@ -77,7 +81,6 @@ struct admission_screen_s {
     lv_obj_t *canvas;
 
     lv_obj_t *header;
-    lv_obj_t *subheader;
     lv_obj_t *status;
     lv_obj_t *hero_unit;
     lv_obj_t *hero_label;
@@ -212,10 +215,8 @@ static void draw_map_ring(lv_layer_t *layer, const ui_layout_t *layout,
                   i == 0 || i == MAP_TICK_COUNT ? 1.2f : 0.8f, separator);
     }
 
-    // Une piste secondaire très fine suggère la dépression qui se propage
-    // dans le plénum sans ajouter une seconde métrique concurrente.
-    draw_arc(layer, layout, CX, CY, 132.0f, 0.7f, 220.0f, 320.0f,
-             separator);
+    // La couronne est la seule indication graphique de la pression ; le
+    // centre reste réservé à sa valeur et au schéma de circulation.
 }
 
 static void draw_flow_arrow(lv_layer_t *layer, const ui_layout_t *layout,
@@ -287,17 +288,17 @@ static void draw_manifold(lv_layer_t *layer, const ui_layout_t *layout,
                   runner_x[i] + 2.5f, 211.0f, AIRFLOW_LINE_W, runner, false);
     }
 
-    // La matrice inférieure n'est jamais une grille fermée : chaque trait
-    // s'interrompt avant les cellules pour préserver la hiérarchie texte.
-    draw_line(layer, layout, 29.0f, MATRIX_LINE_Y, 137.0f, MATRIX_LINE_Y,
+    // Les séparateurs restent dans les gouttières : aucune ligne ne traverse
+    // une valeur ou son libellé. Le disque les découpe naturellement en bas.
+    draw_line(layer, layout, 32.0f, MATRIX_LINE_Y, 143.0f, MATRIX_LINE_Y,
               AIRFLOW_LINE_W, separator, false);
-    draw_line(layer, layout, 183.0f, MATRIX_LINE_Y, 291.0f, MATRIX_LINE_Y,
+    draw_line(layer, layout, 177.0f, MATRIX_LINE_Y, 288.0f, MATRIX_LINE_Y,
               AIRFLOW_LINE_W, separator, false);
-    draw_line(layer, layout, 29.0f, MATRIX_SPLIT_Y, 137.0f, MATRIX_SPLIT_Y,
+    draw_line(layer, layout, 32.0f, MATRIX_SPLIT_Y, 143.0f, MATRIX_SPLIT_Y,
               AIRFLOW_LINE_W, separator, false);
-    draw_line(layer, layout, 183.0f, MATRIX_SPLIT_Y, 291.0f, MATRIX_SPLIT_Y,
+    draw_line(layer, layout, 177.0f, MATRIX_SPLIT_Y, 288.0f, MATRIX_SPLIT_Y,
               AIRFLOW_LINE_W, separator, false);
-    draw_line(layer, layout, 160.0f, MATRIX_LINE_Y + 5.0f, 160.0f,
+    draw_line(layer, layout, 160.0f, MATRIX_LINE_Y + 4.0f, 160.0f,
               MATRIX_SPLIT_Y - 5.0f, AIRFLOW_LINE_W, separator, false);
     draw_line(layer, layout, 160.0f, MATRIX_SPLIT_Y + 5.0f, 160.0f,
               MATRIX_BOTTOM_Y - 5.0f, AIRFLOW_LINE_W, separator, false);
@@ -332,6 +333,9 @@ static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font,
     lv_obj_set_style_text_color(label, color, 0);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_pad_all(label, 0, 0);
+    // Une information reste sur une seule ligne : mieux vaut une largeur
+    // explicitement dimensionnée qu'un retour automatique dans le cadran.
+    lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
     lv_label_set_text_static(label, text != NULL ? text : "");
     return label;
 }
@@ -454,7 +458,7 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
     lv_obj_add_event_cb(scr->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
     snprintf(scr->hero_text, sizeof(scr->hero_text), "--");
-    snprintf(scr->status_text, sizeof(scr->status_text), "NO ECU LINK");
+    snprintf(scr->status_text, sizeof(scr->status_text), "HORS LIGNE");
     for (int i = 0; i < METRIC_COUNT; i++) {
         snprintf(scr->metric_text[i], sizeof(scr->metric_text[i]), "--");
     }
@@ -469,17 +473,15 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
     const lv_color_t dim = ui_theme_amber_dim();
 
     scr->header = make_label(scr->root, caption_font, bright, "ADMISSION");
-    scr->subheader = make_label(scr->root, caption_font, dim,
-                                "AIRFLOW / MANIFOLD");
     scr->status = make_label(scr->root, caption_font, dim, scr->status_text);
     scr->hero = text_create(scr->root, hero_font, CX, HERO_Y, 170, 2,
                             scr->hero_text);
     scr->hero_unit = make_label(scr->root, value_font, bright, "kPa");
     scr->hero_label = make_label(scr->root, caption_font, bright,
-                                 "MANIFOLD PRESSURE");
+                                 "PRESSION COLLECTEUR");
 
     static const char *const kMetricLabels[METRIC_COUNT] = {
-        "THROTTLE", "TPS", "INTAKE AIR", "MAP"
+        "PAPILLON", "TPS", "AIR ADMIS", "MAP"
     };
     for (int i = 0; i < METRIC_COUNT; i++) {
         scr->metric[i] = text_create(scr->root, value_font, kMetricX[i],
@@ -489,9 +491,9 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
                                           kMetricLabels[i]);
     }
 
-    if (scr->header == NULL || scr->subheader == NULL ||
-        scr->status == NULL || !text_valid(&scr->hero) ||
-        scr->hero_unit == NULL || scr->hero_label == NULL) goto fail;
+    if (scr->header == NULL || scr->status == NULL ||
+        !text_valid(&scr->hero) || scr->hero_unit == NULL ||
+        scr->hero_label == NULL) goto fail;
     for (int i = 0; i < METRIC_COUNT; i++) {
         if (!text_valid(&scr->metric[i]) || scr->metric_label[i] == NULL) {
             goto fail;
@@ -499,15 +501,14 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
     }
 
     place_label(scr->header, scr->root, CX, HEADER_Y, 180);
-    place_label(scr->subheader, scr->root, CX, SUBHEADER_Y, 220);
-    place_label(scr->status, scr->root, CX, STATUS_Y, 160);
+    place_label(scr->status, scr->root, CX, STATUS_Y, 220);
     place_text(&scr->hero, scr->root);
-    place_label(scr->hero_unit, scr->root, CX, HERO_UNIT_Y, 90);
-    place_label(scr->hero_label, scr->root, CX, HERO_LABEL_Y, 190);
+    place_label(scr->hero_unit, scr->root, CX, HERO_UNIT_Y, 70);
+    place_label(scr->hero_label, scr->root, CX, HERO_LABEL_Y, 240);
     for (int i = 0; i < METRIC_COUNT; i++) {
         place_text(&scr->metric[i], scr->root);
         place_label(scr->metric_label[i], scr->root, kMetricX[i],
-                    kMetricLabelY[i], 116);
+                    kMetricLabelY[i], 92);
     }
 
     return scr;
@@ -534,16 +535,16 @@ void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
 
     if (!scr->connected) {
         set_unavailable(scr);
-        snprintf(scr->status_text, sizeof(scr->status_text), "NO ECU LINK");
+        snprintf(scr->status_text, sizeof(scr->status_text), "HORS LIGNE");
     } else {
         snprintf(scr->hero_text, sizeof(scr->hero_text), "%.0f", scr->map_kpa);
-        set_metric_text(scr, METRIC_THROTTLE, "%.0f%%", scr->throttle);
-        set_metric_text(scr, METRIC_TPS, "%.2fV", scr->throttle_pot_voltage);
-        set_metric_text(scr, METRIC_INTAKE, "%.0f°C", scr->intake_air_temp);
-        // Le quatrième indicateur conserve la lecture MAP compacte du
-        // sélecteur multi-métrique, sans inventer une nouvelle donnée ECU.
-        set_metric_text(scr, METRIC_MAP_AUX, "%.0f", scr->map_kpa);
-        snprintf(scr->status_text, sizeof(scr->status_text), "AIR PATH / LIVE");
+        set_metric_text(scr, METRIC_THROTTLE, "%.0f %%", scr->throttle);
+        set_metric_text(scr, METRIC_TPS, "%.2f V", scr->throttle_pot_voltage);
+        set_metric_text(scr, METRIC_INTAKE, "%.0f °C", scr->intake_air_temp);
+        // La quatrième mesure garde la pression MAP sous forme compacte,
+        // tandis que la valeur héroïque reste la lecture principale.
+        set_metric_text(scr, METRIC_MAP_AUX, "%.0f kPa", scr->map_kpa);
+        snprintf(scr->status_text, sizeof(scr->status_text), "DONNÉES EN DIRECT");
     }
 
     text_set(&scr->hero, scr->root, scr->hero_text);
@@ -551,7 +552,7 @@ void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
         text_set(&scr->metric[i], scr->root, scr->metric_text[i]);
     }
     lv_label_set_text_static(scr->status, scr->status_text);
-    place_label(scr->status, scr->root, CX, STATUS_Y, 160);
+    place_label(scr->status, scr->root, CX, STATUS_Y, 220);
 
     // Les textes viennent de buffers persistants et set_text_static ne copie
     // rien : cette voie ne fait aucune allocation pendant une mise à jour.

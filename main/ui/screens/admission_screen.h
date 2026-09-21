@@ -3,8 +3,9 @@
 #include "lvgl.h"
 #include "domain/ecu_data.h"
 
-// Écran admission ambre pour le cadran rond 480 x 480. La géométrie, les
-// buffers texte et les objets LVGL restent privés à l'implémentation.
+// Écran admission ambre pour le cadran rond 480 x 480. La composition
+// respecte une safe area circulaire ; géométrie, textes et objets LVGL restent
+// privés à l'implémentation.
 typedef struct admission_screen_s admission_screen_t;
 
 // `parent` doit rester vivant jusqu'à admission_screen_destroy(). Les appels
