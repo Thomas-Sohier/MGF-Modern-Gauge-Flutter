@@ -77,7 +77,7 @@ mapfile -t LVGL_OBJS < <(find "$OBJ" -name '*.o')
 # 3. UI + simulateur (recompilés à chaque fois), liés aux objets LVGL du cache.
 echo ">> compilation UI + simulateur..."
 gcc "${CFLAGS[@]}" \
-    -DTTF_PATH="\"$MAIN/fonts/Michroma-Regular.ttf\"" \
+    -DMGF_SIMULATOR=1 -DTTF_PATH="\"$MAIN/fonts/Michroma-Regular.ttf\"" \
     "${UI_SRCS[@]}" "${LVGL_OBJS[@]}" \
     -lm -o "$BUILD/gen_golden"
 

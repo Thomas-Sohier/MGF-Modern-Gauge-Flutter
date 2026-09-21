@@ -203,6 +203,11 @@ static void hands_draw_cb(lv_event_t *event) {
 }
 
 static bool read_local_time(int *hour, int *minute) {
+#ifdef MGF_SIMULATOR
+    *hour = 10;
+    *minute = 10;
+    return true;
+#else
     const time_t now = time(NULL);
     const struct tm *local = now != (time_t)-1 ? localtime(&now) : NULL;
     if (local != NULL && local->tm_hour >= 0 && local->tm_hour < 24 &&
@@ -217,6 +222,7 @@ static bool read_local_time(int *hour, int *minute) {
     *hour = 12;
     *minute = 0;
     return false;
+#endif
 }
 
 clock_screen_t *clock_screen_create(lv_obj_t *parent) {
