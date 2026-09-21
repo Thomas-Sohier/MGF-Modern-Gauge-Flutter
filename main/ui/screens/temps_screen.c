@@ -10,10 +10,9 @@
 // ── Repère logique : 320 px, identique à style_amber.c ─────────────────────
 #define SCREEN_CX       160.0f
 #define HEADER_Y         20.0f
-#define SUBHEADER_Y      36.0f
-#define HEADER_LINE_Y     49.0f
+#define HEADER_LINE_Y     43.0f
 
-#define HERO_CY         116.0f
+#define HERO_CY         114.0f
 #define HERO_R_OUT       58.0f
 #define HERO_R_IN        51.0f
 #define HERO_START     208.0f
@@ -21,16 +20,22 @@
 #define HERO_TICK_R0    62.0f
 #define HERO_TICK_R1    67.0f
 
+// Les cinq colonnes sont rentrées dans le disque : à 480 px, les deux
+// colonnes extrêmes restent ainsi lisibles jusque dans leurs libellés.
 #define MATRIX_LINE_Y   184.0f
-#define CELL_CY         216.0f
-#define CELL_R_OUT       22.0f
-#define CELL_R_IN        17.0f
-#define CELL_START     208.0f
-#define CELL_END       332.0f
-#define MATRIX_BOTTOM_Y 290.0f
-#define STATUS_LINE_Y   298.0f
-#define STATUS_Y        303.0f
-#define SUMMARY_Y       315.0f
+#define CELL_CY         214.0f
+#define CELL_R_OUT       19.0f
+#define CELL_R_IN        15.0f
+#define CELL_START     210.0f
+#define CELL_END       330.0f
+#define MATRIX_BOTTOM_Y 278.0f
+#define STATUS_LINE_Y   285.0f
+#define STATUS_Y        292.0f
+#define SUMMARY_Y       306.0f
+#define METRIC_X0        58.0f
+#define METRIC_STEP      51.0f
+#define METRIC_VALUE_Y  243.0f
+#define METRIC_NAME_Y   259.0f
 
 #define SEPARATOR_W      0.8f
 #define METRIC_COUNT       5
@@ -67,7 +72,6 @@ struct temps_screen_s {
     lv_obj_t *overlay;
 
     lv_obj_t *header;
-    lv_obj_t *subheader;
     lv_obj_t *hero_value;
     lv_obj_t *hero_unit;
     lv_obj_t *hero_name;
@@ -182,11 +186,11 @@ static void canvas_draw_cb(lv_event_t *event) {
     const lv_color_t separator = ui_theme_amber_separator();
 
     // Fine ligne d'en-tête, interrompue au centre comme la grille du cadran.
-    draw_line(layer, ox + 25.0f * k, oy + HEADER_LINE_Y * k,
+    draw_line(layer, ox + 53.0f * k, oy + HEADER_LINE_Y * k,
               ox + 132.0f * k, oy + HEADER_LINE_Y * k,
               SEPARATOR_W * k, separator);
     draw_line(layer, ox + 188.0f * k, oy + HEADER_LINE_Y * k,
-              ox + 295.0f * k, oy + HEADER_LINE_Y * k,
+              ox + 267.0f * k, oy + HEADER_LINE_Y * k,
               SEPARATOR_W * k, separator);
 
     // Anneau principal : une réserve dim et une progression ambre active.
@@ -212,18 +216,18 @@ static void canvas_draw_cb(lv_event_t *event) {
               SEPARATOR_W * k, separator);
 
     // La matrice basse conserve une séparation ouverte à chaque intersection.
-    draw_line(layer, ox + 28.0f * k, oy + MATRIX_LINE_Y * k,
-              ox + 292.0f * k, oy + MATRIX_LINE_Y * k,
+    draw_line(layer, ox + 35.0f * k, oy + MATRIX_LINE_Y * k,
+              ox + 285.0f * k, oy + MATRIX_LINE_Y * k,
               SEPARATOR_W * k, separator);
     for (int i = 1; i < METRIC_COUNT; i++) {
-        const float x = ox + (float)(64 * i) * k;
+        const float x = ox + (METRIC_X0 + METRIC_STEP * ((float)i - 0.5f)) * k;
         draw_separator_with_gap(layer, x, oy + MATRIX_LINE_Y * k,
                                 oy + MATRIX_BOTTOM_Y * k, 7.0f * k, k);
     }
 
     // Cinq jauges thermiques compactes : même geste visuel, cinq plages ECU.
     for (int i = 0; i < METRIC_COUNT; i++) {
-        const float x = ox + (32.0f + (float)i * 64.0f) * k;
+        const float x = ox + (METRIC_X0 + (float)i * METRIC_STEP) * k;
         const float progress = clamp_progress(scr->values[i],
                                                kMetrics[i].maximum);
         const lv_color_t active = (i == METRIC_COOLANT || scr->danger[i])
@@ -233,8 +237,8 @@ static void canvas_draw_cb(lv_event_t *event) {
                           progress, dim, active);
     }
 
-    draw_line(layer, ox + 28.0f * k, oy + STATUS_LINE_Y * k,
-              ox + 292.0f * k, oy + STATUS_LINE_Y * k,
+    draw_line(layer, ox + 62.0f * k, oy + STATUS_LINE_Y * k,
+              ox + 258.0f * k, oy + STATUS_LINE_Y * k,
               SEPARATOR_W * k, separator);
 }
 
@@ -265,7 +269,6 @@ static void place_centered(const temps_screen_t *scr, lv_obj_t *label,
 
 static void place_labels(temps_screen_t *scr) {
     place_centered(scr, scr->header, SCREEN_CX, HEADER_Y);
-    place_centered(scr, scr->subheader, SCREEN_CX, SUBHEADER_Y);
     place_centered(scr, scr->hero_value, SCREEN_CX, HERO_CY - 4.0f);
     place_centered(scr, scr->hero_unit, SCREEN_CX + 43.0f, HERO_CY + 16.0f);
     place_centered(scr, scr->hero_name, SCREEN_CX, 157.0f);
@@ -273,10 +276,9 @@ static void place_labels(temps_screen_t *scr) {
     place_centered(scr, scr->summary, SCREEN_CX, SUMMARY_Y);
 
     for (int i = 0; i < METRIC_COUNT; i++) {
-        place_centered(scr, scr->metric_value[i],
-                       32.0f + (float)i * 64.0f, 256.0f);
-        place_centered(scr, scr->metric_name[i],
-                       32.0f + (float)i * 64.0f, 278.0f);
+        const float x = METRIC_X0 + (float)i * METRIC_STEP;
+        place_centered(scr, scr->metric_value[i], x, METRIC_VALUE_Y);
+        place_centered(scr, scr->metric_name[i], x, METRIC_NAME_Y);
     }
 }
 
@@ -327,8 +329,8 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
     lv_obj_clear_flag(scr->overlay, LV_OBJ_FLAG_SCROLLABLE);
 
     snprintf(scr->hero_text, sizeof(scr->hero_text), "--");
-    snprintf(scr->status_text, sizeof(scr->status_text), "NO LINK");
-    snprintf(scr->summary_text, sizeof(scr->summary_text), "WAITING FOR ECU");
+    snprintf(scr->status_text, sizeof(scr->status_text), "PAS DE LIAISON");
+    snprintf(scr->summary_text, sizeof(scr->summary_text), "EN ATTENTE");
     for (int i = 0; i < METRIC_COUNT; i++) {
         snprintf(scr->metric_text[i], sizeof(scr->metric_text[i]), "--");
     }
@@ -338,8 +340,8 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
     const lv_font_t *value = value_font();
     const lv_font_t *small = small_font();
 
-    scr->header = make_label(scr->overlay, small, bright, "TEMPERATURES");
-    scr->subheader = make_label(scr->overlay, small, dim, "LIVE SENSOR MATRIX");
+    scr->header = make_label(scr->overlay, small, bright,
+                             "TEMPERATURES / °C");
     scr->hero_value = make_label(scr->overlay, ui_font_or(ui_font_xl,
                                                            &lv_font_montserrat_48),
                                  bright, scr->hero_text);
@@ -348,8 +350,8 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
     scr->status = make_label(scr->overlay, small, dim, scr->status_text);
     scr->summary = make_label(scr->overlay, small, dim, scr->summary_text);
 
-    if (scr->header == NULL || scr->subheader == NULL ||
-        scr->hero_value == NULL || scr->hero_unit == NULL ||
+    if (scr->header == NULL || scr->hero_value == NULL ||
+        scr->hero_unit == NULL ||
         scr->hero_name == NULL || scr->status == NULL || scr->summary == NULL) {
         goto fail;
     }
@@ -392,8 +394,10 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
         if (scr->available[i] && raw > peak) peak = raw;
 
         if (scr->available[i]) {
+            // L'unité est annoncée dans l'en-tête : garder les cinq nombres
+            // seuls évite qu'un suffixe « °C » fasse toucher deux colonnes.
             snprintf(scr->metric_text[i], sizeof(scr->metric_text[i]),
-                     "%.0f°C", raw);
+                     "%.0f", raw);
         } else {
             snprintf(scr->metric_text[i], sizeof(scr->metric_text[i]), "--");
         }
@@ -417,14 +421,14 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
     lv_label_set_text_static(scr->hero_value, scr->hero_text);
 
     if (!data->connected) {
-        snprintf(scr->status_text, sizeof(scr->status_text), "NO LINK");
-        snprintf(scr->summary_text, sizeof(scr->summary_text), "WAITING FOR ECU");
+        snprintf(scr->status_text, sizeof(scr->status_text), "PAS DE LIAISON");
+        snprintf(scr->summary_text, sizeof(scr->summary_text), "EN ATTENTE");
     } else if (any_danger) {
-        snprintf(scr->status_text, sizeof(scr->status_text), "THERMAL / CHECK");
-        snprintf(scr->summary_text, sizeof(scr->summary_text), "PEAK %.0f°C", peak);
+        snprintf(scr->status_text, sizeof(scr->status_text), "ALERTE THERMIQUE");
+        snprintf(scr->summary_text, sizeof(scr->summary_text), "MAX. %.0f °C", peak);
     } else {
-        snprintf(scr->status_text, sizeof(scr->status_text), "THERMAL / NOMINAL");
-        snprintf(scr->summary_text, sizeof(scr->summary_text), "PEAK %.0f°C", peak);
+        snprintf(scr->status_text, sizeof(scr->status_text), "TEMPERATURES OK");
+        snprintf(scr->summary_text, sizeof(scr->summary_text), "MAX. %.0f °C", peak);
     }
     lv_label_set_text_static(scr->status, scr->status_text);
     lv_label_set_text_static(scr->summary, scr->summary_text);
