@@ -115,9 +115,7 @@ static void canvas_draw_cb(lv_event_t *event) {
 
     lv_area_t area;
     lv_obj_get_coords(canvas, &area);
-    ui_layout_t layout = amber_draw_layout(&area);
-    layout.ox += area.x1;
-    layout.oy += area.y1;
+    const ui_layout_t layout = amber_draw_layout(&area);
 
     draw_ring(layer, &layout, scr->feedback, scr->connected);
     draw_trim_scale(layer, &layout, 96.0f, scr->short_trim);
@@ -180,18 +178,14 @@ injection_screen_t *injection_screen_create(lv_obj_t *parent) {
     if (scr == NULL) return NULL;
     lv_memzero(scr, sizeof(*scr));
 
-    lv_obj_set_style_bg_color(parent, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
-    lv_obj_update_layout(parent);
-
     scr->root = amber_ui_root_create(parent);
     if (scr->root == NULL) goto fail;
     scr->canvas = amber_ui_canvas_create(scr->root, scr, canvas_draw_cb);
     if (scr->canvas == NULL) goto fail;
 
-    const lv_font_t *font_xl = ui_font_or(ui_font_xl, &lv_font_montserrat_48);
-    const lv_font_t *font_l = ui_font_or(ui_font_l, &lv_font_montserrat_20);
-    const lv_font_t *font_m = ui_font_or(ui_font_m, &lv_font_montserrat_14);
+    const lv_font_t *font_xl = amber_ui_font_hero();
+    const lv_font_t *font_l = amber_ui_font_value();
+    const lv_font_t *font_m = amber_ui_font_caption();
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
 
@@ -249,16 +243,16 @@ injection_screen_t *injection_screen_create(lv_obj_t *parent) {
                             130.0f, 0.0f);
     amber_ui_place_centered(scr->metric_shadow[METRIC_SHORT_TRIM], scr->root,
                             96.0f, TRIM_VALUE_Y, 108.0f,
-                            UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            amber_ui_bold_spread(1));
     amber_ui_place_centered(scr->metric_front[METRIC_SHORT_TRIM], scr->root,
                             96.0f, TRIM_VALUE_Y, 108.0f,
-                            -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            -amber_ui_bold_spread(1));
     amber_ui_place_centered(scr->metric_shadow[METRIC_LONG_TRIM], scr->root,
                             224.0f, TRIM_VALUE_Y, 108.0f,
-                            UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            amber_ui_bold_spread(1));
     amber_ui_place_centered(scr->metric_front[METRIC_LONG_TRIM], scr->root,
                             224.0f, TRIM_VALUE_Y, 108.0f,
-                            -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            -amber_ui_bold_spread(1));
 
     amber_ui_place_centered(inj_one_label, scr->root, 96.0f, INJ_LABEL_Y,
                             130.0f, 0.0f);
@@ -266,16 +260,16 @@ injection_screen_t *injection_screen_create(lv_obj_t *parent) {
                             130.0f, 0.0f);
     amber_ui_place_centered(scr->metric_shadow[METRIC_INJECTOR_1], scr->root,
                             96.0f, INJ_VALUE_Y, 108.0f,
-                            UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            amber_ui_bold_spread(1));
     amber_ui_place_centered(scr->metric_front[METRIC_INJECTOR_1], scr->root,
                             96.0f, INJ_VALUE_Y, 108.0f,
-                            -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            -amber_ui_bold_spread(1));
     amber_ui_place_centered(scr->metric_shadow[METRIC_INJECTOR_2], scr->root,
                             224.0f, INJ_VALUE_Y, 108.0f,
-                            UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            amber_ui_bold_spread(1));
     amber_ui_place_centered(scr->metric_front[METRIC_INJECTOR_2], scr->root,
                             224.0f, INJ_VALUE_Y, 108.0f,
-                            -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            -amber_ui_bold_spread(1));
 
     return scr;
 

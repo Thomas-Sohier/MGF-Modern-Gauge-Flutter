@@ -262,9 +262,9 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
                                             canvas_draw_cb);
     if (screen->canvas == NULL) goto fail;
 
-    const lv_font_t *font_xl = ui_font_or(ui_font_xl, &lv_font_montserrat_48);
-    const lv_font_t *font_value = ui_font_or(ui_font_l, &lv_font_montserrat_20);
-    const lv_font_t *font_caption = ui_font_or(ui_font_m, &lv_font_montserrat_14);
+    const lv_font_t *font_xl = amber_ui_font_hero();
+    const lv_font_t *font_value = amber_ui_font_value();
+    const lv_font_t *font_caption = amber_ui_font_caption();
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
 

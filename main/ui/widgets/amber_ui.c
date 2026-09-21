@@ -1,6 +1,7 @@
 #include "ui/widgets/amber_ui.h"
 
 #include "ui/themes/ui_theme.h"
+#include "ui/fonts/ui_fonts.h"
 #include "ui/ui_layout.h"
 
 #include <math.h>
@@ -60,6 +61,22 @@ lv_obj_t *amber_ui_label_create(lv_obj_t *parent, const lv_font_t *font,
     }
     lv_label_set_text_static(label, text);
     return label;
+}
+
+const lv_font_t *amber_ui_font_hero(void) {
+    return ui_font_or(ui_font_xl, &lv_font_montserrat_48);
+}
+
+const lv_font_t *amber_ui_font_value(void) {
+    return ui_font_or(ui_font_l, &lv_font_montserrat_20);
+}
+
+const lv_font_t *amber_ui_font_caption(void) {
+    return ui_font_or(ui_font_m, &lv_font_montserrat_14);
+}
+
+float amber_ui_bold_spread(unsigned physical_pixels) {
+    return (float)physical_pixels * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX;
 }
 
 void amber_ui_place_centered(lv_obj_t *object, lv_obj_t *parent,

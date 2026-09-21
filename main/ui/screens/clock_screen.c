@@ -232,23 +232,8 @@ clock_screen_t *clock_screen_create(lv_obj_t *parent) {
     if (screen == NULL) return NULL;
     lv_memzero(screen, sizeof(*screen));
 
-    lv_obj_set_style_bg_color(parent, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
-    lv_obj_update_layout(parent);
-
-    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
-                                lv_obj_get_content_height(parent));
-    if (side <= 0) goto fail;
-
-    screen->root = lv_obj_create(parent);
+    screen->root = amber_ui_root_create(parent);
     if (screen->root == NULL) goto fail;
-    lv_obj_remove_style_all(screen->root);
-    lv_obj_set_size(screen->root, side, side);
-    lv_obj_set_style_bg_color(screen->root, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(screen->root, LV_OPA_COVER, 0);
-    lv_obj_center(screen->root);
-    lv_obj_clear_flag(screen->root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_update_layout(screen->root);
 
     screen->face = amber_ui_canvas_create(screen->root, NULL, face_draw_cb);
     if (screen->face == NULL) goto fail;
@@ -256,7 +241,7 @@ clock_screen_t *clock_screen_create(lv_obj_t *parent) {
     screen->hands = amber_ui_canvas_create(screen->root, screen, hands_draw_cb);
     if (screen->hands == NULL) goto fail;
 
-    const lv_font_t *font = ui_font_or(ui_font_xl, &lv_font_montserrat_48);
+    const lv_font_t *font = amber_ui_font_hero();
     for (int i = 0; i < CARDINAL_COUNT; i++) {
         screen->labels[i] = amber_ui_label_create(
             screen->root, font, ui_theme_amber_bright(), k_cardinal_text[i], 0.0f);

@@ -7,6 +7,8 @@
 
 // Primitives vectorielles communes aux écrans ambre. Toutes les coordonnées
 // sont exprimées dans le repère logique 320×320 puis transformées ici.
+// Le layout retourné est directement exprimé dans les coordonnées absolues
+// de la couche de dessin : les écrans ne doivent pas rajouter l'origine.
 ui_layout_t amber_draw_layout(const lv_area_t *area);
 float amber_clampf(float value, float low, float high);
 float amber_progress(float value, float low, float high);

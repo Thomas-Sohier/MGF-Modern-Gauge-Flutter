@@ -85,9 +85,7 @@ static void canvas_draw_cb(lv_event_t *event) {
     lv_layer_t *layer = lv_event_get_layer(event);
     lv_area_t area;
     lv_obj_get_coords(canvas, &area);
-    ui_layout_t layout = amber_draw_layout(&area);
-    layout.ox += area.x1;
-    layout.oy += area.y1;
+    const ui_layout_t layout = amber_draw_layout(&area);
     ui_layout_t line_layout = layout;
     line_layout.ox -= 0.5f;
     line_layout.oy -= 0.5f;
@@ -119,7 +117,7 @@ navigation_screen_t *navigation_screen_create(lv_obj_t *parent) {
     if (scr->canvas == NULL) goto fail;
 
     const lv_font_t *font_m = ui_font_or(ui_font_m, &lv_font_montserrat_20);
-    const lv_font_t *font_xl = ui_font_or(ui_font_xl, &lv_font_montserrat_48);
+    const lv_font_t *font_xl = amber_ui_font_hero();
     const lv_font_t *font_small = ui_font_or(ui_font_l, &lv_font_montserrat_14);
 
     scr->header = amber_ui_label_create(scr->root, font_small,

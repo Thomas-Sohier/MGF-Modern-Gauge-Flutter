@@ -278,7 +278,7 @@ music_screen_t *music_screen_create(lv_obj_t *parent) {
     if (scr->canvas == NULL) goto fail;
 
     scr->title = amber_value_widget_create(
-        scr->root, ui_font_or(ui_font_l, &lv_font_montserrat_20), MUSIC_CX,
+        scr->root, amber_ui_font_value(), MUSIC_CX,
         TITLE_Y, 1, DEMO_TITLE);
     if (scr->title == NULL) goto fail;
 

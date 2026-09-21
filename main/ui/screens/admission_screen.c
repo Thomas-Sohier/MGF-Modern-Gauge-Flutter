@@ -256,7 +256,7 @@ static amber_text_t text_create(lv_obj_t *parent, const lv_font_t *font,
         text.shadow = NULL;
         return text;
     }
-    const float offset = (float)spread * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX;
+    const float offset = (float)spread * amber_ui_bold_spread(1);
     amber_ui_place_centered(text.shadow, parent, x, y, (float)width, offset);
     amber_ui_place_centered(text.front, parent, x, y, (float)width, -offset);
     return text;
@@ -361,15 +361,15 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
     amber_ui_place_centered(scr->status, scr->root, CX, STATUS_Y, 220.0f,
                              0.0f);
     amber_ui_place_centered(scr->hero.shadow, scr->root, CX, HERO_Y, 170.0f,
-                             2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                             amber_ui_bold_spread(2));
     amber_ui_place_centered(scr->hero.front, scr->root, CX, HERO_Y, 170.0f,
-                             -2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                             -amber_ui_bold_spread(2));
     amber_ui_place_centered(scr->hero_unit, scr->root, CX, HERO_UNIT_Y,
                              70.0f, 0.0f);
     amber_ui_place_centered(scr->hero_label, scr->root, CX, HERO_LABEL_Y,
                              240.0f, 0.0f);
     for (int i = 0; i < METRIC_COUNT; i++) {
-        const float offset = UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX;
+        const float offset = amber_ui_bold_spread(1);
         amber_ui_place_centered(scr->metric[i].shadow, scr->root,
                                 kMetricX[i], kMetricY[i], 112.0f, offset);
         amber_ui_place_centered(scr->metric[i].front, scr->root,

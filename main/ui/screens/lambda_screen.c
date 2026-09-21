@@ -163,9 +163,7 @@ static void canvas_draw_cb(lv_event_t *event) {
 
     lv_area_t area;
     lv_obj_get_coords(canvas, &area);
-    ui_layout_t layout = amber_draw_layout(&area);
-    layout.ox += area.x1;
-    layout.oy += area.y1;
+    const ui_layout_t layout = amber_draw_layout(&area);
 
     draw_afr_ring(layer, &layout, screen);
     draw_sensor_meter(layer, &layout, METER_X_LEFT, screen->lambda_mv,
@@ -213,42 +211,40 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
 
     screen->root = amber_ui_root_create(parent);
     if (screen->root == NULL) goto fail;
-    lv_obj_set_style_radius(screen->root, 0, 0);
-    lv_obj_set_style_clip_corner(screen->root, false, 0);
     screen->canvas = amber_ui_canvas_create(screen->root, screen,
                                             canvas_draw_cb);
     if (screen->canvas == NULL) goto fail;
 
     const lv_font_t *title_font = ui_font_or(ui_font_m, &lv_font_montserrat_20);
-    const lv_font_t *body_font = ui_font_or(ui_font_l, &lv_font_montserrat_20);
+    const lv_font_t *body_font = amber_ui_font_value();
     const lv_font_t *caption_font = &lv_font_montserrat_14;
-    const lv_font_t *hero_font = ui_font_or(ui_font_xl, &lv_font_montserrat_48);
+    const lv_font_t *hero_font = amber_ui_font_hero();
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
     const lv_color_t separator = ui_theme_amber_separator();
 
     screen->title.shadow = amber_ui_label_create(
-        screen->root, title_font, separator, "WIDEBAND / AFR", 0.0f);
+        screen->root, title_font, separator, "LARGE BANDE / AFR", 0.0f);
     screen->title.front = amber_ui_label_create(
-        screen->root, title_font, bright, "WIDEBAND / AFR", 0.0f);
+        screen->root, title_font, bright, "LARGE BANDE / AFR", 0.0f);
     amber_ui_place_centered(screen->title.shadow, screen->root, CX, 30.0f,
-                            0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, amber_ui_bold_spread(1));
     amber_ui_place_centered(screen->title.front, screen->root, CX, 30.0f,
-                            0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, -amber_ui_bold_spread(1));
 
     screen->subtitle.shadow = amber_ui_label_create(
-        screen->root, caption_font, dim, "SENSOR ARRAY", 0.0f);
+        screen->root, caption_font, dim, "RESEAU DE SONDES", 0.0f);
     screen->subtitle.front = amber_ui_label_create(
-        screen->root, caption_font, dim, "SENSOR ARRAY", 0.0f);
+        screen->root, caption_font, dim, "RESEAU DE SONDES", 0.0f);
     amber_ui_place_centered(screen->subtitle.shadow, screen->root, CX, 48.0f,
                             0.0f, 0.0f);
     amber_ui_place_centered(screen->subtitle.front, screen->root, CX, 48.0f,
                             0.0f, 0.0f);
 
     screen->signal.shadow = amber_ui_label_create(
-        screen->root, caption_font, separator, "SIGNAL LIVE", 0.0f);
+        screen->root, caption_font, separator, "SIGNAL ACTIF", 0.0f);
     screen->signal.front = amber_ui_label_create(
-        screen->root, caption_font, bright, "SIGNAL LIVE", 0.0f);
+        screen->root, caption_font, bright, "SIGNAL ACTIF", 0.0f);
     amber_ui_place_centered(screen->signal.shadow, screen->root, CX, 65.0f,
                             0.0f, 0.0f);
     amber_ui_place_centered(screen->signal.front, screen->root, CX, 65.0f,
@@ -259,27 +255,27 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
     screen->afr.front = amber_ui_label_create(
         screen->root, hero_font, bright, "0.00", 0.0f);
     amber_ui_place_centered(screen->afr.shadow, screen->root, CX, 141.0f,
-                            0.0f, 2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, amber_ui_bold_spread(2));
     amber_ui_place_centered(screen->afr.front, screen->root, CX, 141.0f,
-                            0.0f, -2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, -amber_ui_bold_spread(2));
 
     screen->afr_unit.shadow = amber_ui_label_create(
-        screen->root, body_font, separator, "AIR / FUEL", 0.0f);
+        screen->root, body_font, separator, "AIR / CARB.", 0.0f);
     screen->afr_unit.front = amber_ui_label_create(
-        screen->root, body_font, bright, "AIR / FUEL", 0.0f);
+        screen->root, body_font, bright, "AIR / CARB.", 0.0f);
     amber_ui_place_centered(screen->afr_unit.shadow, screen->root, CX, 177.0f,
-                            0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, amber_ui_bold_spread(1));
     amber_ui_place_centered(screen->afr_unit.front, screen->root, CX, 177.0f,
-                            0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, -amber_ui_bold_spread(1));
 
     screen->lambda_value.shadow = amber_ui_label_create(
         screen->root, body_font, separator, "0", 0.0f);
     screen->lambda_value.front = amber_ui_label_create(
         screen->root, body_font, bright, "0", 0.0f);
     amber_ui_place_centered(screen->lambda_value.shadow, screen->root, 67.0f,
-                            95.0f, 0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            95.0f, 0.0f, amber_ui_bold_spread(1));
     amber_ui_place_centered(screen->lambda_value.front, screen->root, 67.0f,
-                            95.0f, 0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            95.0f, 0.0f, -amber_ui_bold_spread(1));
 
     screen->lambda_unit.shadow = amber_ui_label_create(
         screen->root, caption_font, dim, "mV", 0.0f);
@@ -304,9 +300,9 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
     screen->o2_value.front = amber_ui_label_create(
         screen->root, body_font, bright, "0", 0.0f);
     amber_ui_place_centered(screen->o2_value.shadow, screen->root, 253.0f,
-                            95.0f, 0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            95.0f, 0.0f, amber_ui_bold_spread(1));
     amber_ui_place_centered(screen->o2_value.front, screen->root, 253.0f,
-                            95.0f, 0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            95.0f, 0.0f, -amber_ui_bold_spread(1));
 
     screen->o2_unit.shadow = amber_ui_label_create(
         screen->root, caption_font, dim, "mV", 0.0f);
@@ -318,9 +314,9 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
                             111.0f, 0.0f, 0.0f);
 
     screen->o2_label.shadow = amber_ui_label_create(
-        screen->root, caption_font, dim, "O2 SENSOR", 0.0f);
+        screen->root, caption_font, dim, "SONDE O2", 0.0f);
     screen->o2_label.front = amber_ui_label_create(
-        screen->root, caption_font, dim, "O2 SENSOR", 0.0f);
+        screen->root, caption_font, dim, "SONDE O2", 0.0f);
     amber_ui_place_centered(screen->o2_label.shadow, screen->root, 253.0f,
                             130.0f, 0.0f, 0.0f);
     amber_ui_place_centered(screen->o2_label.front, screen->root, 253.0f,
@@ -331,9 +327,9 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
     screen->duty_value.front = amber_ui_label_create(
         screen->root, body_font, bright, "0", 0.0f);
     amber_ui_place_centered(screen->duty_value.shadow, screen->root, CX, 230.0f,
-                            0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, amber_ui_bold_spread(1));
     amber_ui_place_centered(screen->duty_value.front, screen->root, CX, 230.0f,
-                            0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, -amber_ui_bold_spread(1));
 
     screen->duty_unit.shadow = amber_ui_label_create(
         screen->root, caption_font, dim, "%", 0.0f);
@@ -345,9 +341,9 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
                             0.0f, 0.0f);
 
     screen->duty_label.shadow = amber_ui_label_create(
-        screen->root, caption_font, dim, "HEATER DUTY", 0.0f);
+        screen->root, caption_font, dim, "CHAUFFAGE", 0.0f);
     screen->duty_label.front = amber_ui_label_create(
-        screen->root, caption_font, dim, "HEATER DUTY", 0.0f);
+        screen->root, caption_font, dim, "CHAUFFAGE", 0.0f);
     amber_ui_place_centered(screen->duty_label.shadow, screen->root, CX, 266.0f,
                             0.0f, 0.0f);
     amber_ui_place_centered(screen->duty_label.front, screen->root, CX, 266.0f,
@@ -406,30 +402,30 @@ void lambda_screen_update(lambda_screen_t *screen, const ecu_data_t *data) {
     lv_label_set_text_static(screen->afr.shadow, screen->afr_buf);
     lv_label_set_text_static(screen->afr.front, screen->afr_buf);
     amber_ui_place_centered(screen->afr.shadow, screen->root, CX, 141.0f,
-                            0.0f, 2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, amber_ui_bold_spread(2));
     amber_ui_place_centered(screen->afr.front, screen->root, CX, 141.0f,
-                            0.0f, -2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, -amber_ui_bold_spread(2));
 
     lv_label_set_text_static(screen->lambda_value.shadow, screen->lambda_buf);
     lv_label_set_text_static(screen->lambda_value.front, screen->lambda_buf);
     amber_ui_place_centered(screen->lambda_value.shadow, screen->root, 67.0f,
-                            95.0f, 0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            95.0f, 0.0f, amber_ui_bold_spread(1));
     amber_ui_place_centered(screen->lambda_value.front, screen->root, 67.0f,
-                            95.0f, 0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            95.0f, 0.0f, -amber_ui_bold_spread(1));
 
     lv_label_set_text_static(screen->o2_value.shadow, screen->o2_buf);
     lv_label_set_text_static(screen->o2_value.front, screen->o2_buf);
     amber_ui_place_centered(screen->o2_value.shadow, screen->root, 253.0f,
-                            95.0f, 0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            95.0f, 0.0f, amber_ui_bold_spread(1));
     amber_ui_place_centered(screen->o2_value.front, screen->root, 253.0f,
-                            95.0f, 0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            95.0f, 0.0f, -amber_ui_bold_spread(1));
 
     lv_label_set_text_static(screen->duty_value.shadow, screen->duty_buf);
     lv_label_set_text_static(screen->duty_value.front, screen->duty_buf);
     amber_ui_place_centered(screen->duty_value.shadow, screen->root, CX, 230.0f,
-                            0.0f, UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, amber_ui_bold_spread(1));
     amber_ui_place_centered(screen->duty_value.front, screen->root, CX, 230.0f,
-                            0.0f, -UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+                            0.0f, -amber_ui_bold_spread(1));
 
     const char *signal = screen->connected ? "SIGNAL LIVE" : "SIGNAL LOST";
     lv_label_set_text_static(screen->signal.shadow, signal);

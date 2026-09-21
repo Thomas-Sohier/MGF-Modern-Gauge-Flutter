@@ -262,7 +262,7 @@ static void place_labels(temps_screen_t *scr) {
 }
 
 static const lv_font_t *value_font(void) {
-    return ui_font_or(ui_font_l, &lv_font_montserrat_20);
+    return amber_ui_font_value();
 }
 
 static const lv_font_t *small_font(void) {
@@ -278,10 +278,6 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
 
     scr->root = amber_ui_root_create(parent);
     if (scr->root == NULL) goto fail;
-    // This screen historically used a square root; keep its background and
-    // clipping behavior unchanged while sharing the common construction.
-    lv_obj_set_style_radius(scr->root, 0, 0);
-    lv_obj_set_style_clip_corner(scr->root, false, 0);
     scr->canvas = amber_ui_canvas_create(scr->root, scr, canvas_draw_cb);
     if (scr->canvas == NULL) goto fail;
 
@@ -306,7 +302,7 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
     scr->header = amber_ui_label_create(scr->overlay, small, bright,
                                         "TEMPERATURES / °C", 0.0f);
     scr->hero_value = amber_ui_label_create(
-        scr->overlay, ui_font_or(ui_font_xl, &lv_font_montserrat_48), bright,
+        scr->overlay, amber_ui_font_hero(), bright,
         scr->hero_text, 0.0f);
     scr->hero_unit = amber_ui_label_create(scr->overlay, value, bright, "°C",
                                            0.0f);

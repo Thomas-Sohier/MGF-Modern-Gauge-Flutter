@@ -122,9 +122,7 @@ static void canvas_draw_cb(lv_event_t *event) {
 
     lv_area_t area;
     lv_obj_get_coords(canvas, &area);
-    ui_layout_t layout = amber_draw_layout(&area);
-    layout.ox += area.x1;
-    layout.oy += area.y1;
+    const ui_layout_t layout = amber_draw_layout(&area);
     ui_layout_t line_layout = layout;
     line_layout.ox -= 0.5f;
     line_layout.oy -= 0.5f;
@@ -169,18 +167,12 @@ faults_screen_t *faults_screen_create(lv_obj_t *parent) {
     if (scr == NULL) return NULL;
     lv_memzero(scr, sizeof(*scr));
 
-    lv_obj_set_style_bg_color(parent, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
-    lv_obj_update_layout(parent);
-
     scr->root = amber_ui_root_create(parent);
     if (scr->root == NULL) goto fail;
-    lv_obj_set_style_radius(scr->root, 0, 0);
-    lv_obj_set_style_clip_corner(scr->root, false, 0);
     scr->canvas = amber_ui_canvas_create(scr->root, scr, canvas_draw_cb);
     if (scr->canvas == NULL) goto fail;
 
-    const lv_font_t *title_font = ui_font_or(ui_font_l, &lv_font_montserrat_20);
+    const lv_font_t *title_font = amber_ui_font_value();
     const lv_font_t *body_font = ui_font_or(ui_font_m, &lv_font_montserrat_20);
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();

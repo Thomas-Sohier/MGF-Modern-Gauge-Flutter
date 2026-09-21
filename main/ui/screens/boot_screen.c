@@ -10,8 +10,7 @@
 #include "ui/screens/boot_screen.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/fonts/ui_fonts.h"
-
-#include <stdlib.h>
+#include "ui/widgets/amber_ui.h"
 
 #define BOOT_LOGO_SIZE 240
 
@@ -83,14 +82,11 @@ static lv_vector_path_t *create_logo_path(void) {
 
 boot_screen_t *boot_screen_create(lv_obj_t *parent) {
     if (parent == NULL) return NULL;
-    boot_screen_t *screen = calloc(1, sizeof(*screen));
+    boot_screen_t *screen = lv_malloc(sizeof(*screen));
     if (screen == NULL) return NULL;
-    screen->root = lv_obj_create(parent);
-    if (screen->root == NULL) { free(screen); return NULL; }
-    lv_obj_remove_style_all(screen->root);
-    lv_obj_set_size(screen->root, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_style_bg_color(screen->root, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(screen->root, LV_OPA_COVER, 0);
+    lv_memzero(screen, sizeof(*screen));
+    screen->root = amber_ui_root_create(parent);
+    if (screen->root == NULL) { lv_free(screen); return NULL; }
 
     LV_DRAW_BUF_INIT_STATIC(draw_buf);
     screen->canvas = lv_canvas_create(screen->root);
@@ -111,7 +107,7 @@ boot_screen_t *boot_screen_create(lv_obj_t *parent) {
 
     screen->label = lv_label_create(screen->root);
     if (screen->label == NULL) { boot_screen_destroy(screen); return NULL; }
-    lv_label_set_text(screen->label, "SYSTEM STARTING");
+    lv_label_set_text(screen->label, "DEMARRAGE SYSTEME");
     lv_obj_set_style_text_color(screen->label, ui_theme_amber_dim(), 0);
     lv_obj_set_style_text_font(screen->label, ui_font_or(ui_font_m, LV_FONT_DEFAULT), 0);
     lv_obj_center(screen->label);
@@ -122,5 +118,5 @@ boot_screen_t *boot_screen_create(lv_obj_t *parent) {
 void boot_screen_destroy(boot_screen_t *screen) {
     if (screen == NULL) return;
     if (screen->root != NULL) lv_obj_delete(screen->root);
-    free(screen);
+    lv_free(screen);
 }

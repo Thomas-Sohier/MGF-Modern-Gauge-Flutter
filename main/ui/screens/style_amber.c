@@ -189,22 +189,10 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
     if (scr == NULL) return NULL;
     lv_memzero(scr, sizeof(*scr));
 
-    lv_obj_set_style_bg_color(parent, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
-
-    lv_obj_update_layout(parent);
-    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
-                               lv_obj_get_content_height(parent));
-    if (side <= 0) goto fail;
-
-    scr->root = lv_obj_create(parent);
+    scr->root = amber_ui_root_create(parent);
     if (scr->root == NULL) goto fail;
-    lv_obj_remove_style_all(scr->root);
-    lv_obj_set_size(scr->root, side, side);
-    lv_obj_center(scr->root);
-    lv_obj_clear_flag(scr->root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_update_layout(scr->root);
     parent = scr->root;
+    const int32_t side = lv_obj_get_width(scr->root);
     const ui_layout_t layout = ui_layout_fit(side, side);
     const float k = layout.scale;
 
@@ -212,7 +200,7 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
     if (scr->canvas == NULL) goto fail;
 
     scr->value = amber_value_widget_create(
-        parent, ui_font_or(ui_font_xl, &lv_font_montserrat_48),
+        parent, amber_ui_font_hero(),
         RPM_VAL_X, RPM_VAL_Y, BOLD_XL, "0");
     if (scr->value == NULL) goto fail;
 

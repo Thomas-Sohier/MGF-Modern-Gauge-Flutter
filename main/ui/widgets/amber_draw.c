@@ -11,7 +11,11 @@ static int32_t scaled(float value) {
 }
 
 ui_layout_t amber_draw_layout(const lv_area_t *area) {
-    return ui_layout_fit(lv_area_get_width(area), lv_area_get_height(area));
+    ui_layout_t layout = ui_layout_fit(lv_area_get_width(area),
+                                       lv_area_get_height(area));
+    layout.ox += area->x1;
+    layout.oy += area->y1;
+    return layout;
 }
 
 float amber_clampf(float value, float low, float high) {

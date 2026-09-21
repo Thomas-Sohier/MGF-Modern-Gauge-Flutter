@@ -205,9 +205,9 @@ ignition_screen_t *ignition_screen_create(lv_obj_t *parent) {
                                             canvas_draw_cb);
     if (screen->canvas == NULL) goto fail;
 
-    const lv_font_t *font_xl = ui_font_or(ui_font_xl, &lv_font_montserrat_48);
-    const lv_font_t *font_value = ui_font_or(ui_font_l, &lv_font_montserrat_20);
-    const lv_font_t *font_caption = ui_font_or(ui_font_m, &lv_font_montserrat_14);
+    const lv_font_t *font_xl = amber_ui_font_hero();
+    const lv_font_t *font_value = amber_ui_font_value();
+    const lv_font_t *font_caption = amber_ui_font_caption();
 
     screen->advance_text[0] = '0';
     screen->advance_text[1] = '\0';
@@ -260,10 +260,10 @@ ignition_screen_t *ignition_screen_create(lv_obj_t *parent) {
 
     amber_ui_place_centered(
         screen->advance_shadow, screen->root, SCREEN_CX, 143.0f, 0.0f,
-        BOLD_SPREAD_PX * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+        amber_ui_bold_spread(BOLD_SPREAD_PX));
     amber_ui_place_centered(
         screen->advance, screen->root, SCREEN_CX, 143.0f, 0.0f,
-        -BOLD_SPREAD_PX * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+        -amber_ui_bold_spread(BOLD_SPREAD_PX));
     amber_ui_place_centered(screen->advance_caption, screen->root, SCREEN_CX,
                              181.0f, 0.0f, 0.0f);
 
@@ -308,10 +308,10 @@ void ignition_screen_update(ignition_screen_t *screen, const ecu_data_t *data) {
     // géométrique et n'alloue rien, tandis que le canvas redessine l'arc.
     amber_ui_place_centered(
         screen->advance_shadow, screen->root, SCREEN_CX, 143.0f, 0.0f,
-        BOLD_SPREAD_PX * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+        amber_ui_bold_spread(BOLD_SPREAD_PX));
     amber_ui_place_centered(
         screen->advance, screen->root, SCREEN_CX, 143.0f, 0.0f,
-        -BOLD_SPREAD_PX * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+        -amber_ui_bold_spread(BOLD_SPREAD_PX));
     for (int i = 0; i < 4; i++) {
         amber_ui_place_centered(screen->metric_value[i], screen->root,
                                 k_metric_x[i], k_metric_value_y[i], 0.0f,
