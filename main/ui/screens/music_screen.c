@@ -3,6 +3,7 @@
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/ui_layout.h"
+#include "ui/widgets/amber_ui.h"
 #include "ui/widgets/amber_value.h"
 
 #include <math.h>
@@ -248,31 +249,6 @@ static void canvas_draw_cb(lv_event_t *event) {
     draw_controls(layer, &layout, true);
 }
 
-static void place_centered(lv_obj_t *object, lv_obj_t *parent, float x,
-                           float y) {
-    lv_obj_update_layout(object);
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
-                                              lv_obj_get_height(parent));
-    lv_obj_set_pos(object,
-                   (int32_t)lroundf(ui_layout_x(&layout, x)) -
-                       lv_obj_get_width(object) / 2,
-                   (int32_t)lroundf(ui_layout_y(&layout, y)) -
-                       lv_obj_get_height(object) / 2);
-}
-
-static lv_obj_t *create_label(lv_obj_t *parent, const lv_font_t *font,
-                              lv_color_t color, const char *text, float x,
-                              float y) {
-    lv_obj_t *label = lv_label_create(parent);
-    if (label == NULL) return NULL;
-    lv_obj_set_style_text_font(label, font, 0);
-    lv_obj_set_style_text_color(label, color, 0);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(label, text);
-    place_centered(label, parent, x, y);
-    return label;
-}
-
 music_screen_t *music_screen_create(lv_obj_t *parent) {
     if (parent == NULL) return NULL;
 
@@ -298,35 +274,33 @@ music_screen_t *music_screen_create(lv_obj_t *parent) {
     lv_obj_set_style_bg_opa(scr->root, LV_OPA_COVER, 0);
     lv_obj_clear_flag(scr->root, LV_OBJ_FLAG_SCROLLABLE);
 
-    scr->canvas = lv_obj_create(scr->root);
+    scr->canvas = amber_ui_canvas_create(scr->root, scr, canvas_draw_cb);
     if (scr->canvas == NULL) goto fail;
-    lv_obj_remove_style_all(scr->canvas);
-    lv_obj_set_size(scr->canvas, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(scr->canvas, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_user_data(scr->canvas, scr);
-    lv_obj_add_event_cb(scr->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
     scr->title = amber_value_widget_create(
         scr->root, ui_font_or(ui_font_l, &lv_font_montserrat_20), MUSIC_CX,
         TITLE_Y, 1, DEMO_TITLE);
     if (scr->title == NULL) goto fail;
 
-    scr->artist = create_label(scr->root,
-                               ui_font_or(ui_font_m, &lv_font_montserrat_20),
-                               ui_theme_amber_dim(), DEMO_ARTIST, MUSIC_CX,
-                               ARTIST_Y);
+    scr->artist = amber_ui_label_create(
+        scr->root, ui_font_or(ui_font_m, &lv_font_montserrat_20),
+        ui_theme_amber_dim(), DEMO_ARTIST, 0.0f);
+    amber_ui_place_centered(scr->artist, scr->root, MUSIC_CX, ARTIST_Y, 0.0f,
+                            0.0f);
     if (scr->artist == NULL) goto fail;
 
-    scr->position = create_label(scr->root,
-                                 ui_font_or(ui_font_m, &lv_font_montserrat_20),
-                                 ui_theme_amber_dim(), DEMO_POSITION, 65.0f,
-                                 TIME_Y);
+    scr->position = amber_ui_label_create(
+        scr->root, ui_font_or(ui_font_m, &lv_font_montserrat_20),
+        ui_theme_amber_dim(), DEMO_POSITION, 0.0f);
+    amber_ui_place_centered(scr->position, scr->root, 65.0f, TIME_Y, 0.0f,
+                            0.0f);
     if (scr->position == NULL) goto fail;
 
-    scr->duration = create_label(scr->root,
-                                 ui_font_or(ui_font_m, &lv_font_montserrat_20),
-                                 ui_theme_amber_dim(), DEMO_DURATION, 255.0f,
-                                 TIME_Y);
+    scr->duration = amber_ui_label_create(
+        scr->root, ui_font_or(ui_font_m, &lv_font_montserrat_20),
+        ui_theme_amber_dim(), DEMO_DURATION, 0.0f);
+    amber_ui_place_centered(scr->duration, scr->root, 255.0f, TIME_Y, 0.0f,
+                            0.0f);
     if (scr->duration == NULL) goto fail;
 
     return scr;

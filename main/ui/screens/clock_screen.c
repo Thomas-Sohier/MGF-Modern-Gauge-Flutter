@@ -3,6 +3,7 @@
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/ui_layout.h"
+#include "ui/widgets/amber_ui.h"
 
 #include <math.h>
 #include <time.h>
@@ -218,20 +219,6 @@ static bool read_local_time(int *hour, int *minute) {
     return false;
 }
 
-static void place_cardinal_label(lv_obj_t *label, lv_obj_t *root,
-                                 float angle_degrees) {
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(root),
-                                             lv_obj_get_height(root));
-    lv_obj_update_layout(label);
-
-    const float angle = angle_degrees * (float)M_PI / 180.0f;
-    const float x = ui_layout_x(&layout, CLOCK_CX + cosf(angle) * LABEL_RADIUS);
-    const float y = ui_layout_y(&layout, CLOCK_CY + sinf(angle) * LABEL_RADIUS);
-    lv_obj_set_pos(label,
-                   (int32_t)lroundf(x) - lv_obj_get_width(label) / 2,
-                   (int32_t)lroundf(y) - lv_obj_get_height(label) / 2);
-}
-
 clock_screen_t *clock_screen_create(lv_obj_t *parent) {
     if (parent == NULL) return NULL;
 
@@ -257,31 +244,23 @@ clock_screen_t *clock_screen_create(lv_obj_t *parent) {
     lv_obj_clear_flag(screen->root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_update_layout(screen->root);
 
-    screen->face = lv_obj_create(screen->root);
+    screen->face = amber_ui_canvas_create(screen->root, NULL, face_draw_cb);
     if (screen->face == NULL) goto fail;
-    lv_obj_remove_style_all(screen->face);
-    lv_obj_set_size(screen->face, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(screen->face, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_event_cb(screen->face, face_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
-    screen->hands = lv_obj_create(screen->root);
+    screen->hands = amber_ui_canvas_create(screen->root, screen, hands_draw_cb);
     if (screen->hands == NULL) goto fail;
-    lv_obj_remove_style_all(screen->hands);
-    lv_obj_set_size(screen->hands, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(screen->hands, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_user_data(screen->hands, screen);
-    lv_obj_add_event_cb(screen->hands, hands_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
     const lv_font_t *font = ui_font_or(ui_font_xl, &lv_font_montserrat_48);
     for (int i = 0; i < CARDINAL_COUNT; i++) {
-        screen->labels[i] = lv_label_create(screen->root);
+        screen->labels[i] = amber_ui_label_create(
+            screen->root, font, ui_theme_amber_bright(), k_cardinal_text[i], 0.0f);
         if (screen->labels[i] == NULL) goto fail;
-        lv_obj_set_style_text_font(screen->labels[i], font, 0);
-        lv_obj_set_style_text_color(screen->labels[i], ui_theme_amber_bright(), 0);
-        lv_obj_set_style_text_align(screen->labels[i], LV_TEXT_ALIGN_CENTER, 0);
-        lv_label_set_text(screen->labels[i], k_cardinal_text[i]);
-        place_cardinal_label(screen->labels[i], screen->root,
-                             k_cardinal_angle[i]);
+
+        const float angle = k_cardinal_angle[i] * (float)M_PI / 180.0f;
+        amber_ui_place_centered(
+            screen->labels[i], screen->root,
+            CLOCK_CX + cosf(angle) * LABEL_RADIUS,
+            CLOCK_CY + sinf(angle) * LABEL_RADIUS, 0.0f, 0.0f);
     }
 
     read_local_time(&screen->hour, &screen->minute);

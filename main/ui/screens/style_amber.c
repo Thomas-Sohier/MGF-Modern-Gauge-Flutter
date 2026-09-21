@@ -2,6 +2,7 @@
 #include "ui/icons/dash_icons.h"
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
+#include "ui/widgets/amber_ui.h"
 #include "ui/widgets/amber_value.h"
 #include "ui/ui_layout.h"
 
@@ -181,14 +182,6 @@ static void canvas_draw_cb(lv_event_t *e) {
 
 // ── 2. CRÉATION ──────────────────────────────────────────────────────────────
 
-static void place(lv_obj_t *o, lv_obj_t *parent, float rx, float ry) {
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
-                                              lv_obj_get_height(parent));
-    lv_obj_align(o, LV_ALIGN_TOP_LEFT,
-                 (int32_t)lroundf(ui_layout_x(&layout, rx)),
-                 (int32_t)lroundf(ui_layout_y(&layout, ry)));
-}
-
 amber_screen_t *amber_screen_create(lv_obj_t *parent) {
     if (parent == NULL) return NULL;
 
@@ -215,13 +208,8 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
     const ui_layout_t layout = ui_layout_fit(side, side);
     const float k = layout.scale;
 
-    scr->canvas = lv_obj_create(parent);
+    scr->canvas = amber_ui_canvas_create(parent, scr, canvas_draw_cb);
     if (scr->canvas == NULL) goto fail;
-    lv_obj_remove_style_all(scr->canvas);
-    lv_obj_set_size(scr->canvas, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(scr->canvas, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_user_data(scr->canvas, scr);
-    lv_obj_add_event_cb(scr->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
     scr->value = amber_value_widget_create(
         parent, ui_font_or(ui_font_xl, &lv_font_montserrat_48),
@@ -238,8 +226,8 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
         scr->icons[i] = dash_icon_create(parent, kInd[i].icon, isz,
                                          ui_theme_amber_bright());
         if (scr->icons[i] == NULL) goto fail;
-        place(scr->icons[i], parent, kInd[i].x - IND_ICON_SZ * 0.5f,
-              kInd[i].icon_y - IND_ICON_SZ * 0.5f);
+        amber_ui_place_centered(scr->icons[i], parent, kInd[i].x,
+                                kInd[i].icon_y, 0.0f, 0.0f);
 
         scr->ind_value[i] = amber_value_widget_create(
             parent, ui_font_or(ui_font_m, &lv_font_montserrat_20),
