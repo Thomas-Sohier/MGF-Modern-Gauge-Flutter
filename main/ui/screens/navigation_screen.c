@@ -2,7 +2,7 @@
 
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
-#include "ui/ui_layout.h"
+#include "ui/widgets/amber_draw.h"
 #include "ui/widgets/amber_value.h"
 
 #include <math.h>
@@ -30,98 +30,51 @@ struct navigation_screen_s {
     amber_value_widget_t *distance_unit;
 };
 
-static ui_layout_t layout_of(const lv_area_t *area) {
-    ui_layout_t layout = ui_layout_fit(lv_area_get_width(area),
-                                        lv_area_get_height(area));
-    layout.ox += area->x1;
-    layout.oy += area->y1;
-    return layout;
-}
-
-static float px(const ui_layout_t *layout, float x) {
-    return ui_layout_x(layout, x);
-}
-
-static float py(const ui_layout_t *layout, float y) {
-    return ui_layout_y(layout, y);
-}
-
-static void draw_line(lv_layer_t *layer, const ui_layout_t *layout,
-                      float x1, float y1, float x2, float y2,
-                      float width, lv_color_t color, bool rounded) {
-    lv_draw_line_dsc_t dsc;
-    lv_draw_line_dsc_init(&dsc);
-    dsc.color = color;
-    dsc.opa = LV_OPA_COVER;
-    dsc.width = LV_MAX(1, (int32_t)lroundf(width * layout->scale));
-    dsc.round_start = rounded;
-    dsc.round_end = rounded;
-    dsc.p1.x = px(layout, x1);
-    dsc.p1.y = py(layout, y1);
-    dsc.p2.x = px(layout, x2);
-    dsc.p2.y = py(layout, y2);
-    lv_draw_line(layer, &dsc);
-}
-
-static void draw_arc(lv_layer_t *layer, const ui_layout_t *layout,
-                     float cx, float cy, float radius, float width,
-                     float start_angle, float end_angle, lv_color_t color) {
-    lv_draw_arc_dsc_t dsc;
-    lv_draw_arc_dsc_init(&dsc);
-    dsc.center.x = lroundf(px(layout, cx));
-    dsc.center.y = lroundf(py(layout, cy));
-    dsc.radius = lroundf(radius * layout->scale);
-    dsc.width = LV_MAX(1, (int32_t)lroundf(width * layout->scale));
-    dsc.start_angle = start_angle;
-    dsc.end_angle = end_angle;
-    dsc.color = color;
-    dsc.opa = LV_OPA_COVER;
-    dsc.rounded = 0;
-    lv_draw_arc(layer, &dsc);
-}
-
 static void draw_route(lv_layer_t *layer, const ui_layout_t *layout) {
     const lv_color_t road = ui_theme_amber_separator();
     const lv_color_t core = ui_theme_amber_bright();
     const lv_color_t guide = ui_theme_amber_dim();
+    ui_layout_t line_layout = *layout;
+    line_layout.ox -= 0.5f;
+    line_layout.oy -= 0.5f;
 
     // Deux courbes fines donnent un repère de carte sans remplir la surface.
-    draw_arc(layer, layout, NAV_CX, NAV_ROUTE_CY, NAV_ROUTE_R, NAV_LINE_W,
-             205.0f, 335.0f, guide);
-    draw_arc(layer, layout, NAV_CX, NAV_ROUTE_CY, NAV_ROUTE_R + 8.0f,
-             NAV_LINE_W, 205.0f, 335.0f, road);
+    amber_draw_arc(layer, layout, NAV_CX, NAV_ROUTE_CY, NAV_ROUTE_R,
+                   NAV_LINE_W, 205.0f, 335.0f, guide, false);
+    amber_draw_arc(layer, layout, NAV_CX, NAV_ROUTE_CY, NAV_ROUTE_R + 8.0f,
+                   NAV_LINE_W, 205.0f, 335.0f, road, false);
 
     // Route principale : couche large sombre/ambre puis liseré lumineux.
-    draw_line(layer, layout, 154.0f, 166.0f, 154.0f, 137.0f,
-              NAV_ROUTE_ROAD_W, road, true);
-    draw_line(layer, layout, 154.0f, 137.0f, 164.0f, 119.0f,
-              NAV_ROUTE_ROAD_W, road, true);
-    draw_line(layer, layout, 164.0f, 119.0f, 184.0f, 105.0f,
-              NAV_ROUTE_ROAD_W, road, true);
-    draw_line(layer, layout, 184.0f, 105.0f, 219.0f, 105.0f,
-              NAV_ROUTE_ROAD_W, road, true);
+    amber_draw_line(layer, &line_layout, 154.0f, 166.0f, 154.0f, 137.0f,
+                    NAV_ROUTE_ROAD_W, road, true);
+    amber_draw_line(layer, &line_layout, 154.0f, 137.0f, 164.0f, 119.0f,
+                    NAV_ROUTE_ROAD_W, road, true);
+    amber_draw_line(layer, &line_layout, 164.0f, 119.0f, 184.0f, 105.0f,
+                    NAV_ROUTE_ROAD_W, road, true);
+    amber_draw_line(layer, &line_layout, 184.0f, 105.0f, 219.0f, 105.0f,
+                    NAV_ROUTE_ROAD_W, road, true);
 
-    draw_line(layer, layout, 154.0f, 166.0f, 154.0f, 137.0f,
-              NAV_ROUTE_CORE_W, core, true);
-    draw_line(layer, layout, 154.0f, 137.0f, 164.0f, 119.0f,
-              NAV_ROUTE_CORE_W, core, true);
-    draw_line(layer, layout, 164.0f, 119.0f, 184.0f, 105.0f,
-              NAV_ROUTE_CORE_W, core, true);
-    draw_line(layer, layout, 184.0f, 105.0f, 219.0f, 105.0f,
-              NAV_ROUTE_CORE_W, core, true);
+    amber_draw_line(layer, &line_layout, 154.0f, 166.0f, 154.0f, 137.0f,
+                    NAV_ROUTE_CORE_W, core, true);
+    amber_draw_line(layer, &line_layout, 154.0f, 137.0f, 164.0f, 119.0f,
+                    NAV_ROUTE_CORE_W, core, true);
+    amber_draw_line(layer, &line_layout, 164.0f, 119.0f, 184.0f, 105.0f,
+                    NAV_ROUTE_CORE_W, core, true);
+    amber_draw_line(layer, &line_layout, 184.0f, 105.0f, 219.0f, 105.0f,
+                    NAV_ROUTE_CORE_W, core, true);
 
     // Flèche de manœuvre droite, également entièrement vectorielle.
-    draw_line(layer, layout, 219.0f, 105.0f, 207.0f, 94.0f,
-              NAV_ARROW_W, core, true);
-    draw_line(layer, layout, 219.0f, 105.0f, 207.0f, 116.0f,
-              NAV_ARROW_W, core, true);
+    amber_draw_line(layer, &line_layout, 219.0f, 105.0f, 207.0f, 94.0f,
+                    NAV_ARROW_W, core, true);
+    amber_draw_line(layer, &line_layout, 219.0f, 105.0f, 207.0f, 116.0f,
+                    NAV_ARROW_W, core, true);
 
     // Petit embranchement secondaire : il rend la géométrie lisible comme une
     // route, sans introduire de bitmap ou d'icône externe.
-    draw_line(layer, layout, 164.0f, 119.0f, 143.0f, 110.0f,
-              NAV_LINE_W, guide, true);
-    draw_line(layer, layout, 143.0f, 110.0f, 126.0f, 110.0f,
-              NAV_LINE_W, guide, true);
+    amber_draw_line(layer, &line_layout, 164.0f, 119.0f, 143.0f, 110.0f,
+                    NAV_LINE_W, guide, true);
+    amber_draw_line(layer, &line_layout, 143.0f, 110.0f, 126.0f, 110.0f,
+                    NAV_LINE_W, guide, true);
 }
 
 static void canvas_draw_cb(lv_event_t *event) {
@@ -131,16 +84,21 @@ static void canvas_draw_cb(lv_event_t *event) {
     lv_layer_t *layer = lv_event_get_layer(event);
     lv_area_t area;
     lv_obj_get_coords(canvas, &area);
-    const ui_layout_t layout = layout_of(&area);
+    ui_layout_t layout = amber_draw_layout(&area);
+    layout.ox += area.x1;
+    layout.oy += area.y1;
+    ui_layout_t line_layout = layout;
+    line_layout.ox -= 0.5f;
+    line_layout.oy -= 0.5f;
 
     draw_route(layer, &layout);
 
     // Séparateur ouvert, comme dans le cadran RPM : les marges évitent une
     // grille fermée et laissent respirer le disque rond.
-    draw_line(layer, &layout, 38.0f, NAV_SEPARATOR_Y, 104.0f,
-              NAV_SEPARATOR_Y, NAV_LINE_W, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 216.0f, NAV_SEPARATOR_Y, 282.0f,
-              NAV_SEPARATOR_Y, NAV_LINE_W, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &line_layout, 38.0f, NAV_SEPARATOR_Y, 104.0f,
+                    NAV_SEPARATOR_Y, NAV_LINE_W, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &line_layout, 216.0f, NAV_SEPARATOR_Y, 282.0f,
+                    NAV_SEPARATOR_Y, NAV_LINE_W, ui_theme_amber_separator(), false);
 }
 
 static lv_obj_t *label_create(lv_obj_t *parent, const lv_font_t *font,
@@ -158,8 +116,10 @@ static lv_obj_t *label_create(lv_obj_t *parent, const lv_font_t *font,
 static void place_centered(lv_obj_t *label, lv_obj_t *parent,
                            float ref_x, float ref_y) {
     lv_obj_update_layout(label);
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
-                                              lv_obj_get_height(parent));
+    const lv_area_t area = {
+        0, 0, lv_obj_get_width(parent) - 1, lv_obj_get_height(parent) - 1
+    };
+    const ui_layout_t layout = amber_draw_layout(&area);
     const int32_t width = lv_obj_get_width(label);
     const int32_t height = lv_obj_get_height(label);
     lv_obj_align(label, LV_ALIGN_TOP_LEFT,

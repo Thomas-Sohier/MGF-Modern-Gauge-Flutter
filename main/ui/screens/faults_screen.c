@@ -2,7 +2,7 @@
 
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
-#include "ui/ui_layout.h"
+#include "ui/widgets/amber_draw.h"
 
 #include <math.h>
 
@@ -34,48 +34,6 @@ struct faults_screen_s {
     bool connected;
 };
 
-static ui_layout_t layout_of(const lv_area_t *area) {
-    ui_layout_t layout = ui_layout_fit(lv_area_get_width(area),
-                                        lv_area_get_height(area));
-    layout.ox += area->x1;
-    layout.oy += area->y1;
-    return layout;
-}
-
-static void draw_line(lv_layer_t *layer, const ui_layout_t *layout,
-                      float x1, float y1, float x2, float y2,
-                      float width, lv_color_t color, bool rounded) {
-    lv_draw_line_dsc_t d;
-    lv_draw_line_dsc_init(&d);
-    d.color = color;
-    d.opa = LV_OPA_COVER;
-    d.width = LV_MAX(1, (int32_t)lroundf(width * layout->scale));
-    d.round_start = rounded;
-    d.round_end = rounded;
-    d.p1.x = ui_layout_x(layout, x1);
-    d.p1.y = ui_layout_y(layout, y1);
-    d.p2.x = ui_layout_x(layout, x2);
-    d.p2.y = ui_layout_y(layout, y2);
-    lv_draw_line(layer, &d);
-}
-
-static void draw_arc(lv_layer_t *layer, const ui_layout_t *layout,
-                     float radius, float width, float start, float end,
-                     lv_color_t color) {
-    lv_draw_arc_dsc_t d;
-    lv_draw_arc_dsc_init(&d);
-    d.center.x = lroundf(ui_layout_x(layout, SCREEN_CX));
-    d.center.y = lroundf(ui_layout_y(layout, SCREEN_CY));
-    d.radius = LV_MAX(1, (int32_t)lroundf(radius * layout->scale));
-    d.width = LV_MAX(1, (int32_t)lroundf(width * layout->scale));
-    d.start_angle = start;
-    d.end_angle = end;
-    d.color = color;
-    d.opa = LV_OPA_COVER;
-    d.rounded = 0;
-    lv_draw_arc(layer, &d);
-}
-
 static void draw_ring_segments(lv_layer_t *layer, const ui_layout_t *layout,
                                bool connected) {
     const lv_color_t bright = ui_theme_amber_bright();
@@ -87,19 +45,19 @@ static void draw_ring_segments(lv_layer_t *layer, const ui_layout_t *layout,
         const float start = (float)i * (360.0f / STATUS_SEGMENTS) +
                             STATUS_GAP_DEG * 0.5f;
         const float end = start + STATUS_BAR_DEG;
-        draw_arc(layer, layout, OUTER_R, 2.0f, start, end,
-                 connected ? bright : dim);
+        amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, OUTER_R, 2.0f,
+                       start, end, connected ? bright : dim, false);
     }
 
     // Deux filets continus donnent de la profondeur sans fermer les panneaux.
-    draw_arc(layer, layout, STATUS_R, LINE_W, 4.0f, 176.0f,
-             ui_theme_amber_separator());
-    draw_arc(layer, layout, STATUS_R, LINE_W, 184.0f, 356.0f,
-             ui_theme_amber_separator());
-    draw_arc(layer, layout, CORE_R, LINE_W, 12.0f, 168.0f,
-             ui_theme_amber_separator());
-    draw_arc(layer, layout, CORE_R, LINE_W, 192.0f, 348.0f,
-             ui_theme_amber_separator());
+    amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, STATUS_R, LINE_W,
+                   4.0f, 176.0f, ui_theme_amber_separator(), false);
+    amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, STATUS_R, LINE_W,
+                   184.0f, 356.0f, ui_theme_amber_separator(), false);
+    amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, CORE_R, LINE_W,
+                   12.0f, 168.0f, ui_theme_amber_separator(), false);
+    amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, CORE_R, LINE_W,
+                   192.0f, 348.0f, ui_theme_amber_separator(), false);
 }
 
 static void draw_connector(lv_layer_t *layer, const ui_layout_t *layout,
@@ -108,6 +66,9 @@ static void draw_connector(lv_layer_t *layer, const ui_layout_t *layout,
                                        : ui_theme_amber_dim();
     const lv_color_t accent = connected ? ui_theme_amber_bright()
                                         : ui_theme_amber_separator();
+    ui_layout_t line_layout = *layout;
+    line_layout.ox -= 0.5f;
+    line_layout.oy -= 0.5f;
     const float x1 = 139.0f;
     const float x2 = 181.0f;
     const float y1 = 111.0f;
@@ -127,28 +88,28 @@ static void draw_connector(lv_layer_t *layer, const ui_layout_t *layout,
     };
     lv_draw_rect(layer, &box, &area);
 
-    draw_line(layer, layout, 147.0f, 103.0f, 147.0f, 111.0f,
-              ICON_LINE_W, color, false);
-    draw_line(layer, layout, 160.0f, 103.0f, 160.0f, 111.0f,
-              ICON_LINE_W, color, false);
-    draw_line(layer, layout, 173.0f, 103.0f, 173.0f, 111.0f,
-              ICON_LINE_W, color, false);
+    amber_draw_line(layer, &line_layout, 147.0f, 103.0f, 147.0f, 111.0f,
+                    ICON_LINE_W, color, false);
+    amber_draw_line(layer, &line_layout, 160.0f, 103.0f, 160.0f, 111.0f,
+                    ICON_LINE_W, color, false);
+    amber_draw_line(layer, &line_layout, 173.0f, 103.0f, 173.0f, 111.0f,
+                    ICON_LINE_W, color, false);
 
-    draw_line(layer, layout, 147.0f, 120.0f, 147.0f, 128.0f,
-              ICON_LINE_W, color, true);
-    draw_line(layer, layout, 160.0f, 120.0f, 160.0f, 128.0f,
-              ICON_LINE_W, color, true);
-    draw_line(layer, layout, 173.0f, 120.0f, 173.0f, 128.0f,
-              ICON_LINE_W, color, true);
+    amber_draw_line(layer, &line_layout, 147.0f, 120.0f, 147.0f, 128.0f,
+                    ICON_LINE_W, color, true);
+    amber_draw_line(layer, &line_layout, 160.0f, 120.0f, 160.0f, 128.0f,
+                    ICON_LINE_W, color, true);
+    amber_draw_line(layer, &line_layout, 173.0f, 120.0f, 173.0f, 128.0f,
+                    ICON_LINE_W, color, true);
 
     // Le câble est ouvert côté déconnexion et fermé côté liaison active.
-    draw_line(layer, layout, x2, 128.0f, 193.0f, 128.0f,
-              ICON_LINE_W, accent, true);
-    draw_line(layer, layout, 193.0f, 128.0f, 198.0f, 133.0f,
-              ICON_LINE_W, accent, true);
+    amber_draw_line(layer, &line_layout, x2, 128.0f, 193.0f, 128.0f,
+                    ICON_LINE_W, accent, true);
+    amber_draw_line(layer, &line_layout, 193.0f, 128.0f, 198.0f, 133.0f,
+                    ICON_LINE_W, accent, true);
     if (!connected) {
-        draw_line(layer, layout, 128.0f, 99.0f, 192.0f, 157.0f,
-                  ICON_LINE_W, ui_theme_amber_separator(), true);
+        amber_draw_line(layer, &line_layout, 128.0f, 99.0f, 192.0f, 157.0f,
+                        ICON_LINE_W, ui_theme_amber_separator(), true);
     }
 }
 
@@ -160,27 +121,34 @@ static void canvas_draw_cb(lv_event_t *event) {
 
     lv_area_t area;
     lv_obj_get_coords(canvas, &area);
-    const ui_layout_t layout = layout_of(&area);
+    ui_layout_t layout = amber_draw_layout(&area);
+    layout.ox += area.x1;
+    layout.oy += area.y1;
+    ui_layout_t line_layout = layout;
+    line_layout.ox -= 0.5f;
+    line_layout.oy -= 0.5f;
     draw_ring_segments(layer, &layout, scr->connected);
 
     // Trait médian discret : il sépare le statut de liaison de l'information
     // de diagnostic, avec une rupture centrale pour conserver de l'air.
-    draw_line(layer, &layout, 61.0f, 231.0f, 143.0f, 231.0f,
-              LINE_W, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 177.0f, 231.0f, 259.0f, 231.0f,
-              LINE_W, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 76.0f, 237.0f, 76.0f, 242.0f,
-              LINE_W, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 244.0f, 237.0f, 244.0f, 242.0f,
-              LINE_W, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &line_layout, 61.0f, 231.0f, 143.0f, 231.0f,
+                    LINE_W, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &line_layout, 177.0f, 231.0f, 259.0f, 231.0f,
+                    LINE_W, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &line_layout, 76.0f, 237.0f, 76.0f, 242.0f,
+                    LINE_W, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &line_layout, 244.0f, 237.0f, 244.0f, 242.0f,
+                    LINE_W, ui_theme_amber_separator(), false);
 
     draw_connector(layer, &layout, scr->connected);
 }
 
 static void place_center(lv_obj_t *obj, lv_obj_t *parent, float x, float y) {
     lv_obj_update_layout(obj);
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
-                                              lv_obj_get_height(parent));
+    const lv_area_t area = {
+        0, 0, lv_obj_get_width(parent) - 1, lv_obj_get_height(parent) - 1
+    };
+    const ui_layout_t layout = amber_draw_layout(&area);
     const int32_t w = lv_obj_get_width(obj);
     const int32_t h = lv_obj_get_height(obj);
     lv_obj_set_pos(obj,

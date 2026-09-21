@@ -2,7 +2,7 @@
 
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
-#include "ui/ui_layout.h"
+#include "ui/widgets/amber_draw.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -55,61 +55,13 @@ struct injection_screen_s {
     char metric_text[METRIC_COUNT][20];
 };
 
-static ui_layout_t layout_of(const lv_area_t *area) {
-    ui_layout_t layout = ui_layout_fit(lv_area_get_width(area),
-                                        lv_area_get_height(area));
-    layout.ox += area->x1;
-    layout.oy += area->y1;
-    return layout;
-}
-
-static float clampf(float value, float low, float high) {
-    if (value < low) return low;
-    if (value > high) return high;
-    return value;
-}
-
-static void draw_line(lv_layer_t *layer, const ui_layout_t *layout,
-                      float x1, float y1, float x2, float y2, float width,
-                      lv_color_t color, bool rounded) {
-    lv_draw_line_dsc_t dsc;
-    lv_draw_line_dsc_init(&dsc);
-    dsc.color = color;
-    dsc.opa = LV_OPA_COVER;
-    dsc.width = LV_MAX(1, (int32_t)lroundf(width * layout->scale));
-    dsc.round_start = rounded;
-    dsc.round_end = rounded;
-    dsc.p1.x = lroundf(ui_layout_x(layout, x1));
-    dsc.p1.y = lroundf(ui_layout_y(layout, y1));
-    dsc.p2.x = lroundf(ui_layout_x(layout, x2));
-    dsc.p2.y = lroundf(ui_layout_y(layout, y2));
-    lv_draw_line(layer, &dsc);
-}
-
-static void draw_arc(lv_layer_t *layer, const ui_layout_t *layout,
-                     float radius, float width, float start, float end,
-                     lv_color_t color) {
-    lv_draw_arc_dsc_t dsc;
-    lv_draw_arc_dsc_init(&dsc);
-    dsc.center.x = lroundf(ui_layout_x(layout, SCREEN_CX));
-    dsc.center.y = lroundf(ui_layout_y(layout, SCREEN_CY));
-    dsc.radius = LV_MAX(1, (int32_t)lroundf(radius * layout->scale));
-    dsc.width = LV_MAX(1, (int32_t)lroundf(width * layout->scale));
-    dsc.start_angle = start;
-    dsc.end_angle = end;
-    dsc.color = color;
-    dsc.opa = LV_OPA_COVER;
-    dsc.rounded = 0;
-    lv_draw_arc(layer, &dsc);
-}
-
 static void draw_ring(lv_layer_t *layer, const ui_layout_t *layout,
                       float feedback, bool connected) {
     const float total_gap = (RING_SEGMENTS - 1) * RING_GAP_DEG;
     const float segment_deg = (360.0f - total_gap) / RING_SEGMENTS;
     const float pitch_deg = segment_deg + RING_GAP_DEG;
     const float progress = connected
-        ? clampf(feedback / FEEDBACK_MAX, 0.0f, 1.0f)
+        ? amber_clampf(feedback / FEEDBACK_MAX, 0.0f, 1.0f)
         : 0.0f;
     const int lit = (int)lroundf(progress * RING_SEGMENTS);
 
@@ -117,37 +69,39 @@ static void draw_ring(lv_layer_t *layer, const ui_layout_t *layout,
     // cadran automobile tout en conservant une lecture immédiate du feedback.
     for (int i = 0; i < RING_SEGMENTS; i++) {
         const float start = -90.0f + i * pitch_deg;
-        draw_arc(layer, layout, OUTER_RING_R, OUTER_RING_WIDTH, start,
-                 start + segment_deg,
-                 i < lit ? ui_theme_amber_bright() : ui_theme_amber_dim());
+        amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY,
+                       OUTER_RING_R, OUTER_RING_WIDTH, start,
+                       start + segment_deg,
+                       i < lit ? ui_theme_amber_bright() : ui_theme_amber_dim(),
+                       false);
     }
 
     // Guides ouverts : ils structurent la zone centrale sans enfermer les
     // informations dans une grille lourde.
-    draw_arc(layer, layout, GUIDE_R, GUIDE_WIDTH, 208.0f, 332.0f,
-             ui_theme_amber_separator());
+    amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, GUIDE_R, GUIDE_WIDTH,
+                   208.0f, 332.0f, ui_theme_amber_separator(), false);
 }
 
 static void draw_trim_scale(lv_layer_t *layer, const ui_layout_t *layout,
                             float center_x, float value) {
     const float left = center_x - 34.0f;
     const float right = center_x + 34.0f;
-    const float marker = center_x + clampf(value, -30.0f, 30.0f) / 30.0f * 30.0f;
+    const float marker = center_x + amber_clampf(value, -30.0f, 30.0f) / 30.0f * 30.0f;
 
-    draw_line(layer, layout, left, TRIM_BAR_Y, right, TRIM_BAR_Y,
-              PANEL_LINE_WIDTH, ui_theme_amber_separator(), false);
-    draw_line(layer, layout, center_x, TRIM_BAR_Y - 4.0f,
-              center_x, TRIM_BAR_Y + 4.0f, PANEL_LINE_WIDTH,
-              ui_theme_amber_separator(), false);
-    draw_line(layer, layout, left, TRIM_BAR_Y - 2.0f,
-              left, TRIM_BAR_Y + 2.0f, PANEL_LINE_WIDTH,
-              ui_theme_amber_separator(), false);
-    draw_line(layer, layout, right, TRIM_BAR_Y - 2.0f,
-              right, TRIM_BAR_Y + 2.0f, PANEL_LINE_WIDTH,
-              ui_theme_amber_separator(), false);
-    draw_line(layer, layout, marker, TRIM_BAR_Y - 6.0f,
-              marker, TRIM_BAR_Y + 6.0f, 2.0f,
-              ui_theme_amber_bright(), false);
+    amber_draw_line(layer, layout, left, TRIM_BAR_Y, right, TRIM_BAR_Y,
+                    PANEL_LINE_WIDTH, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, layout, center_x, TRIM_BAR_Y - 4.0f,
+                    center_x, TRIM_BAR_Y + 4.0f, PANEL_LINE_WIDTH,
+                    ui_theme_amber_separator(), false);
+    amber_draw_line(layer, layout, left, TRIM_BAR_Y - 2.0f,
+                    left, TRIM_BAR_Y + 2.0f, PANEL_LINE_WIDTH,
+                    ui_theme_amber_separator(), false);
+    amber_draw_line(layer, layout, right, TRIM_BAR_Y - 2.0f,
+                    right, TRIM_BAR_Y + 2.0f, PANEL_LINE_WIDTH,
+                    ui_theme_amber_separator(), false);
+    amber_draw_line(layer, layout, marker, TRIM_BAR_Y - 6.0f,
+                    marker, TRIM_BAR_Y + 6.0f, 2.0f,
+                    ui_theme_amber_bright(), false);
 }
 
 static void canvas_draw_cb(lv_event_t *event) {
@@ -160,7 +114,9 @@ static void canvas_draw_cb(lv_event_t *event) {
 
     lv_area_t area;
     lv_obj_get_coords(canvas, &area);
-    const ui_layout_t layout = layout_of(&area);
+    ui_layout_t layout = amber_draw_layout(&area);
+    layout.ox += area.x1;
+    layout.oy += area.y1;
 
     draw_ring(layer, &layout, scr->feedback, scr->connected);
     draw_trim_scale(layer, &layout, 96.0f, scr->short_trim);
@@ -168,20 +124,24 @@ static void canvas_draw_cb(lv_event_t *event) {
 
     // Grille ouverte : chaque séparateur s'arrête avant la cellule voisine.
     // Les deux colonnes restent ainsi lisibles jusque dans la courbure basse.
-    draw_line(layer, &layout, 48.0f, PANEL_TOP_Y, 143.0f,
-              PANEL_TOP_Y, PANEL_LINE_WIDTH, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 177.0f, PANEL_TOP_Y, 272.0f,
-              PANEL_TOP_Y, PANEL_LINE_WIDTH, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 160.0f, PANEL_TOP_Y + 7.0f, 160.0f,
-              INJ_DIVIDER_Y - 7.0f, PANEL_LINE_WIDTH,
-              ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 48.0f, INJ_DIVIDER_Y, 143.0f,
-              INJ_DIVIDER_Y, PANEL_LINE_WIDTH, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 177.0f, INJ_DIVIDER_Y, 272.0f,
-              INJ_DIVIDER_Y, PANEL_LINE_WIDTH, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 160.0f, INJ_DIVIDER_Y + 7.0f, 160.0f,
-              INJ_VALUE_Y + 9.0f, PANEL_LINE_WIDTH,
-              ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &layout, 48.0f, PANEL_TOP_Y, 143.0f,
+                    PANEL_TOP_Y, PANEL_LINE_WIDTH,
+                    ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &layout, 177.0f, PANEL_TOP_Y, 272.0f,
+                    PANEL_TOP_Y, PANEL_LINE_WIDTH,
+                    ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &layout, 160.0f, PANEL_TOP_Y + 7.0f, 160.0f,
+                    INJ_DIVIDER_Y - 7.0f, PANEL_LINE_WIDTH,
+                    ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &layout, 48.0f, INJ_DIVIDER_Y, 143.0f,
+                    INJ_DIVIDER_Y, PANEL_LINE_WIDTH,
+                    ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &layout, 177.0f, INJ_DIVIDER_Y, 272.0f,
+                    INJ_DIVIDER_Y, PANEL_LINE_WIDTH,
+                    ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &layout, 160.0f, INJ_DIVIDER_Y + 7.0f, 160.0f,
+                    INJ_VALUE_Y + 9.0f, PANEL_LINE_WIDTH,
+                    ui_theme_amber_separator(), false);
 }
 
 static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font,
@@ -200,8 +160,10 @@ static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font,
 
 static void place_label(lv_obj_t *label, lv_obj_t *parent, float x, float y,
                         int32_t width, int spread) {
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
-                                              lv_obj_get_height(parent));
+    const lv_area_t area = {
+        0, 0, lv_obj_get_width(parent) - 1, lv_obj_get_height(parent) - 1
+    };
+    const ui_layout_t layout = amber_draw_layout(&area);
     lv_obj_set_width(label, lroundf(width * layout.scale));
     lv_obj_update_layout(label);
     lv_obj_set_pos(label,

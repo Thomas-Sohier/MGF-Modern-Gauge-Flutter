@@ -2,7 +2,7 @@
 
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
-#include "ui/ui_layout.h"
+#include "ui/widgets/amber_draw.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -76,95 +76,12 @@ struct lambda_screen_s {
     float duty;
 };
 
-static ui_layout_t layout_of(const lv_area_t *area) {
-    ui_layout_t layout = ui_layout_fit(lv_area_get_width(area),
-                                       lv_area_get_height(area));
-    layout.ox += area->x1;
-    layout.oy += area->y1;
-    return layout;
-}
-
-static float clampf(float value, float low, float high) {
-    if (!isfinite(value)) return low;
-    return value < low ? low : (value > high ? high : value);
-}
-
-static float norm(float value, float low, float high) {
-    return clampf((value - low) / (high - low), 0.0f, 1.0f);
-}
-
-static int32_t px(float value) {
-    return (int32_t)lroundf(value);
-}
-
-static void draw_line(lv_layer_t *layer, const ui_layout_t *layout,
-                      float x1, float y1, float x2, float y2, float width,
-                      lv_color_t color, bool rounded) {
-    lv_draw_line_dsc_t d;
-    lv_draw_line_dsc_init(&d);
-    d.color = color;
-    d.opa = LV_OPA_COVER;
-    d.width = LV_MAX(1, px(width * layout->scale));
-    d.round_start = rounded;
-    d.round_end = rounded;
-    d.p1.x = px(ui_layout_x(layout, x1));
-    d.p1.y = px(ui_layout_y(layout, y1));
-    d.p2.x = px(ui_layout_x(layout, x2));
-    d.p2.y = px(ui_layout_y(layout, y2));
-    lv_draw_line(layer, &d);
-}
-
-static void draw_arc(lv_layer_t *layer, const ui_layout_t *layout,
-                     float radius, float width, float start, float end,
-                     lv_color_t color) {
-    lv_draw_arc_dsc_t d;
-    lv_draw_arc_dsc_init(&d);
-    d.center.x = px(ui_layout_x(layout, CX));
-    d.center.y = px(ui_layout_y(layout, CY));
-    d.radius = LV_MAX(1, px(radius * layout->scale));
-    d.width = LV_MAX(1, px(width * layout->scale));
-    d.start_angle = start;
-    d.end_angle = end;
-    d.color = color;
-    d.opa = LV_OPA_COVER;
-    d.rounded = 0;
-    lv_draw_arc(layer, &d);
-}
-
-static void draw_dot(lv_layer_t *layer, const ui_layout_t *layout,
-                    float x, float y, float radius, lv_color_t color) {
-    lv_draw_rect_dsc_t d;
-    lv_draw_rect_dsc_init(&d);
-    d.bg_color = color;
-    d.bg_opa = LV_OPA_COVER;
-    d.radius = LV_RADIUS_CIRCLE;
-
-    const int32_t r = LV_MAX(1, px(radius * layout->scale));
-    const lv_area_t area = {
-        px(ui_layout_x(layout, x)) - r,
-        px(ui_layout_y(layout, y)) - r,
-        px(ui_layout_x(layout, x)) + r,
-        px(ui_layout_y(layout, y)) + r,
-    };
-    lv_draw_rect(layer, &d, &area);
-}
-
-static void draw_radial_marker(lv_layer_t *layer, const ui_layout_t *layout,
-                               float angle, float inner, float outer,
-                               lv_color_t color) {
-    const float radians = angle * 0.01745329252f;
-    const float c = cosf(radians);
-    const float s = sinf(radians);
-    draw_line(layer, layout, CX + c * inner, CY + s * inner,
-              CX + c * outer, CY + s * outer, ICON_W, color, false);
-}
-
 static void draw_afr_ring(lv_layer_t *layer, const ui_layout_t *layout,
                           const lambda_screen_t *screen) {
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
     const lv_color_t separator = ui_theme_amber_separator();
-    const float progress = norm(screen->afr_value, AFR_MIN, AFR_MAX);
+    const float progress = amber_progress(screen->afr_value, AFR_MIN, AFR_MAX);
     const int lit = (int)lroundf(progress * AFR_SEGMENTS);
     const float gap = 2.0f;
     const float bar = (360.0f - AFR_SEGMENTS * gap) / AFR_SEGMENTS;
@@ -174,52 +91,53 @@ static void draw_afr_ring(lv_layer_t *layer, const ui_layout_t *layout,
     for (int i = 0; i < AFR_SEGMENTS; i++) {
         const float start = (float)i * (bar + gap) + gap * 0.5f;
         const lv_color_t color = (screen->connected && i < lit) ? bright : dim;
-        draw_arc(layer, layout, OUTER_R, OUTER_W, start, start + bar, color);
+        amber_draw_arc(layer, layout, CX, CY, OUTER_R, OUTER_W, start,
+                       start + bar, color, false);
     }
 
     // Fenêtre de mélange nominale : deux repères fins, jamais une couleur
     // d'alerte. Ils rendent la zone de référence lisible sous toute intensité.
-    const float nominal_low = norm(14.0f, AFR_MIN, AFR_MAX) * 360.0f;
-    const float nominal_high = norm(15.2f, AFR_MIN, AFR_MAX) * 360.0f;
-    draw_arc(layer, layout, OUTER_R + 2.5f, 0.8f,
-             nominal_low - 2.0f, nominal_low + 2.0f, separator);
-    draw_arc(layer, layout, OUTER_R + 2.5f, 0.8f,
-             nominal_high - 2.0f, nominal_high + 2.0f, separator);
+    const float nominal_low = amber_progress(14.0f, AFR_MIN, AFR_MAX) * 360.0f;
+    const float nominal_high = amber_progress(15.2f, AFR_MIN, AFR_MAX) * 360.0f;
+    amber_draw_arc(layer, layout, CX, CY, OUTER_R + 2.5f, 0.8f,
+                   nominal_low - 2.0f, nominal_low + 2.0f, separator, false);
+    amber_draw_arc(layer, layout, CX, CY, OUTER_R + 2.5f, 0.8f,
+                   nominal_high - 2.0f, nominal_high + 2.0f, separator, false);
 
     // Le seuil AFR est une rupture de structure. Hors plage, un second trait
     // autour du curseur renforce l'information sans introduire rouge ou vert.
-    const float danger_angle = norm(AFR_DANGER, AFR_MIN, AFR_MAX) * 360.0f;
-    draw_radial_marker(layer, layout, danger_angle, OUTER_R - 4.0f,
-                       OUTER_R + 4.0f, separator);
+    const float danger_angle = amber_progress(AFR_DANGER, AFR_MIN, AFR_MAX) * 360.0f;
+    amber_draw_tick(layer, layout, CX, CY, danger_angle, OUTER_R - 4.0f,
+                    OUTER_R + 4.0f, ICON_W, separator, false);
     if (screen->afr_value >= AFR_DANGER) {
-        draw_radial_marker(layer, layout, danger_angle - 3.0f,
-                           OUTER_R - 7.0f, OUTER_R + 4.0f, bright);
-        draw_radial_marker(layer, layout, danger_angle + 3.0f,
-                           OUTER_R - 7.0f, OUTER_R + 4.0f, bright);
+        amber_draw_tick(layer, layout, CX, CY, danger_angle - 3.0f,
+                        OUTER_R - 7.0f, OUTER_R + 4.0f, ICON_W, bright, false);
+        amber_draw_tick(layer, layout, CX, CY, danger_angle + 3.0f,
+                        OUTER_R - 7.0f, OUTER_R + 4.0f, ICON_W, bright, false);
     }
 }
 
 static void draw_sensor_meter(lv_layer_t *layer, const ui_layout_t *layout,
                               float x, float value, lv_color_t color) {
-    const int lit = (int)lroundf(norm(value, 0.0f, 1000.0f) * METER_SEGMENTS);
+    const int lit = (int)lroundf(amber_progress(value, 0.0f, 1000.0f) * METER_SEGMENTS);
     const float step = (METER_MAX_Y - METER_MIN_Y) / METER_SEGMENTS;
 
     for (int i = 0; i < METER_SEGMENTS; i++) {
         const float y = METER_MAX_Y - (i + 0.5f) * step;
         const lv_color_t segment = i < lit ? color : ui_theme_amber_dim();
-        draw_line(layer, layout, x - METER_W * 0.5f, y,
-                  x + METER_W * 0.5f, y, 2.0f, segment, false);
+        amber_draw_line(layer, layout, x - METER_W * 0.5f, y,
+                        x + METER_W * 0.5f, y, 2.0f, segment, false);
     }
 
     // Petite échelle externe : elle distingue la télémétrie de la valeur AFR.
-    draw_line(layer, layout, x - METER_W * 0.5f - 4.0f, METER_MIN_Y,
-              x - METER_W * 0.5f - 4.0f, METER_MAX_Y,
-              LINE_W, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, layout, x - METER_W * 0.5f - 4.0f, METER_MIN_Y,
+                    x - METER_W * 0.5f - 4.0f, METER_MAX_Y,
+                    LINE_W, ui_theme_amber_separator(), false);
 }
 
 static void draw_duty_meter(lv_layer_t *layer, const ui_layout_t *layout,
                             const lambda_screen_t *screen) {
-    const float progress = norm(screen->duty, 0.0f, 100.0f);
+    const float progress = amber_progress(screen->duty, 0.0f, 100.0f);
     const int lit = (int)lroundf(progress * DUTY_SEGMENTS);
     const float gap = 2.0f;
     const float step = (DUTY_END - DUTY_START) / DUTY_SEGMENTS;
@@ -230,12 +148,13 @@ static void draw_duty_meter(lv_layer_t *layer, const ui_layout_t *layout,
         const lv_color_t color = (screen->connected && i < lit)
                                      ? ui_theme_amber_bright()
                                      : ui_theme_amber_dim();
-        draw_arc(layer, layout, DUTY_R, 2.0f, start, end, color);
+        amber_draw_arc(layer, layout, CX, CY, DUTY_R, 2.0f, start, end,
+                       color, false);
     }
 
     // Repère zéro central, volontairement séparé de la couronne.
-    draw_dot(layer, layout, CX, CY + DUTY_R, 1.4f,
-             ui_theme_amber_separator());
+    amber_draw_dot(layer, layout, CX, CY + DUTY_R, 1.4f,
+                   ui_theme_amber_separator());
 }
 
 static void canvas_draw_cb(lv_event_t *event) {
@@ -246,7 +165,9 @@ static void canvas_draw_cb(lv_event_t *event) {
 
     lv_area_t area;
     lv_obj_get_coords(canvas, &area);
-    const ui_layout_t layout = layout_of(&area);
+    ui_layout_t layout = amber_draw_layout(&area);
+    layout.ox += area.x1;
+    layout.oy += area.y1;
 
     draw_afr_ring(layer, &layout, screen);
     draw_sensor_meter(layer, &layout, METER_X_LEFT, screen->lambda_mv,
@@ -258,21 +179,21 @@ static void canvas_draw_cb(lv_event_t *event) {
     draw_duty_meter(layer, &layout, screen);
 
     // Architecture ouverte : les filets s'arrêtent avant les blocs de texte.
-    draw_line(layer, &layout, 48.0f, 61.0f, 125.0f, 61.0f,
-              LINE_W, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 195.0f, 61.0f, 272.0f, 61.0f,
-              LINE_W, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 78.0f, 190.0f, 122.0f, 190.0f,
-              LINE_W, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 198.0f, 190.0f, 242.0f, 190.0f,
-              LINE_W, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &layout, 48.0f, 61.0f, 125.0f, 61.0f,
+                    LINE_W, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &layout, 195.0f, 61.0f, 272.0f, 61.0f,
+                    LINE_W, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &layout, 78.0f, 190.0f, 122.0f, 190.0f,
+                    LINE_W, ui_theme_amber_separator(), false);
+    amber_draw_line(layer, &layout, 198.0f, 190.0f, 242.0f, 190.0f,
+                    LINE_W, ui_theme_amber_separator(), false);
 
     // Un noyau en deux arcs apporte une profondeur de cadran sans fermer la
     // lecture de la valeur centrale.
-    draw_arc(layer, &layout, 82.0f, LINE_W, 196.0f, 344.0f,
-             ui_theme_amber_separator());
-    draw_arc(layer, &layout, 88.0f, 0.7f, 16.0f, 164.0f,
-             ui_theme_amber_dim());
+    amber_draw_arc(layer, &layout, CX, CY, 82.0f, LINE_W, 196.0f, 344.0f,
+                   ui_theme_amber_separator(), false);
+    amber_draw_arc(layer, &layout, CX, CY, 88.0f, 0.7f, 16.0f, 164.0f,
+                   ui_theme_amber_dim(), false);
 }
 
 static void text_style(amber_text_t *text, lv_color_t front,
@@ -282,10 +203,12 @@ static void text_style(amber_text_t *text, lv_color_t front,
 }
 
 static void text_place(amber_text_t *text, lv_obj_t *parent) {
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
-                                             lv_obj_get_height(parent));
-    const int32_t dx = px(text->spread * layout.scale * UI_REFERENCE_SIZE /
-                          UI_DISPLAY_SIZE_PX);
+    const lv_area_t area = {
+        0, 0, lv_obj_get_width(parent) - 1, lv_obj_get_height(parent) - 1
+    };
+    const ui_layout_t layout = amber_draw_layout(&area);
+    const int32_t dx = lroundf(text->spread * layout.scale * UI_REFERENCE_SIZE /
+                               UI_DISPLAY_SIZE_PX);
 
     lv_obj_update_layout(text->shadow);
     lv_obj_update_layout(text->front);
@@ -295,11 +218,11 @@ static void text_place(amber_text_t *text, lv_obj_t *parent) {
     const int32_t h_front = lv_obj_get_height(text->front);
 
     lv_obj_set_pos(text->shadow,
-                   px(ui_layout_x(&layout, text->x)) - w_shadow / 2 + dx,
-                   px(ui_layout_y(&layout, text->y)) - h_shadow / 2);
+                   lroundf(ui_layout_x(&layout, text->x)) - w_shadow / 2 + dx,
+                   lroundf(ui_layout_y(&layout, text->y)) - h_shadow / 2);
     lv_obj_set_pos(text->front,
-                   px(ui_layout_x(&layout, text->x)) - w_front / 2 - dx,
-                   px(ui_layout_y(&layout, text->y)) - h_front / 2);
+                   lroundf(ui_layout_x(&layout, text->x)) - w_front / 2 - dx,
+                   lroundf(ui_layout_y(&layout, text->y)) - h_front / 2);
 }
 
 static amber_text_t text_create(lv_obj_t *parent, const lv_font_t *font,
@@ -449,9 +372,15 @@ void lambda_screen_update(lambda_screen_t *screen, const ecu_data_t *data) {
     screen->afr_value = isfinite(data->estimated_air_fuel)
                             ? data->estimated_air_fuel
                             : 0.0f;
-    screen->lambda_mv = clampf(data->lambda_mv, 0.0f, 1000.0f);
-    screen->o2_mv = clampf(data->o2_mv, 0.0f, 1000.0f);
-    screen->duty = clampf(data->lambda_sensor_duty_cycle, 0.0f, 100.0f);
+    screen->lambda_mv = isfinite(data->lambda_mv)
+                            ? amber_clampf(data->lambda_mv, 0.0f, 1000.0f)
+                            : 0.0f;
+    screen->o2_mv = isfinite(data->o2_mv)
+                        ? amber_clampf(data->o2_mv, 0.0f, 1000.0f)
+                        : 0.0f;
+    screen->duty = isfinite(data->lambda_sensor_duty_cycle)
+                       ? amber_clampf(data->lambda_sensor_duty_cycle, 0.0f, 100.0f)
+                       : 0.0f;
 
     snprintf(screen->afr_buf, sizeof(screen->afr_buf), "%.2f",
              screen->afr_value);
