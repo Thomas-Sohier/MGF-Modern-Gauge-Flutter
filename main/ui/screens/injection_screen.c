@@ -20,20 +20,17 @@
 #define GUIDE_R             126.0f
 #define GUIDE_WIDTH           0.8f
 #define PANEL_LINE_WIDTH      0.8f
-#define ICON_LINE_WIDTH       1.8f
-
-#define HEADER_Y             25.0f
-#define SUBHEADER_Y          44.0f
-#define HERO_Y              101.0f
-#define HERO_LABEL_Y        139.0f
-#define PANEL_TOP_Y         165.0f
-#define TRIM_LABEL_Y        177.0f
-#define TRIM_VALUE_Y        195.0f
-#define TRIM_BAR_Y          216.0f
-#define INJ_DIVIDER_Y       232.0f
-#define INJ_ICON_Y          246.0f
-#define INJ_VALUE_Y         264.0f
-#define INJ_LABEL_Y         283.0f
+#define HEADER_Y             27.0f
+#define SUBHEADER_Y          49.0f
+#define HERO_Y               91.0f
+#define HERO_LABEL_Y        124.0f
+#define PANEL_TOP_Y         151.0f
+#define TRIM_LABEL_Y        169.0f
+#define TRIM_VALUE_Y        196.0f
+#define TRIM_BAR_Y          211.0f
+#define INJ_DIVIDER_Y       223.0f
+#define INJ_VALUE_Y         262.0f
+#define INJ_LABEL_Y         241.0f
 
 #define METRIC_COUNT 4
 enum {
@@ -153,41 +150,6 @@ static void draw_trim_scale(lv_layer_t *layer, const ui_layout_t *layout,
               ui_theme_amber_bright(), false);
 }
 
-static void draw_injector_icon(lv_layer_t *layer, const ui_layout_t *layout,
-                               float center_x) {
-    const lv_color_t color = ui_theme_amber_bright();
-
-    // Injecteur stylisé : corps, prise électrique, rampe et pointe. Toutes
-    // les formes sont des traits LVGL, donc aucune image n'est embarquée.
-    draw_line(layer, layout, center_x - 10.0f, INJ_ICON_Y - 9.0f,
-              center_x + 7.0f, INJ_ICON_Y - 9.0f, ICON_LINE_WIDTH,
-              color, false);
-    draw_line(layer, layout, center_x + 7.0f, INJ_ICON_Y - 9.0f,
-              center_x + 7.0f, INJ_ICON_Y + 2.0f, ICON_LINE_WIDTH,
-              color, false);
-    draw_line(layer, layout, center_x + 7.0f, INJ_ICON_Y + 2.0f,
-              center_x + 2.0f, INJ_ICON_Y + 8.0f, ICON_LINE_WIDTH,
-              color, false);
-    draw_line(layer, layout, center_x + 2.0f, INJ_ICON_Y + 8.0f,
-              center_x + 2.0f, INJ_ICON_Y + 14.0f, ICON_LINE_WIDTH,
-              color, false);
-    draw_line(layer, layout, center_x - 10.0f, INJ_ICON_Y - 9.0f,
-              center_x - 10.0f, INJ_ICON_Y - 3.0f, ICON_LINE_WIDTH,
-              color, false);
-    draw_line(layer, layout, center_x - 15.0f, INJ_ICON_Y - 3.0f,
-              center_x - 10.0f, INJ_ICON_Y - 3.0f, ICON_LINE_WIDTH,
-              color, false);
-    draw_line(layer, layout, center_x - 15.0f, INJ_ICON_Y - 3.0f,
-              center_x - 15.0f, INJ_ICON_Y + 4.0f, ICON_LINE_WIDTH,
-              color, false);
-    draw_line(layer, layout, center_x - 15.0f, INJ_ICON_Y + 4.0f,
-              center_x - 4.0f, INJ_ICON_Y + 4.0f, ICON_LINE_WIDTH,
-              color, false);
-    draw_line(layer, layout, center_x - 4.0f, INJ_ICON_Y + 4.0f,
-              center_x - 1.0f, INJ_ICON_Y + 9.0f, ICON_LINE_WIDTH,
-              color, false);
-}
-
 static void canvas_draw_cb(lv_event_t *event) {
     if (lv_event_get_code(event) != LV_EVENT_DRAW_MAIN) return;
 
@@ -201,24 +163,25 @@ static void canvas_draw_cb(lv_event_t *event) {
     const ui_layout_t layout = layout_of(&area);
 
     draw_ring(layer, &layout, scr->feedback, scr->connected);
-    draw_trim_scale(layer, &layout, 82.0f, scr->short_trim);
-    draw_trim_scale(layer, &layout, 238.0f, scr->long_trim);
-    draw_injector_icon(layer, &layout, 82.0f);
-    draw_injector_icon(layer, &layout, 238.0f);
+    draw_trim_scale(layer, &layout, 96.0f, scr->short_trim);
+    draw_trim_scale(layer, &layout, 224.0f, scr->long_trim);
 
-    // Séparateurs interrompus à chaque cellule : le cadran reste ouvert et
-    // les extrémités suivent visuellement la courbure du disque.
-    draw_line(layer, &layout, 42.0f, PANEL_TOP_Y, 132.0f,
+    // Grille ouverte : chaque séparateur s'arrête avant la cellule voisine.
+    // Les deux colonnes restent ainsi lisibles jusque dans la courbure basse.
+    draw_line(layer, &layout, 48.0f, PANEL_TOP_Y, 143.0f,
               PANEL_TOP_Y, PANEL_LINE_WIDTH, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 188.0f, PANEL_TOP_Y, 278.0f,
+    draw_line(layer, &layout, 177.0f, PANEL_TOP_Y, 272.0f,
               PANEL_TOP_Y, PANEL_LINE_WIDTH, ui_theme_amber_separator(), false);
     draw_line(layer, &layout, 160.0f, PANEL_TOP_Y + 7.0f, 160.0f,
               INJ_DIVIDER_Y - 7.0f, PANEL_LINE_WIDTH,
               ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 42.0f, INJ_DIVIDER_Y, 132.0f,
+    draw_line(layer, &layout, 48.0f, INJ_DIVIDER_Y, 143.0f,
               INJ_DIVIDER_Y, PANEL_LINE_WIDTH, ui_theme_amber_separator(), false);
-    draw_line(layer, &layout, 188.0f, INJ_DIVIDER_Y, 278.0f,
+    draw_line(layer, &layout, 177.0f, INJ_DIVIDER_Y, 272.0f,
               INJ_DIVIDER_Y, PANEL_LINE_WIDTH, ui_theme_amber_separator(), false);
+    draw_line(layer, &layout, 160.0f, INJ_DIVIDER_Y + 7.0f, 160.0f,
+              INJ_VALUE_Y + 9.0f, PANEL_LINE_WIDTH,
+              ui_theme_amber_separator(), false);
 }
 
 static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font,
@@ -268,10 +231,10 @@ static void set_available_text(injection_screen_t *scr, const ecu_data_t *data) 
              sizeof(scr->metric_text[METRIC_LONG_TRIM]), "%+.1f%%",
              data->long_term_trim);
     snprintf(scr->metric_text[METRIC_INJECTOR_1],
-             sizeof(scr->metric_text[METRIC_INJECTOR_1]), "%.2fms",
+             sizeof(scr->metric_text[METRIC_INJECTOR_1]), "%.2f ms",
              data->injector_1_pw);
     snprintf(scr->metric_text[METRIC_INJECTOR_2],
-             sizeof(scr->metric_text[METRIC_INJECTOR_2]), "%.2fms",
+             sizeof(scr->metric_text[METRIC_INJECTOR_2]), "%.2f ms",
              data->injector_2_pw);
 }
 
@@ -325,17 +288,17 @@ injection_screen_t *injection_screen_create(lv_obj_t *parent) {
 
     lv_obj_t *header = make_label(scr->root, font_l, bright, "INJECTION", 180);
     lv_obj_t *subheader = make_label(scr->root, font_m, dim,
-                                     "FUEL CONTROL / ECU", 220);
+                                     "GESTION\nCARBURANT", 300);
     lv_obj_t *hero_label = make_label(scr->root, font_m, bright,
-                                      "FEEDBACK", 150);
+                                      "CORRECTION", 180);
     lv_obj_t *trim_short_label = make_label(scr->root, font_m, dim,
-                                            "ST TRIM", 110);
+                                            "COURT\nTERME", 130);
     lv_obj_t *trim_long_label = make_label(scr->root, font_m, dim,
-                                           "LT TRIM", 110);
+                                           "LONG\nTERME", 130);
     lv_obj_t *inj_one_label = make_label(scr->root, font_m, dim,
-                                         "INJ 1", 110);
+                                         "INJECT. 1", 130);
     lv_obj_t *inj_two_label = make_label(scr->root, font_m, dim,
-                                         "INJ 2", 110);
+                                         "INJECT. 2", 130);
 
     set_unavailable_text(scr);
     scr->hero_front = make_label(scr->root, font_xl, bright, scr->hero_text, 190);
@@ -361,23 +324,23 @@ injection_screen_t *injection_screen_create(lv_obj_t *parent) {
                SCREEN_CX, HERO_Y, 190, 2);
     place_label(hero_label, scr->root, SCREEN_CX, HERO_LABEL_Y, 150, 0);
 
-    place_label(trim_short_label, scr->root, 82.0f, TRIM_LABEL_Y, 110, 0);
-    place_label(trim_long_label, scr->root, 238.0f, TRIM_LABEL_Y, 110, 0);
+    place_label(trim_short_label, scr->root, 96.0f, TRIM_LABEL_Y, 130, 0);
+    place_label(trim_long_label, scr->root, 224.0f, TRIM_LABEL_Y, 130, 0);
     place_pair(scr->metric_front[METRIC_SHORT_TRIM],
                scr->metric_shadow[METRIC_SHORT_TRIM], scr->root,
-               82.0f, TRIM_VALUE_Y, 116, 1);
+               96.0f, TRIM_VALUE_Y, 108, 1);
     place_pair(scr->metric_front[METRIC_LONG_TRIM],
                scr->metric_shadow[METRIC_LONG_TRIM], scr->root,
-               238.0f, TRIM_VALUE_Y, 116, 1);
+               224.0f, TRIM_VALUE_Y, 108, 1);
 
-    place_label(inj_one_label, scr->root, 82.0f, INJ_LABEL_Y, 110, 0);
-    place_label(inj_two_label, scr->root, 238.0f, INJ_LABEL_Y, 110, 0);
+    place_label(inj_one_label, scr->root, 96.0f, INJ_LABEL_Y, 130, 0);
+    place_label(inj_two_label, scr->root, 224.0f, INJ_LABEL_Y, 130, 0);
     place_pair(scr->metric_front[METRIC_INJECTOR_1],
                scr->metric_shadow[METRIC_INJECTOR_1], scr->root,
-               82.0f, INJ_VALUE_Y, 116, 1);
+               96.0f, INJ_VALUE_Y, 108, 1);
     place_pair(scr->metric_front[METRIC_INJECTOR_2],
                scr->metric_shadow[METRIC_INJECTOR_2], scr->root,
-               238.0f, INJ_VALUE_Y, 116, 1);
+               224.0f, INJ_VALUE_Y, 108, 1);
 
     return scr;
 
