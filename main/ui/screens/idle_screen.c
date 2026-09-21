@@ -3,6 +3,7 @@
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/widgets/amber_draw.h"
+#include "ui/widgets/amber_ui.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -97,10 +98,6 @@ struct idle_screen_s {
     float adjuster;
     bool connected;
 };
-
-static int32_t px(float value) {
-    return (int32_t)lroundf(value);
-}
 
 static void draw_segment_meter(lv_layer_t *layer, const ui_layout_t *layout,
                                float x, float value, float low, float high,
@@ -229,34 +226,6 @@ static void canvas_draw_cb(lv_event_t *event) {
     draw_panel_lines(layer, &layout);
 }
 
-static lv_obj_t *label_create(lv_obj_t *parent, const lv_font_t *font,
-                              lv_color_t color, const char *text) {
-    lv_obj_t *label = lv_label_create(parent);
-    if (label == NULL) return NULL;
-
-    lv_obj_set_style_text_font(label, font, 0);
-    lv_obj_set_style_text_color(label, color, 0);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_pad_all(label, 0, 0);
-    lv_label_set_text_static(label, text != NULL ? text : "");
-    return label;
-}
-
-static void place_centered(lv_obj_t *object, lv_obj_t *parent, float x,
-                           float y, float offset) {
-    if (object == NULL) return;
-
-    lv_obj_update_layout(object);
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
-                                             lv_obj_get_height(parent));
-    const int32_t dx = px(offset * layout.scale * UI_REFERENCE_SIZE /
-                          UI_DISPLAY_SIZE_PX);
-    lv_obj_set_pos(object, px(ui_layout_x(&layout, x)) -
-                             lv_obj_get_width(object) / 2 + dx,
-                   px(ui_layout_y(&layout, y)) -
-                             lv_obj_get_height(object) / 2);
-}
-
 static void set_text(lv_obj_t *label, char *buffer, size_t size,
                      const char *format, float value) {
     if (label == NULL || buffer == NULL || size == 0) return;
@@ -287,34 +256,11 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
     if (screen == NULL) return NULL;
     lv_memzero(screen, sizeof(*screen));
 
-    lv_obj_set_style_bg_color(parent, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
-    lv_obj_update_layout(parent);
-
-    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
-                                lv_obj_get_content_height(parent));
-    if (side <= 0) goto fail;
-
-    screen->root = lv_obj_create(parent);
+    screen->root = amber_ui_root_create(parent);
     if (screen->root == NULL) goto fail;
-    lv_obj_remove_style_all(screen->root);
-    lv_obj_set_size(screen->root, side, side);
-    lv_obj_center(screen->root);
-    lv_obj_set_style_bg_color(screen->root, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(screen->root, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(screen->root, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_clip_corner(screen->root, true, 0);
-    lv_obj_clear_flag(screen->root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_update_layout(screen->root);
-
-    screen->canvas = lv_obj_create(screen->root);
+    screen->canvas = amber_ui_canvas_create(screen->root, screen,
+                                            canvas_draw_cb);
     if (screen->canvas == NULL) goto fail;
-    lv_obj_remove_style_all(screen->canvas);
-    lv_obj_set_size(screen->canvas, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(screen->canvas, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_user_data(screen->canvas, screen);
-    lv_obj_add_event_cb(screen->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN,
-                        NULL);
 
     const lv_font_t *font_xl = ui_font_or(ui_font_xl, &lv_font_montserrat_48);
     const lv_font_t *font_value = ui_font_or(ui_font_l, &lv_font_montserrat_20);
@@ -339,40 +285,45 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
         screen->metric_text[i][1] = '\0';
     }
 
-    screen->title = label_create(screen->root, font_caption, bright,
-                                 "RALENTI");
-    screen->subtitle = label_create(screen->root, font_caption, dim,
-                                    "BOUCLE FERMEE");
+    screen->title = amber_ui_label_create(screen->root, font_caption, bright,
+                                          "RALENTI", 0.0f);
+    screen->subtitle = amber_ui_label_create(screen->root, font_caption, dim,
+                                             "BOUCLE FERMEE", 0.0f);
 
     // Le décalage du calque dim simule le faux-gras Michroma sans modifier la
     // police, comme sur le cadran RPM ambre de référence.
-    screen->hero_shadow = label_create(screen->root, font_xl, dim,
-                                       screen->hero_text);
-    screen->hero = label_create(screen->root, font_xl, bright,
-                                screen->hero_text);
-    screen->hero_unit = label_create(screen->root, font_caption, bright, "RPM");
-    screen->error = label_create(screen->root, font_value, dim,
-                                 screen->error_text);
-    screen->status = label_create(screen->root, font_caption, dim,
-                                  screen->status_text);
+    screen->hero_shadow = amber_ui_label_create(screen->root, font_xl, dim,
+                                                screen->hero_text, 0.0f);
+    screen->hero = amber_ui_label_create(screen->root, font_xl, bright,
+                                         screen->hero_text, 0.0f);
+    screen->hero_unit = amber_ui_label_create(screen->root, font_caption,
+                                              bright, "RPM", 0.0f);
+    screen->error = amber_ui_label_create(screen->root, font_value, dim,
+                                          screen->error_text, 0.0f);
+    screen->status = amber_ui_label_create(screen->root, font_caption, dim,
+                                           screen->status_text, 0.0f);
 
-    screen->metric_value[METRIC_SETPOINT] = label_create(
-        screen->root, font_value, bright, screen->metric_text[METRIC_SETPOINT]);
-    screen->metric_value[METRIC_VALVE] = label_create(
-        screen->root, font_value, bright, screen->metric_text[METRIC_VALVE]);
-    screen->metric_value[METRIC_BASE] = label_create(
-        screen->root, font_value, bright, screen->metric_text[METRIC_BASE]);
-    screen->metric_value[METRIC_ADJUSTER] = label_create(
-        screen->root, font_value, bright, screen->metric_text[METRIC_ADJUSTER]);
+    screen->metric_value[METRIC_SETPOINT] = amber_ui_label_create(
+        screen->root, font_value, bright, screen->metric_text[METRIC_SETPOINT],
+        0.0f);
+    screen->metric_value[METRIC_VALVE] = amber_ui_label_create(
+        screen->root, font_value, bright, screen->metric_text[METRIC_VALVE],
+        0.0f);
+    screen->metric_value[METRIC_BASE] = amber_ui_label_create(
+        screen->root, font_value, bright, screen->metric_text[METRIC_BASE],
+        0.0f);
+    screen->metric_value[METRIC_ADJUSTER] = amber_ui_label_create(
+        screen->root, font_value, bright, screen->metric_text[METRIC_ADJUSTER],
+        0.0f);
 
-    screen->metric_name[METRIC_SETPOINT] = label_create(
-        screen->root, font_caption, dim, "CONSIGNE");
-    screen->metric_name[METRIC_VALVE] = label_create(
-        screen->root, font_caption, dim, "VANNE");
-    screen->metric_name[METRIC_BASE] = label_create(
-        screen->root, font_caption, dim, "BASE");
-    screen->metric_name[METRIC_ADJUSTER] = label_create(
-        screen->root, font_caption, dim, "AJUSTEUR");
+    screen->metric_name[METRIC_SETPOINT] = amber_ui_label_create(
+        screen->root, font_caption, dim, "CONSIGNE", 0.0f);
+    screen->metric_name[METRIC_VALVE] = amber_ui_label_create(
+        screen->root, font_caption, dim, "VANNE", 0.0f);
+    screen->metric_name[METRIC_BASE] = amber_ui_label_create(
+        screen->root, font_caption, dim, "BASE", 0.0f);
+    screen->metric_name[METRIC_ADJUSTER] = amber_ui_label_create(
+        screen->root, font_caption, dim, "AJUSTEUR", 0.0f);
 
     if (screen->title == NULL || screen->subtitle == NULL ||
         screen->hero_shadow == NULL || screen->hero == NULL ||
@@ -386,22 +337,29 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
         }
     }
 
-    place_centered(screen->title, screen->root, SCREEN_CX, TITLE_Y, 0.0f);
-    place_centered(screen->subtitle, screen->root, SCREEN_CX, SUBTITLE_Y,
-                   0.0f);
-    place_centered(screen->hero_shadow, screen->root, SCREEN_CX, HERO_Y,
-                   BOLD_SPREAD_PX);
-    place_centered(screen->hero, screen->root, SCREEN_CX, HERO_Y,
-                   -BOLD_SPREAD_PX);
-    place_centered(screen->hero_unit, screen->root, SCREEN_CX, HERO_UNIT_Y,
-                   0.0f);
-    place_centered(screen->error, screen->root, SCREEN_CX, ERROR_Y, 0.0f);
-    place_centered(screen->status, screen->root, SCREEN_CX, STATUS_Y, 0.0f);
+    amber_ui_place_centered(screen->title, screen->root, SCREEN_CX, TITLE_Y,
+                             0.0f, 0.0f);
+    amber_ui_place_centered(screen->subtitle, screen->root, SCREEN_CX,
+                             SUBTITLE_Y, 0.0f, 0.0f);
+    amber_ui_place_centered(screen->hero_shadow, screen->root, SCREEN_CX,
+                             HERO_Y, 0.0f,
+                             BOLD_SPREAD_PX * UI_REFERENCE_SIZE /
+                             UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->hero, screen->root, SCREEN_CX, HERO_Y,
+                             0.0f,
+                             -BOLD_SPREAD_PX * UI_REFERENCE_SIZE /
+                             UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->hero_unit, screen->root, SCREEN_CX,
+                             HERO_UNIT_Y, 0.0f, 0.0f);
+    amber_ui_place_centered(screen->error, screen->root, SCREEN_CX, ERROR_Y,
+                             0.0f, 0.0f);
+    amber_ui_place_centered(screen->status, screen->root, SCREEN_CX, STATUS_Y,
+                             0.0f, 0.0f);
     for (int i = 0; i < METRIC_COUNT; i++) {
-        place_centered(screen->metric_value[i], screen->root, kMetricX[i],
-                       kMetricValueY[i], 0.0f);
-        place_centered(screen->metric_name[i], screen->root, kMetricX[i],
-                       kMetricNameY[i], 0.0f);
+        amber_ui_place_centered(screen->metric_value[i], screen->root,
+                                kMetricX[i], kMetricValueY[i], 0.0f, 0.0f);
+        amber_ui_place_centered(screen->metric_name[i], screen->root,
+                                kMetricX[i], kMetricNameY[i], 0.0f, 0.0f);
     }
 
     return screen;
@@ -448,15 +406,21 @@ void idle_screen_update(idle_screen_t *screen, const ecu_data_t *data) {
              screen->adjuster);
 
     // Le texte à largeur intrinsèque est recentré sans recréer de widget.
-    place_centered(screen->hero_shadow, screen->root, SCREEN_CX, HERO_Y,
-                   BOLD_SPREAD_PX);
-    place_centered(screen->hero, screen->root, SCREEN_CX, HERO_Y,
-                   -BOLD_SPREAD_PX);
-    place_centered(screen->error, screen->root, SCREEN_CX, ERROR_Y, 0.0f);
-    place_centered(screen->status, screen->root, SCREEN_CX, STATUS_Y, 0.0f);
+    amber_ui_place_centered(screen->hero_shadow, screen->root, SCREEN_CX,
+                             HERO_Y, 0.0f,
+                             BOLD_SPREAD_PX * UI_REFERENCE_SIZE /
+                             UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->hero, screen->root, SCREEN_CX, HERO_Y,
+                             0.0f,
+                             -BOLD_SPREAD_PX * UI_REFERENCE_SIZE /
+                             UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(screen->error, screen->root, SCREEN_CX, ERROR_Y,
+                             0.0f, 0.0f);
+    amber_ui_place_centered(screen->status, screen->root, SCREEN_CX, STATUS_Y,
+                             0.0f, 0.0f);
     for (int i = 0; i < METRIC_COUNT; i++) {
-        place_centered(screen->metric_value[i], screen->root, kMetricX[i],
-                       kMetricValueY[i], 0.0f);
+        amber_ui_place_centered(screen->metric_value[i], screen->root,
+                                kMetricX[i], kMetricValueY[i], 0.0f, 0.0f);
     }
     lv_obj_invalidate(screen->canvas);
 }

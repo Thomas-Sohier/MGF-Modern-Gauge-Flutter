@@ -3,6 +3,7 @@
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/ui_layout.h"
+#include "ui/widgets/amber_ui.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -89,11 +90,6 @@ struct temps_screen_s {
     bool available[METRIC_COUNT];
     bool danger[METRIC_COUNT];
 };
-
-static ui_layout_t layout_of(const lv_obj_t *obj) {
-    return ui_layout_fit((float)lv_obj_get_width(obj),
-                         (float)lv_obj_get_height(obj));
-}
 
 static void draw_line(lv_layer_t *layer, float x1, float y1, float x2,
                       float y2, float width, lv_color_t color) {
@@ -242,43 +238,26 @@ static void canvas_draw_cb(lv_event_t *event) {
               SEPARATOR_W * k, separator);
 }
 
-static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font,
-                            lv_color_t color, const char *text) {
-    lv_obj_t *label = lv_label_create(parent);
-    if (label == NULL) return NULL;
-
-    lv_obj_set_style_text_font(label, font, 0);
-    lv_obj_set_style_text_color(label, color, 0);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_pad_all(label, 0, 0);
-    lv_label_set_text_static(label, text != NULL ? text : "");
-    return label;
-}
-
-static void place_centered(const temps_screen_t *scr, lv_obj_t *label,
-                           float x, float y) {
-    if (label == NULL) return;
-
-    lv_obj_update_layout(label);
-    const ui_layout_t layout = layout_of(scr->root);
-    const int32_t px = (int32_t)lroundf(ui_layout_x(&layout, x));
-    const int32_t py = (int32_t)lroundf(ui_layout_y(&layout, y));
-    lv_obj_set_pos(label, px - lv_obj_get_width(label) / 2,
-                   py - lv_obj_get_height(label) / 2);
-}
-
 static void place_labels(temps_screen_t *scr) {
-    place_centered(scr, scr->header, SCREEN_CX, HEADER_Y);
-    place_centered(scr, scr->hero_value, SCREEN_CX, HERO_CY - 4.0f);
-    place_centered(scr, scr->hero_unit, SCREEN_CX + 43.0f, HERO_CY + 16.0f);
-    place_centered(scr, scr->hero_name, SCREEN_CX, 157.0f);
-    place_centered(scr, scr->status, SCREEN_CX, STATUS_Y);
-    place_centered(scr, scr->summary, SCREEN_CX, SUMMARY_Y);
+    amber_ui_place_centered(scr->header, scr->root, SCREEN_CX, HEADER_Y,
+                             0.0f, 0.0f);
+    amber_ui_place_centered(scr->hero_value, scr->root, SCREEN_CX,
+                             HERO_CY - 4.0f, 0.0f, 0.0f);
+    amber_ui_place_centered(scr->hero_unit, scr->root, SCREEN_CX + 43.0f,
+                             HERO_CY + 16.0f, 0.0f, 0.0f);
+    amber_ui_place_centered(scr->hero_name, scr->root, SCREEN_CX, 157.0f,
+                             0.0f, 0.0f);
+    amber_ui_place_centered(scr->status, scr->root, SCREEN_CX, STATUS_Y,
+                             0.0f, 0.0f);
+    amber_ui_place_centered(scr->summary, scr->root, SCREEN_CX, SUMMARY_Y,
+                             0.0f, 0.0f);
 
     for (int i = 0; i < METRIC_COUNT; i++) {
         const float x = METRIC_X0 + (float)i * METRIC_STEP;
-        place_centered(scr, scr->metric_value[i], x, METRIC_VALUE_Y);
-        place_centered(scr, scr->metric_name[i], x, METRIC_NAME_Y);
+        amber_ui_place_centered(scr->metric_value[i], scr->root, x,
+                                METRIC_VALUE_Y, 0.0f, 0.0f);
+        amber_ui_place_centered(scr->metric_name[i], scr->root, x,
+                                METRIC_NAME_Y, 0.0f, 0.0f);
     }
 }
 
@@ -297,30 +276,14 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
     if (scr == NULL) return NULL;
     lv_memzero(scr, sizeof(*scr));
 
-    lv_obj_update_layout(parent);
-    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
-                                lv_obj_get_content_height(parent));
-    if (side <= 0) goto fail;
-
-    lv_obj_set_style_bg_color(parent, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
-
-    scr->root = lv_obj_create(parent);
+    scr->root = amber_ui_root_create(parent);
     if (scr->root == NULL) goto fail;
-    lv_obj_remove_style_all(scr->root);
-    lv_obj_set_size(scr->root, side, side);
-    lv_obj_center(scr->root);
-    lv_obj_set_style_bg_color(scr->root, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(scr->root, LV_OPA_COVER, 0);
-    lv_obj_clear_flag(scr->root, LV_OBJ_FLAG_SCROLLABLE);
-
-    scr->canvas = lv_obj_create(scr->root);
+    // This screen historically used a square root; keep its background and
+    // clipping behavior unchanged while sharing the common construction.
+    lv_obj_set_style_radius(scr->root, 0, 0);
+    lv_obj_set_style_clip_corner(scr->root, false, 0);
+    scr->canvas = amber_ui_canvas_create(scr->root, scr, canvas_draw_cb);
     if (scr->canvas == NULL) goto fail;
-    lv_obj_remove_style_all(scr->canvas);
-    lv_obj_set_size(scr->canvas, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(scr->canvas, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_user_data(scr->canvas, scr);
-    lv_obj_add_event_cb(scr->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
     scr->overlay = lv_obj_create(scr->root);
     if (scr->overlay == NULL) goto fail;
@@ -340,15 +303,19 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
     const lv_font_t *value = value_font();
     const lv_font_t *small = small_font();
 
-    scr->header = make_label(scr->overlay, small, bright,
-                             "TEMPERATURES / °C");
-    scr->hero_value = make_label(scr->overlay, ui_font_or(ui_font_xl,
-                                                           &lv_font_montserrat_48),
-                                 bright, scr->hero_text);
-    scr->hero_unit = make_label(scr->overlay, value, bright, "°C");
-    scr->hero_name = make_label(scr->overlay, small, bright, "EAU");
-    scr->status = make_label(scr->overlay, small, dim, scr->status_text);
-    scr->summary = make_label(scr->overlay, small, dim, scr->summary_text);
+    scr->header = amber_ui_label_create(scr->overlay, small, bright,
+                                        "TEMPERATURES / °C", 0.0f);
+    scr->hero_value = amber_ui_label_create(
+        scr->overlay, ui_font_or(ui_font_xl, &lv_font_montserrat_48), bright,
+        scr->hero_text, 0.0f);
+    scr->hero_unit = amber_ui_label_create(scr->overlay, value, bright, "°C",
+                                           0.0f);
+    scr->hero_name = amber_ui_label_create(scr->overlay, small, bright, "EAU",
+                                           0.0f);
+    scr->status = amber_ui_label_create(scr->overlay, small, dim,
+                                        scr->status_text, 0.0f);
+    scr->summary = amber_ui_label_create(scr->overlay, small, dim,
+                                         scr->summary_text, 0.0f);
 
     if (scr->header == NULL || scr->hero_value == NULL ||
         scr->hero_unit == NULL ||
@@ -357,10 +324,10 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
     }
 
     for (int i = 0; i < METRIC_COUNT; i++) {
-        scr->metric_value[i] = make_label(scr->overlay, value, dim,
-                                          scr->metric_text[i]);
-        scr->metric_name[i] = make_label(scr->overlay, small, dim,
-                                         kMetrics[i].name);
+        scr->metric_value[i] = amber_ui_label_create(
+            scr->overlay, value, dim, scr->metric_text[i], 0.0f);
+        scr->metric_name[i] = amber_ui_label_create(
+            scr->overlay, small, dim, kMetrics[i].name, 0.0f);
         if (scr->metric_value[i] == NULL || scr->metric_name[i] == NULL) {
             goto fail;
         }

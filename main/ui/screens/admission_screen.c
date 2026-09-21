@@ -3,6 +3,7 @@
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/widgets/amber_draw.h"
+#include "ui/widgets/amber_ui.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -99,10 +100,6 @@ struct admission_screen_s {
     float throttle_pot_voltage;
     float intake_air_temp;
 };
-
-static int32_t px(float value) {
-    return (int32_t)lroundf(value);
-}
 
 static void draw_map_ring(lv_layer_t *layer, const ui_layout_t *layout,
                           const admission_screen_t *scr) {
@@ -240,52 +237,6 @@ static void canvas_draw_cb(lv_event_t *event) {
     draw_manifold(layer, &layout, scr);
 }
 
-static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font,
-                            lv_color_t color, const char *text) {
-    lv_obj_t *label = lv_label_create(parent);
-    if (label == NULL) return NULL;
-    lv_obj_set_style_text_font(label, font, 0);
-    lv_obj_set_style_text_color(label, color, 0);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_pad_all(label, 0, 0);
-    // Une information reste sur une seule ligne : mieux vaut une largeur
-    // explicitement dimensionnée qu'un retour automatique dans le cadran.
-    lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
-    lv_label_set_text_static(label, text != NULL ? text : "");
-    return label;
-}
-
-static void place_label(lv_obj_t *label, lv_obj_t *parent, float x, float y,
-                        int32_t width) {
-    if (label == NULL) return;
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
-                                             lv_obj_get_height(parent));
-    lv_obj_set_width(label, px(width * layout.scale));
-    lv_obj_update_layout(label);
-    lv_obj_set_pos(label,
-                   px(ui_layout_x(&layout, x)) - lv_obj_get_width(label) / 2,
-                   px(ui_layout_y(&layout, y)) - lv_obj_get_height(label) / 2);
-}
-
-static void place_text(amber_text_t *text, lv_obj_t *parent) {
-    if (text == NULL || text->front == NULL || text->shadow == NULL) return;
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
-                                             lv_obj_get_height(parent));
-    const int32_t offset = px(text->spread * layout.scale *
-                               UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
-    lv_obj_set_width(text->front, px(text->width * layout.scale));
-    lv_obj_set_width(text->shadow, px(text->width * layout.scale));
-    lv_obj_update_layout(text->front);
-    lv_obj_update_layout(text->shadow);
-
-    const int32_t x = px(ui_layout_x(&layout, text->x));
-    const int32_t y = px(ui_layout_y(&layout, text->y));
-    lv_obj_set_pos(text->shadow, x - lv_obj_get_width(text->shadow) / 2 + offset,
-                   y - lv_obj_get_height(text->shadow) / 2);
-    lv_obj_set_pos(text->front, x - lv_obj_get_width(text->front) / 2 - offset,
-                   y - lv_obj_get_height(text->front) / 2);
-}
-
 static amber_text_t text_create(lv_obj_t *parent, const lv_font_t *font,
                                 float x, float y, int32_t width, int spread,
                                 const char *initial) {
@@ -295,15 +246,19 @@ static amber_text_t text_create(lv_obj_t *parent, const lv_font_t *font,
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t separator = ui_theme_amber_separator();
 
-    text.shadow = make_label(parent, font, separator, initial);
+    text.shadow = amber_ui_label_create(parent, font, separator, initial,
+                                        (float)width);
     if (text.shadow == NULL) return text;
-    text.front = make_label(parent, font, bright, initial);
+    text.front = amber_ui_label_create(parent, font, bright, initial,
+                                       (float)width);
     if (text.front == NULL) {
         lv_obj_delete(text.shadow);
         text.shadow = NULL;
         return text;
     }
-    place_text(&text, parent);
+    const float offset = (float)spread * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX;
+    amber_ui_place_centered(text.shadow, parent, x, y, (float)width, offset);
+    amber_ui_place_centered(text.front, parent, x, y, (float)width, -offset);
     return text;
 }
 
@@ -315,7 +270,12 @@ static void text_set(amber_text_t *text, lv_obj_t *parent, const char *value) {
     if (!text_valid(text)) return;
     lv_label_set_text_static(text->front, value != NULL ? value : "");
     lv_label_set_text_static(text->shadow, value != NULL ? value : "");
-    place_text(text, parent);
+    const float offset = (float)text->spread * UI_REFERENCE_SIZE /
+                         UI_DISPLAY_SIZE_PX;
+    amber_ui_place_centered(text->shadow, parent, text->x, text->y,
+                            (float)text->width, offset);
+    amber_ui_place_centered(text->front, parent, text->x, text->y,
+                            (float)text->width, -offset);
 }
 
 static void text_destroy(amber_text_t *text) {
@@ -345,32 +305,10 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
     if (scr == NULL) return NULL;
     lv_memzero(scr, sizeof(*scr));
 
-    lv_obj_set_style_bg_color(parent, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
-    lv_obj_update_layout(parent);
-    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
-                                lv_obj_get_content_height(parent));
-    if (side <= 0) goto fail;
-
-    scr->root = lv_obj_create(parent);
+    scr->root = amber_ui_root_create(parent);
     if (scr->root == NULL) goto fail;
-    lv_obj_remove_style_all(scr->root);
-    lv_obj_set_size(scr->root, side, side);
-    lv_obj_center(scr->root);
-    lv_obj_set_style_bg_color(scr->root, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(scr->root, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(scr->root, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_clip_corner(scr->root, true, 0);
-    lv_obj_clear_flag(scr->root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_update_layout(scr->root);
-
-    scr->canvas = lv_obj_create(scr->root);
+    scr->canvas = amber_ui_canvas_create(scr->root, scr, canvas_draw_cb);
     if (scr->canvas == NULL) goto fail;
-    lv_obj_remove_style_all(scr->canvas);
-    lv_obj_set_size(scr->canvas, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(scr->canvas, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_user_data(scr->canvas, scr);
-    lv_obj_add_event_cb(scr->canvas, canvas_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
     snprintf(scr->hero_text, sizeof(scr->hero_text), "--");
     snprintf(scr->status_text, sizeof(scr->status_text), "HORS LIGNE");
@@ -387,13 +325,16 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
 
-    scr->header = make_label(scr->root, caption_font, bright, "ADMISSION");
-    scr->status = make_label(scr->root, caption_font, dim, scr->status_text);
+    scr->header = amber_ui_label_create(scr->root, caption_font, bright,
+                                        "ADMISSION", 180.0f);
+    scr->status = amber_ui_label_create(scr->root, caption_font, dim,
+                                        scr->status_text, 220.0f);
     scr->hero = text_create(scr->root, hero_font, CX, HERO_Y, 170, 2,
                             scr->hero_text);
-    scr->hero_unit = make_label(scr->root, value_font, bright, "kPa");
-    scr->hero_label = make_label(scr->root, caption_font, bright,
-                                 "PRESSION COLLECTEUR");
+    scr->hero_unit = amber_ui_label_create(scr->root, value_font, bright,
+                                           "kPa", 70.0f);
+    scr->hero_label = amber_ui_label_create(scr->root, caption_font, bright,
+                                            "PRESSION COLLECTEUR", 240.0f);
 
     static const char *const kMetricLabels[METRIC_COUNT] = {
         "PAPILLON", "TPS", "AIR", "MAP"
@@ -402,8 +343,8 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
         scr->metric[i] = text_create(scr->root, value_font, kMetricX[i],
                                      kMetricY[i], 112, 1,
                                      scr->metric_text[i]);
-        scr->metric_label[i] = make_label(scr->root, caption_font, dim,
-                                          kMetricLabels[i]);
+        scr->metric_label[i] = amber_ui_label_create(
+            scr->root, caption_font, dim, kMetricLabels[i], 88.0f);
     }
 
     if (scr->header == NULL || scr->status == NULL ||
@@ -415,15 +356,26 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
         }
     }
 
-    place_label(scr->header, scr->root, CX, HEADER_Y, 180);
-    place_label(scr->status, scr->root, CX, STATUS_Y, 220);
-    place_text(&scr->hero, scr->root);
-    place_label(scr->hero_unit, scr->root, CX, HERO_UNIT_Y, 70);
-    place_label(scr->hero_label, scr->root, CX, HERO_LABEL_Y, 240);
+    amber_ui_place_centered(scr->header, scr->root, CX, HEADER_Y, 180.0f,
+                             0.0f);
+    amber_ui_place_centered(scr->status, scr->root, CX, STATUS_Y, 220.0f,
+                             0.0f);
+    amber_ui_place_centered(scr->hero.shadow, scr->root, CX, HERO_Y, 170.0f,
+                             2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(scr->hero.front, scr->root, CX, HERO_Y, 170.0f,
+                             -2.0f * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
+    amber_ui_place_centered(scr->hero_unit, scr->root, CX, HERO_UNIT_Y,
+                             70.0f, 0.0f);
+    amber_ui_place_centered(scr->hero_label, scr->root, CX, HERO_LABEL_Y,
+                             240.0f, 0.0f);
     for (int i = 0; i < METRIC_COUNT; i++) {
-        place_text(&scr->metric[i], scr->root);
-        place_label(scr->metric_label[i], scr->root, kMetricX[i],
-                    kMetricLabelY[i], 88);
+        const float offset = UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX;
+        amber_ui_place_centered(scr->metric[i].shadow, scr->root,
+                                kMetricX[i], kMetricY[i], 112.0f, offset);
+        amber_ui_place_centered(scr->metric[i].front, scr->root,
+                                kMetricX[i], kMetricY[i], 112.0f, -offset);
+        amber_ui_place_centered(scr->metric_label[i], scr->root,
+                                kMetricX[i], kMetricLabelY[i], 88.0f, 0.0f);
     }
 
     return scr;
@@ -467,7 +419,8 @@ void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
         text_set(&scr->metric[i], scr->root, scr->metric_text[i]);
     }
     lv_label_set_text_static(scr->status, scr->status_text);
-    place_label(scr->status, scr->root, CX, STATUS_Y, 220);
+    amber_ui_place_centered(scr->status, scr->root, CX, STATUS_Y, 220.0f,
+                             0.0f);
 
     // Les textes viennent de buffers persistants et set_text_static ne copie
     // rien : cette voie ne fait aucune allocation pendant une mise à jour.
