@@ -27,6 +27,10 @@ UI_SRCS=(
     "$MAIN/ui/widgets/dual_arc_dial.c" "$MAIN/ui/screens/rpm_screen.c" "$MAIN/ui/screens/boot_screen.c" "$MAIN/infrastructure/fake_ecu.c"
     "$MAIN/ui/icons/gauge_icons.c" "$MAIN/ui/icons/dash_icons.c"
     "$MAIN/ui/screens/style_amber.c" "$MAIN/ui/screens/style_cream.c" "$MAIN/ui/themes/ui_theme.c"
+    "$MAIN/ui/screens/clock_screen.c" "$MAIN/ui/screens/music_screen.c" "$MAIN/ui/screens/navigation_screen.c"
+    "$MAIN/ui/screens/faults_screen.c" "$MAIN/ui/screens/temps_screen.c" "$MAIN/ui/screens/injection_screen.c"
+    "$MAIN/ui/screens/lambda_screen.c" "$MAIN/ui/screens/ignition_screen.c"
+    "$MAIN/ui/screens/idle_screen.c" "$MAIN/ui/screens/admission_screen.c"
     "$MAIN/ui/widgets/amber_value.c" "$MAIN/ui/fonts/ui_fonts.c"
 )
 
@@ -77,10 +81,13 @@ gcc "${CFLAGS[@]}" \
     "${UI_SRCS[@]}" "${LVGL_OBJS[@]}" \
     -lm -o "$BUILD/gen_golden"
 
-# 4. Régénération des trois goldens.
+# 4. Régénération des références visuelles.
 echo ">> génération des goldens..."
 "$BUILD/gen_golden" dual  "$GDIR/rpm_screen.png"
-"$BUILD/gen_golden" amber "$GDIR/rpm_amber.png"
 "$BUILD/gen_golden" cream "$GDIR/rpm_cream.png"
 "$BUILD/gen_golden" boot  "$GDIR/boot_amber.png"
+"$BUILD/gen_golden" amber "$GDIR/rpm_amber.png"
+for style in clock music navigation faults temps injection lambda ignition idle admission; do
+    "$BUILD/gen_golden" "$style" "$GDIR/${style}_amber.png"
+done
 echo ">> OK — goldens régénérés dans test/golden/"

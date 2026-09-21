@@ -33,8 +33,8 @@
 // même à la ligne basse. Les libellés courts laissent une vraie gouttière au
 // séparateur central ; aucune largeur de valeur ne peut donc créer de collision.
 static const float k_metric_x[4] = {100.0f, 220.0f, 110.0f, 210.0f};
-static const float k_metric_value_y[4] = {237.0f, 237.0f, 264.0f, 264.0f};
-static const float k_metric_name_y[4] = {251.0f, 251.0f, 277.0f, 277.0f};
+static const float k_metric_value_y[4] = {225.0f, 225.0f, 267.0f, 267.0f};
+static const float k_metric_name_y[4] = {246.0f, 246.0f, 288.0f, 288.0f};
 
 struct ignition_screen_s {
     lv_obj_t *root;
@@ -348,13 +348,13 @@ ignition_screen_t *ignition_screen_create(lv_obj_t *parent) {
                                            ui_theme_amber_bright(),
                                            screen->coil_total_text);
     screen->metric_name[0] = label_create(screen->root, font_caption,
-                                          ui_theme_amber_dim(), "CORRECTION");
+                                          ui_theme_amber_dim(), "CORR.");
     screen->metric_name[1] = label_create(screen->root, font_caption,
-                                          ui_theme_amber_dim(), "BOBINE 1");
+                                          ui_theme_amber_dim(), "BOB. 1");
     screen->metric_name[2] = label_create(screen->root, font_caption,
-                                          ui_theme_amber_dim(), "BOBINE 2");
+                                          ui_theme_amber_dim(), "BOB. 2");
     screen->metric_name[3] = label_create(screen->root, font_caption,
-                                          ui_theme_amber_dim(), "DURÉE");
+                                          ui_theme_amber_dim(), "DUREE");
 
     if (screen->advance_shadow == NULL || screen->advance == NULL ||
         screen->advance_caption == NULL || screen->metric_value[0] == NULL ||

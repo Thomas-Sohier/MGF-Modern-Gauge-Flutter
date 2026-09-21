@@ -33,16 +33,16 @@
 
 // La grille est volontairement en deux rangées. Chaque libellé dispose ainsi
 // d'une largeur réelle, et aucun texte ne vient toucher la couronne ronde.
-#define TITLE_Y 42.0f
-#define SUBTITLE_Y 58.0f
+#define TITLE_Y 36.0f
+#define SUBTITLE_Y 61.0f
 #define HERO_Y 119.0f
 #define HERO_UNIT_Y 148.0f
 #define ERROR_Y 169.0f
 #define GRID_Y 187.0f
-#define METRIC_VALUE_TOP_Y 207.0f
-#define METRIC_NAME_TOP_Y 222.0f
-#define METRIC_VALUE_BOTTOM_Y 242.0f
-#define METRIC_NAME_BOTTOM_Y 257.0f
+#define METRIC_VALUE_TOP_Y 203.0f
+#define METRIC_NAME_TOP_Y 221.0f
+#define METRIC_VALUE_BOTTOM_Y 243.0f
+#define METRIC_NAME_BOTTOM_Y 261.0f
 #define STATUS_Y 289.0f
 
 #define LINE_W 0.8f
@@ -57,7 +57,7 @@ enum {
     METRIC_ADJUSTER,
 };
 
-static const float kMetricX[METRIC_COUNT] = {100.0f, 220.0f, 100.0f, 220.0f};
+static const float kMetricX[METRIC_COUNT] = {110.0f, 210.0f, 110.0f, 210.0f};
 static const float kMetricValueY[METRIC_COUNT] = {
     METRIC_VALUE_TOP_Y, METRIC_VALUE_TOP_Y,
     METRIC_VALUE_BOTTOM_Y, METRIC_VALUE_BOTTOM_Y,
@@ -411,8 +411,8 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
         screen->metric_text[i][1] = '\0';
     }
 
-    screen->title = label_create(screen->root, font_value, bright,
-                                 "GESTION DU RALENTI");
+    screen->title = label_create(screen->root, font_caption, bright,
+                                 "RALENTI");
     screen->subtitle = label_create(screen->root, font_caption, dim,
                                     "BOUCLE FERMEE");
 

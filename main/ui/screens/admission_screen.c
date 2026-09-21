@@ -24,8 +24,8 @@
 // Zones fixes dans le disque de 320 px : en-tête, valeur principale,
 // schéma de flux, puis deux rangées de mesures. Les libellés ne partagent
 // jamais la ligne de base d'une autre information.
-#define HEADER_Y             28.0f
-#define STATUS_Y             45.0f
+#define HEADER_Y             25.0f
+#define STATUS_Y             48.0f
 #define HEADER_LINE_Y        57.0f
 
 #define HERO_Y               86.0f
@@ -39,10 +39,10 @@
 #define MATRIX_LINE_Y        216.0f
 #define MATRIX_SPLIT_Y       257.0f
 #define MATRIX_BOTTOM_Y      294.0f
-#define VALUE_TOP_Y          229.0f
-#define VALUE_BOTTOM_Y       265.0f
+#define VALUE_TOP_Y          225.0f
+#define VALUE_BOTTOM_Y       263.0f
 #define LABEL_TOP_Y          244.0f
-#define LABEL_BOTTOM_Y       280.0f
+#define LABEL_BOTTOM_Y       282.0f
 
 #define METRIC_COUNT 4
 enum {
@@ -57,7 +57,7 @@ enum {
 // télémétrique basse, comme dans le sélecteur multi-métrique d'origine.
 // Les rangées inférieures sont resserrées vers le centre pour rester dans la
 // safe area circulaire, surtout aux deux coins bas du panneau.
-static const float kMetricX[METRIC_COUNT] = {90.0f, 230.0f, 96.0f, 224.0f};
+static const float kMetricX[METRIC_COUNT] = {94.0f, 226.0f, 108.0f, 212.0f};
 static const float kMetricY[METRIC_COUNT] = {
     VALUE_TOP_Y, VALUE_TOP_Y, VALUE_BOTTOM_Y, VALUE_BOTTOM_Y
 };
@@ -481,7 +481,7 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
                                  "PRESSION COLLECTEUR");
 
     static const char *const kMetricLabels[METRIC_COUNT] = {
-        "PAPILLON", "TPS", "AIR ADMIS", "MAP"
+        "PAPILLON", "TPS", "AIR", "MAP"
     };
     for (int i = 0; i < METRIC_COUNT; i++) {
         scr->metric[i] = text_create(scr->root, value_font, kMetricX[i],
@@ -508,7 +508,7 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
     for (int i = 0; i < METRIC_COUNT; i++) {
         place_text(&scr->metric[i], scr->root);
         place_label(scr->metric_label[i], scr->root, kMetricX[i],
-                    kMetricLabelY[i], 92);
+                    kMetricLabelY[i], 88);
     }
 
     return scr;

@@ -9,6 +9,16 @@
 #include "ui/screens/boot_screen.h"
 #include "ui/screens/style_amber.h"
 #include "ui/screens/style_cream.h"
+#include "ui/screens/clock_screen.h"
+#include "ui/screens/music_screen.h"
+#include "ui/screens/navigation_screen.h"
+#include "ui/screens/faults_screen.h"
+#include "ui/screens/temps_screen.h"
+#include "ui/screens/injection_screen.h"
+#include "ui/screens/lambda_screen.h"
+#include "ui/screens/ignition_screen.h"
+#include "ui/screens/idle_screen.h"
+#include "ui/screens/admission_screen.h"
 #include "ui/fonts/ui_fonts.h"
 #include "domain/ecu_data.h"
 #include "ui/ui_layout.h"
@@ -93,7 +103,8 @@ static void *load_file(const char *path, size_t *out_size) {
 }
 
 int main(int argc, char **argv) {
-    // Usage : gen_golden [dual|amber|cream|boot] <chemin_png>
+    // Usage : gen_golden [dual|cream|boot|amber|clock|music|navigation|
+    //                     faults|temps|injection|lambda|ignition|idle|admission] png
     const char *style = (argc > 1) ? argv[1] : "dual";
     const char *out = (argc > 2) ? argv[2] : "rpm_screen.png";
 
@@ -101,9 +112,8 @@ int main(int argc, char **argv) {
     // ST7701, interface RGB). On rend donc à la résolution réelle du panneau,
     // avec masque circulaire. Les styles legacy (dual/cream) restent en
     // 1024x600 (ancienne cible P4 paysage), non masqués.
-    const int is_amber = (strcmp(style, "amber") == 0);
-    const int is_boot = (strcmp(style, "boot") == 0);
-    const int is_round = is_amber || is_boot;
+    const int is_legacy = strcmp(style, "dual") == 0 || strcmp(style, "cream") == 0;
+    const int is_round = !is_legacy;
     const int32_t W = is_round ? UI_DISPLAY_SIZE_PX : 1024;
     const int32_t H = is_round ? UI_DISPLAY_SIZE_PX : 600;
 
@@ -125,26 +135,36 @@ int main(int argc, char **argv) {
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
 
-    if (strcmp(style, "boot") == 0) {
-        boot_screen_create(screen);
-    } else if (strcmp(style, "amber") == 0) {
-        // Ralenti, valeurs de la photo 1.
-        const ecu_data_t mock = {.connected = true, .rpm = 800, .throttle = 6,
-                                 .coolant_temp = 89, .battery_voltage = 14.2f,
-                                 .oil_temp = 91};
-        amber_screen_update(amber_screen_create(screen), &mock);
-    } else if (strcmp(style, "cream") == 0) {
-        // Ralenti, valeurs de la photo 2.
-        const ecu_data_t mock = {.connected = true, .rpm = 800, .throttle = 6,
-                                 .coolant_temp = 87, .battery_voltage = 14.0f,
-                                 .oil_temp = 90};
-        cream_screen_update(cream_screen_create(screen), &mock);
-    } else {
-        // Écran de base : régime en zone de danger (segments rouges) + papillon.
+    const ecu_data_t mock = {
+        .connected = true, .rpm = 875, .throttle = 7, .coolant_temp = 89,
+        .battery_voltage = 14.2f, .oil_temp = 96, .ambient_temp = 22,
+        .intake_air_temp = 31, .fuel_rail_temp = 38, .map_sensor_kpa = 34,
+        .throttle_pot_voltage = 0.72f, .ignition_advance = 14.5f,
+        .ignition_advance_offset = -1.2f, .coil_1_charge_time = 2.45f,
+        .coil_2_charge_time = 2.52f, .coil_time_microseconds = 2480,
+        .injector_1_pw = 2.18f, .injector_2_pw = 2.24f,
+        .fuelling_feedback_percent = 101, .short_term_trim_percent = 2.8f,
+        .long_term_trim = -1.7f, .lambda_mv = 680, .o2_mv = 665,
+        .estimated_air_fuel = 14.65f, .lambda_sensor_duty_cycle = 53,
+        .idle_setpoint = 850, .idle_adjuster_rpm = 18, .idle_error = 25,
+        .idle_valve_position = 34, .idle_base_position = 30,
+    };
+
+    if (strcmp(style, "boot") == 0) boot_screen_create(screen);
+    else if (strcmp(style, "amber") == 0) amber_screen_update(amber_screen_create(screen), &mock);
+    else if (strcmp(style, "clock") == 0) clock_screen_update(clock_screen_create(screen), &mock);
+    else if (strcmp(style, "music") == 0) music_screen_update(music_screen_create(screen), &mock);
+    else if (strcmp(style, "navigation") == 0) navigation_screen_update(navigation_screen_create(screen), &mock);
+    else if (strcmp(style, "faults") == 0) faults_screen_update(faults_screen_create(screen), &mock);
+    else if (strcmp(style, "temps") == 0) temps_screen_update(temps_screen_create(screen), &mock);
+    else if (strcmp(style, "injection") == 0) injection_screen_update(injection_screen_create(screen), &mock);
+    else if (strcmp(style, "lambda") == 0) lambda_screen_update(lambda_screen_create(screen), &mock);
+    else if (strcmp(style, "ignition") == 0) ignition_screen_update(ignition_screen_create(screen), &mock);
+    else if (strcmp(style, "idle") == 0) idle_screen_update(idle_screen_create(screen), &mock);
+    else if (strcmp(style, "admission") == 0) admission_screen_update(admission_screen_create(screen), &mock);
+    else if (strcmp(style, "cream") == 0) cream_screen_update(cream_screen_create(screen), &mock);
+    else {
         lv_obj_set_style_bg_color(screen, lv_color_hex(0x1C1C1E), 0);
-        const ecu_data_t mock = {.connected = true, .rpm = 7200, .throttle = 85,
-                                 .coolant_temp = 92, .battery_voltage = 14.0f,
-                                 .oil_temp = 98};
         rpm_screen_update(rpm_screen_create(screen), &mock);
     }
 

@@ -7,6 +7,16 @@
 #include "infrastructure/board_display.h"
 #include "ui/screens/style_amber.h"
 #include "ui/screens/boot_screen.h"
+#include "ui/screens/clock_screen.h"
+#include "ui/screens/music_screen.h"
+#include "ui/screens/navigation_screen.h"
+#include "ui/screens/faults_screen.h"
+#include "ui/screens/temps_screen.h"
+#include "ui/screens/injection_screen.h"
+#include "ui/screens/lambda_screen.h"
+#include "ui/screens/ignition_screen.h"
+#include "ui/screens/idle_screen.h"
+#include "ui/screens/admission_screen.h"
 #include "ui/navigation/dashboard_navigator.h"
 #include "ui/fonts/ui_fonts.h"
 #include "infrastructure/fake_ecu.h"
@@ -41,13 +51,43 @@ static const char *TAG = "mgf_gauge";
 extern const uint8_t michroma_start[] asm("_binary_fonts_Michroma_Regular_ttf_start");
 extern const uint8_t michroma_end[]   asm("_binary_fonts_Michroma_Regular_ttf_end");
 
-static void rpm_page_update(void *context, const ecu_data_t *data) {
-    amber_screen_update(context, data);
-}
+#define DEFINE_PAGE_ADAPTER(prefix)                                           \
+    static void prefix##_page_update(void *context, const ecu_data_t *data) { \
+        prefix##_screen_update(context, data);                                \
+    }                                                                         \
+    static void prefix##_page_destroy(void *context) {                        \
+        prefix##_screen_destroy(context);                                     \
+    }
 
-static void rpm_page_destroy(void *context) {
-    amber_screen_destroy(context);
-}
+DEFINE_PAGE_ADAPTER(clock)
+DEFINE_PAGE_ADAPTER(music)
+DEFINE_PAGE_ADAPTER(navigation)
+DEFINE_PAGE_ADAPTER(amber)
+DEFINE_PAGE_ADAPTER(faults)
+DEFINE_PAGE_ADAPTER(temps)
+DEFINE_PAGE_ADAPTER(injection)
+DEFINE_PAGE_ADAPTER(lambda)
+DEFINE_PAGE_ADAPTER(ignition)
+DEFINE_PAGE_ADAPTER(idle)
+DEFINE_PAGE_ADAPTER(admission)
+
+#define REGISTER_PAGE(navigator, prefix, label) do {                          \
+    lv_obj_t *page = dashboard_navigator_create_page(navigator);              \
+    prefix##_screen_t *view = prefix##_screen_create(page);                   \
+    const dashboard_page_t descriptor = {                                    \
+        .name = label, .context = view, .update = prefix##_page_update,        \
+        .destroy = prefix##_page_destroy,                                     \
+    };                                                                         \
+    if (page == NULL || view == NULL ||                                       \
+        !dashboard_navigator_register_page(navigator, page, &descriptor)) {    \
+        ESP_LOGE(TAG, "impossible de créer la page %s", label);              \
+        dashboard_navigator_destroy(navigator);                               \
+        boot_screen_destroy(boot);                                            \
+        board_display_unlock();                                               \
+        board_display_backlight_off();                                        \
+        return;                                                               \
+    }                                                                          \
+} while (0)
 
 void app_main(void) {
     ESP_LOGI(TAG, "MGF Gauge LVGL — ecran RPM ambre (ESP32-S3-Touch-LCD-2.1)");
@@ -90,24 +130,26 @@ void app_main(void) {
     lv_refr_now(NULL);
 
     dashboard_navigator_t *navigator = dashboard_navigator_create(screen);
-    lv_obj_t *rpm_page = dashboard_navigator_create_page(navigator);
-    amber_screen_t *ui = amber_screen_create(rpm_page);
-    const dashboard_page_t rpm_descriptor = {
-        .name = "RPM",
-        .context = ui,
-        .update = rpm_page_update,
-        .destroy = rpm_page_destroy,
-    };
-    if (navigator == NULL || rpm_page == NULL || ui == NULL ||
-        !dashboard_navigator_register_page(navigator, rpm_page, &rpm_descriptor)) {
+    if (navigator == NULL) {
         ESP_LOGE(TAG, "impossible de créer la navigation du dashboard");
-        if (navigator != NULL) dashboard_navigator_destroy(navigator);
-        else amber_screen_destroy(ui);
         boot_screen_destroy(boot);
         board_display_unlock();
         board_display_backlight_off();
         return;
     }
+
+    // Même ordre cyclique que l'application Flutter de référence.
+    REGISTER_PAGE(navigator, clock, "HEURE");
+    REGISTER_PAGE(navigator, music, "MUSIQUE");
+    REGISTER_PAGE(navigator, navigation, "NAVIGATION");
+    REGISTER_PAGE(navigator, amber, "RPM");
+    REGISTER_PAGE(navigator, faults, "DEFAUTS");
+    REGISTER_PAGE(navigator, temps, "TEMPERATURES");
+    REGISTER_PAGE(navigator, injection, "INJECTION");
+    REGISTER_PAGE(navigator, lambda, "LAMBDA");
+    REGISTER_PAGE(navigator, ignition, "ALLUMAGE");
+    REGISTER_PAGE(navigator, idle, "RALENTI");
+    REGISTER_PAGE(navigator, admission, "ADMISSION");
 
     // Composition de l'application : la source est branchée au contrôleur,
     // qui possède le snapshot et orchestre le rafraîchissement de l'écran.
