@@ -2,7 +2,7 @@
 
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
-#include "ui/ui_layout.h"
+#include "ui/widgets/amber_draw.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -100,91 +100,8 @@ struct admission_screen_s {
     float intake_air_temp;
 };
 
-static ui_layout_t layout_of(const lv_area_t *area) {
-    ui_layout_t layout = ui_layout_fit(lv_area_get_width(area),
-                                       lv_area_get_height(area));
-    layout.ox += area->x1;
-    layout.oy += area->y1;
-    return layout;
-}
-
 static int32_t px(float value) {
     return (int32_t)lroundf(value);
-}
-
-static float clampf(float value, float low, float high) {
-    if (!isfinite(value)) return low;
-    if (value < low) return low;
-    if (value > high) return high;
-    return value;
-}
-
-static void draw_line(lv_layer_t *layer, const ui_layout_t *layout,
-                      float x1, float y1, float x2, float y2, float width,
-                      lv_color_t color, bool rounded) {
-    lv_draw_line_dsc_t dsc;
-    lv_draw_line_dsc_init(&dsc);
-    dsc.color = color;
-    dsc.opa = LV_OPA_COVER;
-    dsc.width = LV_MAX(1, px(width * layout->scale));
-    dsc.round_start = rounded;
-    dsc.round_end = rounded;
-    dsc.p1.x = px(ui_layout_x(layout, x1));
-    dsc.p1.y = px(ui_layout_y(layout, y1));
-    dsc.p2.x = px(ui_layout_x(layout, x2));
-    dsc.p2.y = px(ui_layout_y(layout, y2));
-    lv_draw_line(layer, &dsc);
-}
-
-static void draw_arc(lv_layer_t *layer, const ui_layout_t *layout,
-                     float cx, float cy, float radius, float width,
-                     float start, float end, lv_color_t color) {
-    lv_draw_arc_dsc_t dsc;
-    lv_draw_arc_dsc_init(&dsc);
-    dsc.center.x = px(ui_layout_x(layout, cx));
-    dsc.center.y = px(ui_layout_y(layout, cy));
-    dsc.radius = LV_MAX(1, px(radius * layout->scale));
-    dsc.width = LV_MAX(1, px(width * layout->scale));
-    dsc.start_angle = start;
-    dsc.end_angle = end;
-    dsc.color = color;
-    dsc.opa = LV_OPA_COVER;
-    dsc.rounded = 0;
-    lv_draw_arc(layer, &dsc);
-}
-
-static void draw_arc_wrapped(lv_layer_t *layer, const ui_layout_t *layout,
-                              float cx, float cy, float radius, float width,
-                              float start, float sweep, lv_color_t color) {
-    if (sweep <= 0.0f) return;
-    if (sweep >= 360.0f) {
-        draw_arc(layer, layout, cx, cy, radius, width, 0.0f, 360.0f,
-                 color);
-        return;
-    }
-
-    float normalized = fmodf(start, 360.0f);
-    if (normalized < 0.0f) normalized += 360.0f;
-    const float end = normalized + sweep;
-    if (end <= 360.0f) {
-        draw_arc(layer, layout, cx, cy, radius, width, normalized, end,
-                 color);
-    } else {
-        draw_arc(layer, layout, cx, cy, radius, width, normalized, 360.0f,
-                 color);
-        draw_arc(layer, layout, cx, cy, radius, width, 0.0f, end - 360.0f,
-                 color);
-    }
-}
-
-static void draw_tick(lv_layer_t *layer, const ui_layout_t *layout,
-                      float angle, float inner, float outer, float width,
-                      lv_color_t color) {
-    const float radians = angle * 0.01745329252f;
-    const float c = cosf(radians);
-    const float s = sinf(radians);
-    draw_line(layer, layout, CX + c * inner, CY + s * inner,
-              CX + c * outer, CY + s * outer, width, color, false);
 }
 
 static void draw_map_ring(lv_layer_t *layer, const ui_layout_t *layout,
@@ -193,7 +110,7 @@ static void draw_map_ring(lv_layer_t *layer, const ui_layout_t *layout,
     const lv_color_t dim = ui_theme_amber_dim();
     const lv_color_t separator = ui_theme_amber_separator();
     const float progress = scr->connected
-        ? clampf(scr->map_kpa / MAP_MAX, 0.0f, 1.0f) : 0.0f;
+        ? amber_clampf(scr->map_kpa / MAP_MAX, 0.0f, 1.0f) : 0.0f;
     const float bar = (MAP_RING_SWEEP -
                        (MAP_RING_SEGMENTS - 1) * MAP_RING_GAP) /
                       MAP_RING_SEGMENTS;
@@ -204,15 +121,17 @@ static void draw_map_ring(lv_layer_t *layer, const ui_layout_t *layout,
     // 7 h 30 vers 4 h 30 et laisse respirer le schéma de collecteur.
     for (int i = 0; i < MAP_RING_SEGMENTS; i++) {
         const float start = MAP_RING_START + (float)i * pitch;
-        draw_arc_wrapped(layer, layout, CX, CY, MAP_RING_R, MAP_RING_W,
-                         start, bar, i < lit ? bright : dim);
+        amber_draw_arc_wrapped(layer, layout, CX, CY, MAP_RING_R, MAP_RING_W,
+                                start, bar, i < lit ? bright : dim, false);
     }
 
     for (int i = 0; i <= MAP_TICK_COUNT; i++) {
         const float angle = MAP_RING_START + MAP_RING_SWEEP *
                             (float)i / MAP_TICK_COUNT;
-        draw_tick(layer, layout, angle, MAP_RING_R - 5.0f, MAP_RING_R + 3.0f,
-                  i == 0 || i == MAP_TICK_COUNT ? 1.2f : 0.8f, separator);
+        amber_draw_tick(layer, layout, CX, CY, angle, MAP_RING_R - 5.0f,
+                        MAP_RING_R + 3.0f,
+                        i == 0 || i == MAP_TICK_COUNT ? 1.2f : 0.8f,
+                        separator, false);
     }
 
     // La couronne est la seule indication graphique de la pression ; le
@@ -221,16 +140,10 @@ static void draw_map_ring(lv_layer_t *layer, const ui_layout_t *layout,
 
 static void draw_flow_arrow(lv_layer_t *layer, const ui_layout_t *layout,
                             float x, float y, lv_color_t color) {
-    draw_line(layer, layout, x - 5.0f, y - 3.0f, x, y, AIRFLOW_ICON_W,
-              color, true);
-    draw_line(layer, layout, x, y, x - 5.0f, y + 3.0f, AIRFLOW_ICON_W,
-              color, true);
-}
-
-static void draw_circle(lv_layer_t *layer, const ui_layout_t *layout,
-                        float x, float y, float radius, float width,
-                        lv_color_t color) {
-    draw_arc(layer, layout, x, y, radius, width, 0.0f, 360.0f, color);
+    amber_draw_line(layer, layout, x - 5.0f, y - 3.0f, x, y, AIRFLOW_ICON_W,
+                    color, true);
+    amber_draw_line(layer, layout, x, y, x - 5.0f, y + 3.0f, AIRFLOW_ICON_W,
+                    color, true);
 }
 
 static void draw_manifold(lv_layer_t *layer, const ui_layout_t *layout,
@@ -241,67 +154,69 @@ static void draw_manifold(lv_layer_t *layer, const ui_layout_t *layout,
     const lv_color_t flow = scr->connected && scr->throttle > 1.0f
                                 ? bright : dim;
     const float throttle = scr->connected
-        ? clampf(scr->throttle / 100.0f, 0.0f, 1.0f) : 0.0f;
+        ? amber_clampf(scr->throttle / 100.0f, 0.0f, 1.0f) : 0.0f;
 
     // Trois filets d'admission et deux flèches rendent le sens de circulation
     // explicite : entrée -> papillon -> plénum -> quatre conduits.
-    draw_line(layer, layout, 35.0f, 169.0f, 82.0f, 169.0f,
-              AIRFLOW_LINE_W, dim, false);
-    draw_line(layer, layout, 35.0f, 180.0f, 82.0f, 180.0f,
-              AIRFLOW_LINE_W, flow, false);
-    draw_line(layer, layout, 35.0f, 191.0f, 82.0f, 191.0f,
-              AIRFLOW_LINE_W, dim, false);
+    amber_draw_line(layer, layout, 35.0f, 169.0f, 82.0f, 169.0f,
+                    AIRFLOW_LINE_W, dim, false);
+    amber_draw_line(layer, layout, 35.0f, 180.0f, 82.0f, 180.0f,
+                    AIRFLOW_LINE_W, flow, false);
+    amber_draw_line(layer, layout, 35.0f, 191.0f, 82.0f, 191.0f,
+                    AIRFLOW_LINE_W, dim, false);
     draw_flow_arrow(layer, layout, 64.0f, 180.0f, flow);
     draw_flow_arrow(layer, layout, 78.0f, 180.0f, flow);
 
     // Corps du papillon : anneau et volet pivotant. L'angle du volet est la
     // représentation directe de throttle, sans aiguille superposée au MAP.
-    draw_circle(layer, layout, 99.0f, AIRFLOW_CY, 17.0f, 1.0f, separator);
+    amber_draw_circle(layer, layout, 99.0f, AIRFLOW_CY, 17.0f, 1.0f,
+                      separator);
     const float plate_dx = 3.0f + throttle * 9.0f;
-    draw_line(layer, layout, 99.0f - plate_dx, 190.0f,
-              99.0f + plate_dx, 170.0f, 2.2f, flow, true);
-    draw_circle(layer, layout, 99.0f, AIRFLOW_CY, 2.0f, 1.0f, bright);
+    amber_draw_line(layer, layout, 99.0f - plate_dx, 190.0f,
+                    99.0f + plate_dx, 170.0f, 2.2f, flow, true);
+    amber_draw_circle(layer, layout, 99.0f, AIRFLOW_CY, 2.0f, 1.0f, bright);
 
     // Plénum en capsule ouverte : les quatre branches verticales rappellent
     // un collecteur réel tout en gardant une silhouette parfaitement centrée.
-    draw_line(layer, layout, 119.0f, 161.0f, 211.0f, 161.0f,
-              AIRFLOW_LINE_W, separator, false);
-    draw_line(layer, layout, 119.0f, 199.0f, 211.0f, 199.0f,
-              AIRFLOW_LINE_W, separator, false);
-    draw_arc(layer, layout, 211.0f, 180.0f, 19.0f, AIRFLOW_LINE_W,
-             270.0f, 360.0f, separator);
-    draw_arc(layer, layout, 211.0f, 180.0f, 19.0f, AIRFLOW_LINE_W,
-             0.0f, 90.0f, separator);
+    amber_draw_line(layer, layout, 119.0f, 161.0f, 211.0f, 161.0f,
+                    AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, layout, 119.0f, 199.0f, 211.0f, 199.0f,
+                    AIRFLOW_LINE_W, separator, false);
+    amber_draw_arc(layer, layout, 211.0f, 180.0f, 19.0f, AIRFLOW_LINE_W,
+                   270.0f, 360.0f, separator, false);
+    amber_draw_arc(layer, layout, 211.0f, 180.0f, 19.0f, AIRFLOW_LINE_W,
+                   0.0f, 90.0f, separator, false);
 
     // Liaison papillon-plénum, avec une accentuation centrale lorsque le
     // papillon est ouvert.
-    draw_line(layer, layout, 116.0f, 180.0f, 143.0f, 180.0f,
-              1.2f, flow, false);
+    amber_draw_line(layer, layout, 116.0f, 180.0f, 143.0f, 180.0f,
+                    1.2f, flow, false);
     draw_flow_arrow(layer, layout, 130.0f, 180.0f, flow);
 
     const float runner_x[4] = {145.0f, 157.0f, 169.0f, 181.0f};
     for (int i = 0; i < 4; i++) {
         const lv_color_t runner = (scr->connected && i == 1) ? bright : dim;
-        draw_line(layer, layout, runner_x[i], 199.0f, runner_x[i], 211.0f,
-                  AIRFLOW_LINE_W, runner, false);
-        draw_line(layer, layout, runner_x[i] - 2.5f, 211.0f,
-                  runner_x[i] + 2.5f, 211.0f, AIRFLOW_LINE_W, runner, false);
+        amber_draw_line(layer, layout, runner_x[i], 199.0f, runner_x[i], 211.0f,
+                        AIRFLOW_LINE_W, runner, false);
+        amber_draw_line(layer, layout, runner_x[i] - 2.5f, 211.0f,
+                        runner_x[i] + 2.5f, 211.0f, AIRFLOW_LINE_W, runner,
+                        false);
     }
 
     // Les séparateurs restent dans les gouttières : aucune ligne ne traverse
     // une valeur ou son libellé. Le disque les découpe naturellement en bas.
-    draw_line(layer, layout, 32.0f, MATRIX_LINE_Y, 143.0f, MATRIX_LINE_Y,
-              AIRFLOW_LINE_W, separator, false);
-    draw_line(layer, layout, 177.0f, MATRIX_LINE_Y, 288.0f, MATRIX_LINE_Y,
-              AIRFLOW_LINE_W, separator, false);
-    draw_line(layer, layout, 32.0f, MATRIX_SPLIT_Y, 143.0f, MATRIX_SPLIT_Y,
-              AIRFLOW_LINE_W, separator, false);
-    draw_line(layer, layout, 177.0f, MATRIX_SPLIT_Y, 288.0f, MATRIX_SPLIT_Y,
-              AIRFLOW_LINE_W, separator, false);
-    draw_line(layer, layout, 160.0f, MATRIX_LINE_Y + 4.0f, 160.0f,
-              MATRIX_SPLIT_Y - 5.0f, AIRFLOW_LINE_W, separator, false);
-    draw_line(layer, layout, 160.0f, MATRIX_SPLIT_Y + 5.0f, 160.0f,
-              MATRIX_BOTTOM_Y - 5.0f, AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, layout, 32.0f, MATRIX_LINE_Y, 143.0f, MATRIX_LINE_Y,
+                    AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, layout, 177.0f, MATRIX_LINE_Y, 288.0f, MATRIX_LINE_Y,
+                    AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, layout, 32.0f, MATRIX_SPLIT_Y, 143.0f, MATRIX_SPLIT_Y,
+                    AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, layout, 177.0f, MATRIX_SPLIT_Y, 288.0f, MATRIX_SPLIT_Y,
+                    AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, layout, 160.0f, MATRIX_LINE_Y + 4.0f, 160.0f,
+                    MATRIX_SPLIT_Y - 5.0f, AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, layout, 160.0f, MATRIX_SPLIT_Y + 5.0f, 160.0f,
+                    MATRIX_BOTTOM_Y - 5.0f, AIRFLOW_LINE_W, separator, false);
 }
 
 static void canvas_draw_cb(lv_event_t *event) {
@@ -314,14 +229,14 @@ static void canvas_draw_cb(lv_event_t *event) {
 
     lv_area_t area;
     lv_obj_get_coords(canvas, &area);
-    const ui_layout_t layout = layout_of(&area);
+    const ui_layout_t layout = amber_draw_layout(&area);
     const lv_color_t separator = ui_theme_amber_separator();
 
     draw_map_ring(layer, &layout, scr);
-    draw_line(layer, &layout, 28.0f, HEADER_LINE_Y, 126.0f,
-              HEADER_LINE_Y, AIRFLOW_LINE_W, separator, false);
-    draw_line(layer, &layout, 194.0f, HEADER_LINE_Y, 292.0f,
-              HEADER_LINE_Y, AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, &layout, 28.0f, HEADER_LINE_Y, 126.0f,
+                    HEADER_LINE_Y, AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, &layout, 194.0f, HEADER_LINE_Y, 292.0f,
+                    HEADER_LINE_Y, AIRFLOW_LINE_W, separator, false);
     draw_manifold(layer, &layout, scr);
 }
 
@@ -523,12 +438,12 @@ void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
 
     scr->connected = data->connected;
     scr->map_kpa = scr->connected && isfinite(data->map_sensor_kpa)
-                       ? clampf(data->map_sensor_kpa, 0.0f, MAP_MAX) : 0.0f;
+                       ? amber_clampf(data->map_sensor_kpa, 0.0f, MAP_MAX) : 0.0f;
     scr->throttle = scr->connected && isfinite(data->throttle)
-                        ? clampf(data->throttle, 0.0f, 100.0f) : 0.0f;
+                        ? amber_clampf(data->throttle, 0.0f, 100.0f) : 0.0f;
     scr->throttle_pot_voltage = scr->connected &&
                                 isfinite(data->throttle_pot_voltage)
-                                    ? clampf(data->throttle_pot_voltage, 0.0f,
+                                    ? amber_clampf(data->throttle_pot_voltage, 0.0f,
                                              5.0f) : 0.0f;
     scr->intake_air_temp = scr->connected && isfinite(data->intake_air_temp)
                                ? data->intake_air_temp : 0.0f;

@@ -2,14 +2,10 @@
 
 #include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
-#include "ui/ui_layout.h"
+#include "ui/widgets/amber_draw.h"
 
 #include <math.h>
 #include <stdio.h>
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
 
 // Toutes les coordonnées sont exprimées dans le repère ambre partagé 320 x
 // 320. Le contenu est ensuite inscrit dans le plus grand carré disponible.
@@ -57,69 +53,6 @@ struct ignition_screen_s {
     float advance_value;
 };
 
-static ui_layout_t layout_of(const lv_area_t *area) {
-    ui_layout_t layout = ui_layout_fit(lv_area_get_width(area),
-                                       lv_area_get_height(area));
-    layout.ox += area->x1;
-    layout.oy += area->y1;
-    return layout;
-}
-
-static void draw_line(lv_layer_t *layer, const ui_layout_t *layout,
-                      float x1, float y1, float x2, float y2, float width,
-                      lv_color_t color, bool rounded) {
-    lv_draw_line_dsc_t dsc;
-    lv_draw_line_dsc_init(&dsc);
-    dsc.color = color;
-    dsc.opa = LV_OPA_COVER;
-    dsc.width = LV_MAX(1, (int32_t)lroundf(width * layout->scale));
-    dsc.round_start = rounded;
-    dsc.round_end = rounded;
-    dsc.p1.x = lroundf(ui_layout_x(layout, x1));
-    dsc.p1.y = lroundf(ui_layout_y(layout, y1));
-    dsc.p2.x = lroundf(ui_layout_x(layout, x2));
-    dsc.p2.y = lroundf(ui_layout_y(layout, y2));
-    lv_draw_line(layer, &dsc);
-}
-
-static void draw_arc(lv_layer_t *layer, const ui_layout_t *layout,
-                     float radius, float width, float start, float end,
-                     lv_color_t color) {
-    lv_draw_arc_dsc_t dsc;
-    lv_draw_arc_dsc_init(&dsc);
-    dsc.center.x = lroundf(ui_layout_x(layout, SCREEN_CX));
-    dsc.center.y = lroundf(ui_layout_y(layout, SCREEN_CY));
-    dsc.radius = LV_MAX(1, (int32_t)lroundf(radius * layout->scale));
-    dsc.width = LV_MAX(1, (int32_t)lroundf(width * layout->scale));
-    dsc.start_angle = (uint16_t)lroundf(start);
-    dsc.end_angle = (uint16_t)lroundf(end);
-    dsc.color = color;
-    dsc.opa = LV_OPA_COVER;
-    dsc.rounded = 0;
-    lv_draw_arc(layer, &dsc);
-}
-
-static void draw_ring(lv_layer_t *layer, const ui_layout_t *layout,
-                      float radius, float width, lv_color_t color) {
-    draw_arc(layer, layout, radius, width, 0.0f, 360.0f, color);
-}
-
-static void draw_tick(lv_layer_t *layer, const ui_layout_t *layout,
-                      float angle, float inner, float outer, float width,
-                      lv_color_t color) {
-    const float radians = angle * (float)M_PI / 180.0f;
-    const float c = cosf(radians);
-    const float s = sinf(radians);
-    draw_line(layer, layout, SCREEN_CX + c * inner, SCREEN_CY + s * inner,
-              SCREEN_CX + c * outer, SCREEN_CY + s * outer, width, color,
-              false);
-}
-
-static float clamp01(float value) {
-    if (value < 0.0f) return 0.0f;
-    if (value > 1.0f) return 1.0f;
-    return value;
-}
 
 static void draw_spark_symbol(lv_layer_t *layer, const ui_layout_t *layout) {
     const lv_color_t bright = ui_theme_amber_bright();
@@ -127,29 +60,32 @@ static void draw_spark_symbol(lv_layer_t *layer, const ui_layout_t *layout) {
 
     // Éclair central : deux épaisseurs ambre donnent un relief net sans
     // introduire de bitmap ni d'icône externe.
-    draw_line(layer, layout, 154.0f, 91.0f, 165.0f, 91.0f, 2.6f, dim,
-              true);
-    draw_line(layer, layout, 165.0f, 91.0f, 157.0f, 101.0f, 2.6f, dim,
-              true);
-    draw_line(layer, layout, 157.0f, 101.0f, 166.0f, 101.0f, 2.6f, dim,
-              true);
-    draw_line(layer, layout, 166.0f, 101.0f, 153.0f, 116.0f, 2.6f, dim,
-              true);
+    amber_draw_line(layer, layout, 154.0f, 91.0f, 165.0f, 91.0f, 2.6f, dim,
+                    true);
+    amber_draw_line(layer, layout, 165.0f, 91.0f, 157.0f, 101.0f, 2.6f, dim,
+                    true);
+    amber_draw_line(layer, layout, 157.0f, 101.0f, 166.0f, 101.0f, 2.6f, dim,
+                    true);
+    amber_draw_line(layer, layout, 166.0f, 101.0f, 153.0f, 116.0f, 2.6f, dim,
+                    true);
 
-    draw_line(layer, layout, 154.0f, 89.0f, 165.0f, 89.0f, 1.2f, bright,
-              true);
-    draw_line(layer, layout, 165.0f, 89.0f, 157.0f, 99.0f, 1.2f, bright,
-              true);
-    draw_line(layer, layout, 157.0f, 99.0f, 166.0f, 99.0f, 1.2f, bright,
-              true);
-    draw_line(layer, layout, 166.0f, 99.0f, 153.0f, 114.0f, 1.2f, bright,
-              true);
+    amber_draw_line(layer, layout, 154.0f, 89.0f, 165.0f, 89.0f, 1.2f, bright,
+                    true);
+    amber_draw_line(layer, layout, 165.0f, 89.0f, 157.0f, 99.0f, 1.2f, bright,
+                    true);
+    amber_draw_line(layer, layout, 157.0f, 99.0f, 166.0f, 99.0f, 1.2f, bright,
+                    true);
+    amber_draw_line(layer, layout, 166.0f, 99.0f, 153.0f, 114.0f, 1.2f, bright,
+                    true);
 
     // Trois rayons courts évoquent l'étincelle et équilibrent le motif dans le
     // vide entre l'arc de mesure et la valeur principale.
-    draw_line(layer, layout, 143.0f, 98.0f, 137.0f, 95.0f, 0.9f, dim, true);
-    draw_line(layer, layout, 174.0f, 98.0f, 180.0f, 95.0f, 0.9f, dim, true);
-    draw_line(layer, layout, 160.0f, 78.0f, 160.0f, 71.0f, 0.9f, dim, true);
+    amber_draw_line(layer, layout, 143.0f, 98.0f, 137.0f, 95.0f, 0.9f, dim,
+                    true);
+    amber_draw_line(layer, layout, 174.0f, 98.0f, 180.0f, 95.0f, 0.9f, dim,
+                    true);
+    amber_draw_line(layer, layout, 160.0f, 78.0f, 160.0f, 71.0f, 0.9f, dim,
+                    true);
 }
 
 static void draw_advance_gauge(lv_layer_t *layer, const ui_layout_t *layout,
@@ -157,28 +93,33 @@ static void draw_advance_gauge(lv_layer_t *layer, const ui_layout_t *layout,
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
     const lv_color_t separator = ui_theme_amber_separator();
-    const float progress = clamp01((advance - ADVANCE_MIN) /
-                                   (ADVANCE_MAX - ADVANCE_MIN));
+    const float progress = amber_progress(advance, ADVANCE_MIN, ADVANCE_MAX);
 
     // Anneau extérieur discret, puis couronne segmentée : le cadran reste
     // lisible même quand la valeur est proche de zéro.
-    draw_ring(layer, layout, OUTER_R, 0.8f, separator);
-    draw_ring(layer, layout, OUTER_R - 4.0f, 0.55f, dim);
+    amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, OUTER_R, 0.8f,
+                   0.0f, 360.0f, separator, false);
+    amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, OUTER_R - 4.0f, 0.55f,
+                   0.0f, 360.0f, dim, false);
 
     const float segment_gap = 2.4f;
     const float segment_step = 360.0f / 32.0f;
     for (int i = 0; i < 32; i++) {
         const float start = (float)i * segment_step + segment_gap * 0.5f;
-        draw_arc(layer, layout, OUTER_R - 8.0f, 1.4f, start,
-                 start + segment_step - segment_gap, separator);
+        amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, OUTER_R - 8.0f,
+                       1.4f, (float)lroundf(start),
+                       (float)lroundf(start + segment_step - segment_gap),
+                       separator, false);
     }
 
     // Piste principale d'avance, avec extrémités droites comme le cadran RPM.
-    draw_arc(layer, layout, ADVANCE_RADIUS, 7.0f, ADVANCE_START,
-             ADVANCE_START + ADVANCE_SWEEP, dim);
+    amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, ADVANCE_RADIUS, 7.0f,
+                   ADVANCE_START, ADVANCE_START + ADVANCE_SWEEP, dim, false);
     if (progress > 0.0f) {
-        draw_arc(layer, layout, ADVANCE_RADIUS, 7.0f, ADVANCE_START,
-                 ADVANCE_START + ADVANCE_SWEEP * progress, bright);
+        amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, ADVANCE_RADIUS,
+                       7.0f, ADVANCE_START,
+                       (float)lroundf(ADVANCE_START +
+                                      ADVANCE_SWEEP * progress), bright, false);
     }
 
     // Graduations principales et secondaires alignées sur la plage -10..50°.
@@ -187,16 +128,19 @@ static void draw_advance_gauge(lv_layer_t *layer, const ui_layout_t *layout,
         const float angle = ADVANCE_START + ADVANCE_SWEEP * fraction;
         const bool major = (i % 4) == 0 || i == ADVANCE_TICKS - 1;
         const bool active = fraction <= progress;
-        draw_tick(layer, layout, angle, major ? 127.0f : 130.0f,
-                  major ? 136.0f : 134.0f, major ? 1.5f : TICK_W,
-                  active ? bright : dim);
+        amber_draw_tick(layer, layout, SCREEN_CX, SCREEN_CY, angle,
+                        major ? 127.0f : 130.0f,
+                        major ? 136.0f : 134.0f, major ? 1.5f : TICK_W,
+                        active ? bright : dim, false);
     }
 
     // Repères d'extrémité : ils donnent une référence physique à la plage
     // sans multiplier les textes sur le cadran rond.
-    draw_tick(layer, layout, ADVANCE_START, 121.0f, 137.0f, 1.8f, separator);
-    draw_tick(layer, layout, ADVANCE_START + ADVANCE_SWEEP, 121.0f, 137.0f,
-              1.8f, separator);
+    amber_draw_tick(layer, layout, SCREEN_CX, SCREEN_CY, ADVANCE_START,
+                    121.0f, 137.0f, 1.8f, separator, false);
+    amber_draw_tick(layer, layout, SCREEN_CX, SCREEN_CY,
+                    ADVANCE_START + ADVANCE_SWEEP, 121.0f, 137.0f, 1.8f,
+                    separator, false);
 }
 
 static void draw_panel_lines(lv_layer_t *layer, const ui_layout_t *layout) {
@@ -204,18 +148,18 @@ static void draw_panel_lines(lv_layer_t *layer, const ui_layout_t *layout) {
 
     // Séparateurs ouverts : aucun trait ne vient fermer artificiellement le
     // cercle ni couper les valeurs centrales.
-    draw_line(layer, layout, 44.0f, GRID_Y, 127.0f, GRID_Y, LINE_W,
-              separator, false);
-    draw_line(layer, layout, 193.0f, GRID_Y, 276.0f, GRID_Y, LINE_W,
-              separator, false);
+    amber_draw_line(layer, layout, 44.0f, GRID_Y, 127.0f, GRID_Y, LINE_W,
+                    separator, false);
+    amber_draw_line(layer, layout, 193.0f, GRID_Y, 276.0f, GRID_Y, LINE_W,
+                    separator, false);
     // Aucun trait vertical dans la zone des métriques : la gouttière centrale
     // reste vide, y compris lorsque les valeurs affichent leurs unités.
 
     // Petits repères latéraux, inspirés des cellules relevées du cadran RPM.
-    draw_line(layer, layout, 47.0f, GRID_Y + 5.0f, 47.0f, GRID_Y + 12.0f,
-              LINE_W, separator, false);
-    draw_line(layer, layout, 273.0f, GRID_Y + 5.0f, 273.0f, GRID_Y + 12.0f,
-              LINE_W, separator, false);
+    amber_draw_line(layer, layout, 47.0f, GRID_Y + 5.0f, 47.0f, GRID_Y + 12.0f,
+                    LINE_W, separator, false);
+    amber_draw_line(layer, layout, 273.0f, GRID_Y + 5.0f, 273.0f, GRID_Y + 12.0f,
+                    LINE_W, separator, false);
 }
 
 static void canvas_draw_cb(lv_event_t *event) {
@@ -228,7 +172,7 @@ static void canvas_draw_cb(lv_event_t *event) {
 
     lv_area_t area;
     lv_obj_get_coords(canvas, &area);
-    const ui_layout_t layout = layout_of(&area);
+    const ui_layout_t layout = amber_draw_layout(&area);
 
     draw_advance_gauge(layer, &layout, screen->advance_value);
     draw_spark_symbol(layer, &layout);
