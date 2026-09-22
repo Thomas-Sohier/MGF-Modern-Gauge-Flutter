@@ -111,6 +111,7 @@ main/
   fake_ecu.[ch]      # source de données simulée
   app/dashboard_controller.[ch] # orchestration source -> écran
   app/settings_coordinator.[ch] # changements + debounce de persistance
+  app/settings_runtime.[ch] # pont BLE protégé -> application LVGL/NVS
   domain/app_settings.[ch]     # modèle typé + défauts/validation NVS
   infrastructure/settings_store.[ch] # adaptateur ESP-IDF NVS
   style_amber.*     # écran ambre (cible) — cadran rond vectoriel

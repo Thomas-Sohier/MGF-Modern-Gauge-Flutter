@@ -12,9 +12,13 @@ set(MGF_KLINE_RX_GPIO 38 CACHE STRING "LILYGO T-RGB K-line RX GPIO")
 set(MGF_KLINE_LOCAL_ECHO 0 CACHE STRING "Discard local K-line loopback echo (0/1)")
 set(MGF_MEMS_VARIANT MEMS_VARIANT_1_6 CACHE STRING "MEMS variant (MEMS_VARIANT_1_6 or MEMS_VARIANT_1_9)")
 set(MGF_ENABLE_BLE_CONFIG 0 CACHE STRING "Enable optional NimBLE configuration service (0/1)")
+set(MGF_BLE_CONFIG_OPEN_ON_BOOT 0 CACHE STRING "Open BLE configuration advertising at boot (0/1; service images only)")
+set(MGF_RUNTIME_DIAGNOSTICS 0 CACHE STRING "Enable periodic runtime diagnostics (0/1)")
 set(MGF_BLE_CONFIG_SRCS)
+set(MGF_BLE_CONFIG_REQUIRES)
 if(MGF_ENABLE_BLE_CONFIG)
     list(APPEND MGF_BLE_CONFIG_SRCS "infrastructure/ble_config_service.c")
+    list(APPEND MGF_BLE_CONFIG_REQUIRES bt)
 endif()
 # GPIO38/GPIO40 replace microSD DAT0/CMD. Do not add an SDMMC owner here.
 set(MGF_LILYGO_SDMMC_ENABLED 0 CACHE INTERNAL "SDMMC is unavailable in the K-line profile" FORCE)
@@ -24,6 +28,7 @@ idf_component_register(
         "app_main.c"
         "app/dashboard_controller.c"
         "app/settings_coordinator.c"
+        "app/settings_runtime.c"
         "domain/app_settings.c"
         "domain/display_brightness.c"
         "domain/ble_config_protocol.c"
@@ -38,6 +43,7 @@ idf_component_register(
         "infrastructure/fake_ecu.c"
         "infrastructure/kline_uart_esp32.c"
         "infrastructure/mems_ecu.c"
+        "infrastructure/runtime_diagnostics.c"
         "infrastructure/settings_store.c"
         ${MGF_BLE_CONFIG_SRCS}
         "ui/icons/dash_icons.c"
@@ -65,7 +71,7 @@ idf_component_register(
     REQUIRES
         driver                        # GPIO + ESP-IDF compatibility types
         nvs_flash                     # persistent app settings and BT stack data
-        bt                            # optional NimBLE configuration service
+        ${MGF_BLE_CONFIG_REQUIRES}
         esp_lcd
         esp_lcd_st7701                 # ST7701S vendor init + RGB panel
         esp_lcd_panel_io_additions    # série 9 bits ST7701S via XL9535
@@ -90,4 +96,6 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     MGF_MEMS_VARIANT=${MGF_MEMS_VARIANT}
     MGF_LILYGO_SDMMC_ENABLED=${MGF_LILYGO_SDMMC_ENABLED}
     MGF_ENABLE_BLE_CONFIG=${MGF_ENABLE_BLE_CONFIG}
+    MGF_BLE_CONFIG_OPEN_ON_BOOT=${MGF_BLE_CONFIG_OPEN_ON_BOOT}
+    MGF_RUNTIME_DIAGNOSTICS=${MGF_RUNTIME_DIAGNOSTICS}
 )

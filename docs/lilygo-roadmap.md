@@ -146,9 +146,12 @@ C’est la solution la plus complexe et la plus fragile face aux mises à jour E
 
 ### Paramètres et NVS
 
-- ajouter une vraie interface de modification des réglages ;
-- appliquer à l’exécution les changements BLE de luminosité, unités et page ;
-- éviter les accès concurrents entre la tâche NimBLE et la tâche LVGL ;
+- [x] ajouter une interface applicative de modification des réglages via le
+  runtime settings (les setters publics sont prêts ; pas encore de page tactile
+  dédiée) ;
+- [x] appliquer à l’exécution les changements BLE de luminosité, unités et page ;
+- [x] éviter les accès concurrents entre la tâche NimBLE et la tâche LVGL : BLE
+  ne fait qu'alimenter un snapshot protégé, consommé par le timer LVGL ;
 - implémenter la migration lors d’un futur changement de schéma NVS ;
 - tester coupure d’alimentation pendant une sauvegarde ;
 - tester la conservation du bonding Bluetooth et des paramètres après mise à jour.
@@ -167,10 +170,12 @@ C’est la solution la plus complexe et la plus fragile face aux mises à jour E
 
 - choisir un module 3,3 V sans recharge dangereuse d’une CR2032 ;
 - vérifier les résistances pull-up I²C ;
-- tester la détection du drapeau oscillator-stop ;
-- définir si le DS3231 stocke UTC ou l’heure locale ;
-- définir la gestion du fuseau et de l’heure été/hiver ;
-- synchroniser l’heure depuis BLE puis vérifier sa conservation après coupure.
+- [x] détecter le drapeau oscillator-stop et ne l'acquitter qu'après une écriture valide ;
+- [x] définir le DS3231 comme stockage UTC ; les valeurs `LOCAL` BLE sont
+  refusées tant qu'aucun fuseau/DST n'est configuré ;
+- gérer ultérieurement la conversion d'affichage, le fuseau et l'heure été/hiver ;
+- [x] synchroniser l'heure UTC depuis BLE ; vérifier sa conservation après
+  coupure sur carte.
 
 ### K-line
 

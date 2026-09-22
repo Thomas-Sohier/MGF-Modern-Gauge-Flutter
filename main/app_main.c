@@ -28,10 +28,14 @@
 #include "domain/app_settings.h"
 #include "domain/display_brightness.h"
 #include "app/dashboard_controller.h"
-#include "app/settings_coordinator.h"
+#include "app/settings_runtime.h"
+#include "infrastructure/runtime_diagnostics.h"
 
 #ifndef MGF_ENABLE_BLE_CONFIG
 #define MGF_ENABLE_BLE_CONFIG 0
+#endif
+#ifndef MGF_BLE_CONFIG_OPEN_ON_BOOT
+#define MGF_BLE_CONFIG_OPEN_ON_BOOT 0
 #endif
 
 #if MGF_ENABLE_BLE_CONFIG
@@ -49,26 +53,20 @@
 static const char *TAG = "mgf_gauge";
 
 #if MGF_ENABLE_BLE_CONFIG
-static app_settings_t s_ble_settings;
-
-static bool ble_settings_read(void *context, app_settings_t *out) {
-    if (context == NULL || out == NULL) return false;
-    *out = *(const app_settings_t *)context;
-    return app_settings_is_valid(out);
-}
-
-static bool ble_settings_update(void *context, const app_settings_t *settings) {
-    if (context == NULL || !app_settings_is_valid(settings)) return false;
-    if (settings_store_save(settings) != ESP_OK) return false;
-    *(app_settings_t *)context = *settings;
-    return true;
+static bool ble_settings_accept(void *context,
+                                const app_settings_t *settings) {
+    (void)context;
+    return app_settings_is_valid(settings);
 }
 
 static rtc_result_t ble_datetime_set(void *context,
                                      const rtc_datetime_t *date_time,
                                      ble_config_time_basis_t basis) {
-    (void)basis;
-    if (context == NULL) return RTC_ERR_IO;
+    // The DS3231 stores UTC only. Accepting a local civil time here without a
+    // configured offset/DST policy would silently shift the clock, so keep the
+    // wire-level LOCAL value parseable but reject it at the hardware boundary.
+    if (context == NULL || date_time == NULL) return RTC_ERR_INVALID_ARGUMENT;
+    if (basis != BLE_CONFIG_TIME_UTC) return RTC_ERR_INVALID_ARGUMENT;
     return rtc_set(context, date_time);
 }
 #endif
@@ -97,9 +95,45 @@ static bool save_settings(void *context, const app_settings_t *settings) {
     return true;
 }
 
+typedef struct {
+    dashboard_navigator_t *navigator;
+} settings_apply_context_t;
+
+static settings_apply_context_t s_settings_apply_context;
+
+static bool apply_settings(void *context, const app_settings_t *settings) {
+    settings_apply_context_t *apply_context = context;
+    if (apply_context == NULL || apply_context->navigator == NULL ||
+        settings == NULL || !app_settings_is_valid(settings)) {
+        return false;
+    }
+    if (!dashboard_navigator_select_page(
+            apply_context->navigator, (size_t)settings->selected_page)) {
+        return false;
+    }
+    dashboard_navigator_set_units(apply_context->navigator, settings->units);
+    board_display_backlight_set_brightness(
+        display_brightness_level(settings->brightness_percent));
+    return true;
+}
+
 static void settings_timer_tick(lv_timer_t *timer) {
-    settings_coordinator_t *coordinator = lv_timer_get_user_data(timer);
-    settings_coordinator_tick(coordinator, lv_tick_get());
+    settings_runtime_t *runtime = lv_timer_get_user_data(timer);
+#if MGF_ENABLE_BLE_CONFIG
+    app_settings_t pending;
+    if (ble_config_service_take_settings_update(&pending)) {
+        settings_runtime_update(runtime, &pending);
+    }
+#endif
+    settings_runtime_process(runtime, lv_tick_get());
+#if MGF_ENABLE_BLE_CONFIG
+    if (ble_config_service_is_started()) {
+        app_settings_t current;
+        if (settings_runtime_read(runtime, &current)) {
+            ble_config_service_sync_settings(&current);
+        }
+    }
+#endif
 }
 
 static rtc_t *optional_rtc_start(void) {
@@ -182,6 +216,35 @@ DEFINE_PAGE_ADAPTER(admission)
     }                                                                          \
 } while (0)
 
+static void amber_page_settings(void *context, app_settings_units_t units) {
+    amber_screen_set_units(context, units);
+}
+
+static void temps_page_settings(void *context, app_settings_units_t units) {
+    temps_screen_set_units(context, units);
+}
+
+static void admission_page_settings(void *context, app_settings_units_t units) {
+    admission_screen_set_units(context, units);
+}
+
+#define REGISTER_PAGE_WITH_UNITS(navigator, prefix, label, period, units_cb)   \
+    do {                                                                       \
+        lv_obj_t *page = dashboard_navigator_create_page(navigator);           \
+        prefix##_screen_t *view = prefix##_screen_create(page);                \
+        const dashboard_page_t descriptor = {                                  \
+            .name = label, .context = view, .update = prefix##_page_update,    \
+            .destroy = prefix##_page_destroy, .settings_changed = units_cb,    \
+            .update_period_ms = period,                                        \
+        };                                                                     \
+        if (page == NULL || view == NULL ||                                    \
+            !dashboard_navigator_register_page(navigator, page, &descriptor)) { \
+            ESP_LOGE(TAG, "impossible de créer la page %s", label);            \
+            if (view != NULL) prefix##_screen_destroy(view);                   \
+            goto cleanup;                                                       \
+        }                                                                      \
+    } while (0)
+
 void app_main(void) {
     ESP_LOGI(TAG, "MGF Gauge LVGL — ecran RPM ambre (LILYGO T-RGB H597)");
 
@@ -202,8 +265,10 @@ void app_main(void) {
     boot_screen_t *boot = NULL;
     dashboard_navigator_t *navigator = NULL;
     dashboard_controller_t *controller = NULL;
-    settings_coordinator_t *settings_coordinator = NULL;
+    settings_runtime_t *settings_runtime = NULL;
+    runtime_diagnostics_t *diagnostics = NULL;
     lv_timer_t *settings_timer = NULL;
+    bool ecu_ready = false;
 #if MGF_USE_MEMS_KLINE
     mems_ecu_t *mems_ecu = NULL;
 #else
@@ -268,29 +333,33 @@ void app_main(void) {
     }
     REGISTER_PAGE(navigator, music, "MUSIQUE", 0);
     REGISTER_PAGE(navigator, navigation, "NAVIGATION", 0);
-    REGISTER_PAGE(navigator, amber, "RPM", 40);
+    REGISTER_PAGE_WITH_UNITS(navigator, amber, "RPM", 40,
+                             amber_page_settings);
     REGISTER_PAGE(navigator, faults, "DEFAUTS", 1000);
-    REGISTER_PAGE(navigator, temps, "TEMPERATURES", 150);
+    REGISTER_PAGE_WITH_UNITS(navigator, temps, "TEMPERATURES", 150,
+                             temps_page_settings);
     REGISTER_PAGE(navigator, injection, "INJECTION", 80);
     REGISTER_PAGE(navigator, lambda, "LAMBDA", 80);
     REGISTER_PAGE(navigator, ignition, "ALLUMAGE", 80);
     REGISTER_PAGE(navigator, idle, "RALENTI", 150);
-    REGISTER_PAGE(navigator, admission, "ADMISSION", 150);
+    REGISTER_PAGE_WITH_UNITS(navigator, admission, "ADMISSION", 150,
+                             admission_page_settings);
 
-    settings_coordinator = settings_coordinator_create(
-        &settings, save_settings, NULL);
-    if (settings_coordinator == NULL) {
-        ESP_LOGE(TAG, "could not create settings coordinator");
+    s_settings_apply_context = (settings_apply_context_t){
+        .navigator = navigator,
+    };
+    settings_runtime = settings_runtime_create(
+        &settings, save_settings, NULL, apply_settings,
+        &s_settings_apply_context);
+    if (settings_runtime == NULL ||
+        !settings_runtime_apply_current(settings_runtime)) {
+        ESP_LOGE(TAG, "could not create/apply settings runtime");
         goto cleanup;
     }
     dashboard_navigator_set_page_changed_callback(
-        navigator, settings_coordinator_page_changed, settings_coordinator);
-    if (!dashboard_navigator_select_page(navigator,
-                                         (size_t)settings.selected_page)) {
-        ESP_LOGW(TAG, "persisted page is outside the registered navigation");
-    }
+        navigator, settings_runtime_page_changed, settings_runtime);
     settings_timer = lv_timer_create(
-        settings_timer_tick, 250, settings_coordinator);
+        settings_timer_tick, 250, settings_runtime);
     if (settings_timer == NULL) {
         ESP_LOGE(TAG, "could not create settings persistence timer");
         goto cleanup;
@@ -317,6 +386,7 @@ void app_main(void) {
         mems_ecu = NULL;
     } else {
         ecu_source = mems_ecu_source(mems_ecu);
+        ecu_ready = true;
     }
 #else
     fake_ecu = fake_ecu_create();
@@ -326,6 +396,7 @@ void app_main(void) {
         fake_ecu = NULL;
     } else {
         ecu_source = fake_ecu_source(fake_ecu);
+        ecu_ready = true;
     }
 #endif
 
@@ -340,6 +411,23 @@ void app_main(void) {
         goto cleanup;
     }
 
+    const runtime_diagnostics_config_t diagnostics_config = {
+        .period_ms = 0,
+        .display_state = RUNTIME_DIAGNOSTICS_STATE_READY,
+        .lvgl_state = RUNTIME_DIAGNOSTICS_STATE_READY,
+        .ecu_state = ecu_ready ? RUNTIME_DIAGNOSTICS_STATE_READY
+                               : RUNTIME_DIAGNOSTICS_STATE_DEGRADED,
+#if MGF_ENABLE_BLE_CONFIG
+        .ble_state = RUNTIME_DIAGNOSTICS_STATE_STARTING,
+#else
+        .ble_state = RUNTIME_DIAGNOSTICS_STATE_DISABLED,
+#endif
+    };
+    diagnostics = runtime_diagnostics_start(&diagnostics_config);
+    if (diagnostics == NULL) {
+        ESP_LOGW(TAG, "runtime diagnostics disabled or unavailable");
+    }
+
     boot_screen_destroy(boot);
     boot = NULL;
     board_display_unlock();
@@ -347,32 +435,43 @@ void app_main(void) {
 
 #if MGF_ENABLE_BLE_CONFIG
     if (settings_err == ESP_OK) {
-        s_ble_settings = *settings_coordinator_current(settings_coordinator);
         const ble_config_service_config_t ble_config = {
             .device_name = "MGF Gauge",
-            .settings_context = &s_ble_settings,
-            .settings_read = ble_settings_read,
-            .settings_update = ble_settings_update,
+            .settings_context = settings_runtime,
+            .settings_read = settings_runtime_read,
+            .settings_update = ble_settings_accept,
             .rtc_context = rtc,
             .datetime_set = ble_datetime_set,
+            .open_on_start = MGF_BLE_CONFIG_OPEN_ON_BOOT != 0,
         };
         const esp_err_t ble_error = ble_config_service_start(&ble_config);
         if (ble_error != ESP_OK) {
             ESP_LOGW(TAG, "BLE configuration unavailable: %s",
                      esp_err_to_name(ble_error));
+            runtime_diagnostics_set_service_state(
+                diagnostics, RUNTIME_DIAGNOSTICS_SERVICE_BLE,
+                RUNTIME_DIAGNOSTICS_STATE_ERROR);
+        } else {
+            runtime_diagnostics_set_service_state(
+                diagnostics, RUNTIME_DIAGNOSTICS_SERVICE_BLE,
+                RUNTIME_DIAGNOSTICS_STATE_READY);
         }
     } else {
         ESP_LOGW(TAG, "BLE configuration disabled: NVS unavailable");
+        runtime_diagnostics_set_service_state(
+            diagnostics, RUNTIME_DIAGNOSTICS_SERVICE_BLE,
+            RUNTIME_DIAGNOSTICS_STATE_DEGRADED);
     }
 #endif
     return;
 
 cleanup:
     // All LVGL objects and LVGL timers are stopped before the port is torn down.
+    if (diagnostics != NULL) runtime_diagnostics_stop(diagnostics);
     if (controller != NULL) dashboard_controller_destroy(controller);
     if (settings_timer != NULL) lv_timer_delete(settings_timer);
-    if (settings_coordinator != NULL) {
-        settings_coordinator_destroy(settings_coordinator);
+    if (settings_runtime != NULL) {
+        settings_runtime_destroy(settings_runtime);
     }
 #if MGF_USE_MEMS_KLINE
     if (mems_ecu != NULL) mems_ecu_destroy(mems_ecu);
