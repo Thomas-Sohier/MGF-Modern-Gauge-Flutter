@@ -31,6 +31,7 @@ struct clock_screen_s {
     lv_obj_t *labels[CARDINAL_COUNT];
     int hour;
     int minute;
+    rtc_t *rtc;
 };
 
 static ui_layout_t layout_of(const lv_area_t *area) {
@@ -205,12 +206,22 @@ static void hands_draw_cb(lv_event_t *event) {
     draw_hands(layer, &layout, screen);
 }
 
-static bool read_local_time(int *hour, int *minute) {
+static bool read_local_time(const clock_screen_t *screen, int *hour, int *minute) {
 #ifdef MGF_SIMULATOR
+    (void)screen;
     *hour = 10;
     *minute = 10;
     return true;
 #else
+    if (screen != NULL && screen->rtc != NULL) {
+        rtc_datetime_t date_time;
+        if (rtc_read(screen->rtc, &date_time) == RTC_OK) {
+            *hour = date_time.hour;
+            *minute = date_time.minute;
+            return true;
+        }
+    }
+
     const time_t now = time(NULL);
     const struct tm *local = now != (time_t)-1 ? localtime(&now) : NULL;
     if (local != NULL && local->tm_hour >= 0 && local->tm_hour < 24 &&
@@ -257,12 +268,26 @@ clock_screen_t *clock_screen_create(lv_obj_t *parent) {
             CLOCK_CY + sinf(angle) * LABEL_RADIUS, 0.0f, 0.0f);
     }
 
-    read_local_time(&screen->hour, &screen->minute);
+    read_local_time(screen, &screen->hour, &screen->minute);
     return screen;
 
 fail:
     clock_screen_destroy(screen);
     return NULL;
+}
+
+void clock_screen_set_rtc(clock_screen_t *screen, rtc_t *rtc) {
+    if (screen == NULL) return;
+    screen->rtc = rtc;
+    if (screen->hands == NULL) return;
+
+    int hour;
+    int minute;
+    if (!read_local_time(screen, &hour, &minute)) return;
+    if (hour == screen->hour && minute == screen->minute) return;
+    screen->hour = hour;
+    screen->minute = minute;
+    lv_obj_invalidate(screen->hands);
 }
 
 void clock_screen_update(clock_screen_t *screen, const ecu_data_t *data) {
@@ -271,7 +296,7 @@ void clock_screen_update(clock_screen_t *screen, const ecu_data_t *data) {
 
     int hour;
     int minute;
-    read_local_time(&hour, &minute);
+    read_local_time(screen, &hour, &minute);
     if (hour == screen->hour && minute == screen->minute) return;
 
     screen->hour = hour;

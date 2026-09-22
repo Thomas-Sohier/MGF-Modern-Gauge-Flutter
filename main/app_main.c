@@ -23,6 +23,7 @@
 #include "infrastructure/fake_ecu.h"
 #include "infrastructure/kline_board_config.h"
 #include "infrastructure/settings_store.h"
+#include "infrastructure/rtc_ds3231.h"
 #include "domain/app_settings.h"
 #include "app/dashboard_controller.h"
 
@@ -35,6 +36,45 @@
 #endif
 
 static const char *TAG = "mgf_gauge";
+
+static rtc_t *optional_rtc_start(void) {
+    shared_i2c_bus_t bus;
+    if (!board_display_i2c_bus(&bus)) {
+        ESP_LOGW(TAG, "RTC DS3231 désactivée: bus I2C écran indisponible");
+        return NULL;
+    }
+    if (bus.sda_gpio != DS3231_I2C_SDA_GPIO ||
+        bus.scl_gpio != DS3231_I2C_SCL_GPIO) {
+        ESP_LOGI(TAG, "RTC DS3231 en attente du bus LILYGO GPIO8/48");
+        return NULL;
+    }
+
+    const ds3231_config_t config = {
+        .bus = bus,
+        .address = DS3231_I2C_ADDRESS,
+        .timeout_ms = 100,
+    };
+    rtc_t *rtc = ds3231_create(&config);
+    if (rtc == NULL) {
+        ESP_LOGW(TAG, "RTC DS3231 non créée (configuration invalide)");
+        return NULL;
+    }
+
+    const rtc_result_t result = rtc_probe(rtc);
+    if (result == RTC_ERR_IO || result == RTC_ERR_INVALID_ARGUMENT) {
+        ESP_LOGW(TAG, "RTC DS3231 absente ou inaccessible: %s",
+                 rtc_result_name(result));
+        rtc_destroy(rtc);
+        return NULL;
+    }
+    if (result != RTC_OK) {
+        ESP_LOGW(TAG, "RTC DS3231 présente mais heure à valider: %s",
+                 rtc_result_name(result));
+    } else {
+        ESP_LOGI(TAG, "RTC DS3231 détectée sur 0x%02x", DS3231_I2C_ADDRESS);
+    }
+    return rtc;
+}
 
 // TTF Michroma embarqué (cf. EMBED_FILES dans main/CMakeLists.txt).
 extern const uint8_t michroma_start[] asm("_binary_fonts_Michroma_Regular_ttf_start");
@@ -72,6 +112,7 @@ DEFINE_PAGE_ADAPTER(admission)
         ESP_LOGE(TAG, "impossible de créer la page %s", label);              \
         dashboard_navigator_destroy(navigator);                               \
         boot_screen_destroy(boot);                                            \
+        rtc_destroy(rtc);                                                      \
         board_display_unlock();                                               \
         board_display_backlight_off();                                        \
         return;                                                               \
@@ -104,9 +145,14 @@ void app_main(void) {
     }
     board_display_backlight_on();
 
+    // Le bus I2C appartient à l'affichage. Le DS3231 ne l'installe pas et
+    // reste optionnel : la branche LILYGO exportera le bus GPIO8/GPIO48.
+    rtc_t *rtc = optional_rtc_start();
+
     // Toute manipulation d'objets LVGL doit se faire sous verrou (thread LVGL).
     if (!board_display_lock(0)) {
         ESP_LOGE(TAG, "impossible de prendre le verrou LVGL");
+        rtc_destroy(rtc);
         board_display_backlight_off();
         return;
     }
@@ -117,6 +163,7 @@ void app_main(void) {
     lv_obj_t *screen = lv_screen_active();
     if (screen == NULL) {
         ESP_LOGE(TAG, "écran LVGL actif introuvable");
+        rtc_destroy(rtc);
         board_display_unlock();
         board_display_backlight_off();
         return;
@@ -127,6 +174,7 @@ void app_main(void) {
     boot_screen_t *boot = boot_screen_create(screen);
     if (boot == NULL) {
         ESP_LOGE(TAG, "impossible de créer l'écran de démarrage");
+        rtc_destroy(rtc);
         board_display_unlock();
         board_display_backlight_off();
         return;
@@ -137,13 +185,32 @@ void app_main(void) {
     if (navigator == NULL) {
         ESP_LOGE(TAG, "impossible de créer la navigation du dashboard");
         boot_screen_destroy(boot);
+        rtc_destroy(rtc);
         board_display_unlock();
         board_display_backlight_off();
         return;
     }
 
     // Même ordre cyclique que l'application Flutter de référence.
-    REGISTER_PAGE(navigator, clock, "HEURE", 1000);
+    {
+        lv_obj_t *page = dashboard_navigator_create_page(navigator);
+        clock_screen_t *view = clock_screen_create(page);
+        clock_screen_set_rtc(view, rtc);
+        const dashboard_page_t descriptor = {
+            .name = "HEURE", .context = view, .update = clock_page_update,
+            .destroy = clock_page_destroy, .update_period_ms = 1000,
+        };
+        if (page == NULL || view == NULL ||
+            !dashboard_navigator_register_page(navigator, page, &descriptor)) {
+            ESP_LOGE(TAG, "impossible de créer la page HEURE");
+            dashboard_navigator_destroy(navigator);
+            boot_screen_destroy(boot);
+            rtc_destroy(rtc);
+            board_display_unlock();
+            board_display_backlight_off();
+            return;
+        }
+    }
     REGISTER_PAGE(navigator, music, "MUSIQUE", 0);
     REGISTER_PAGE(navigator, navigation, "NAVIGATION", 0);
     REGISTER_PAGE(navigator, amber, "RPM", 40);
@@ -178,6 +245,7 @@ void app_main(void) {
         mems_ecu_destroy(mems_ecu);
         dashboard_navigator_destroy(navigator);
         boot_screen_destroy(boot);
+        rtc_destroy(rtc);
         board_display_unlock();
         board_display_backlight_off();
         return;
@@ -190,6 +258,7 @@ void app_main(void) {
         fake_ecu_destroy(fake_ecu);
         dashboard_navigator_destroy(navigator);
         boot_screen_destroy(boot);
+        rtc_destroy(rtc);
         board_display_unlock();
         board_display_backlight_off();
         return;
@@ -213,6 +282,7 @@ void app_main(void) {
 #endif
         dashboard_navigator_destroy(navigator);
         boot_screen_destroy(boot);
+        rtc_destroy(rtc);
         board_display_unlock();
         board_display_backlight_off();
         return;

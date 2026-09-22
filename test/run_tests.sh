@@ -41,8 +41,7 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_kline_config.c" -o "$BUILD_DIR/test_kline_config_override"
 "$BUILD_DIR/test_kline_config_override"
 
-# Known LILYGO display/I2C resources must fail at compile time.  This catches
-# accidental regressions in the board resource policy without requiring ESP-IDF.
+# Known LILYGO display/I2C resources must fail at compile time.
 for bad_gpio in 17 18 8 48; do
     if gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
         -DMGF_KLINE_TX_GPIO="$bad_gpio" -DMGF_KLINE_RX_GPIO=22 \
@@ -52,3 +51,9 @@ for bad_gpio in 17 18 8 48; do
         exit 1
     fi
 done
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    "$ROOT/test/test_rtc.c" \
+    "$ROOT/main/domain/rtc_time.c" \
+    -o "$BUILD_DIR/test_rtc"
+"$BUILD_DIR/test_rtc"

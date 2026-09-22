@@ -11,7 +11,9 @@ L'écran cible est le style **ambre** (cadran rond monochrome) ; les données EC
 sont simulées.
 
 > Détails matériel, système de conception et points de validation : voir
-> [`CLAUDE.md`](CLAUDE.md).
+> [`CLAUDE.md`](CLAUDE.md). L'option RTC DS3231 pour la future architecture
+> LILYGO est décrite dans [`docs/rtc-ds3231.md`](docs/rtc-ds3231.md) et dans
+> [`specs/lilygo-t-rgb-2.1/future-kline-rtc.md`](specs/lilygo-t-rgb-2.1/future-kline-rtc.md).
 
 ## Rendu reproduit
 

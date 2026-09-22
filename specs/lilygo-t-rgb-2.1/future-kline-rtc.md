@@ -1,12 +1,8 @@
 # K-line LILYGO et extension RTC future
 
-L'adaptation K-line de ce document est maintenant implémentée dans le firmware :
-GPIO40 est le TX, GPIO38 le RX, et le lecteur microSD/SDMMC reste désactivé pour
-libérer ces lignes. L'horloge RTC, la NVS et le bring-up écran LILYGO restent
-hors de cette branche.
+Cette architecture est maintenant implémentée dans le firmware : GPIO40 est le TX K-line, GPIO38 le RX, SDMMC reste désactivé, les paramètres utilisent la NVS et le DS3231 partage le bus I²C GPIO8/48 possédé par l'affichage.
 
-> La partie K-line reste à valider sur carte réelle. La proposition RTC/NVS
-> ci-dessous est documentaire et n'est pas une demande d'implémentation.
+> L'ensemble reste à valider sur la carte réelle, avec un transceiver K-line protégé et après identification de la révision de l'écran.
 
 ## Architecture proposée
 

@@ -111,6 +111,9 @@ static i2c_master_bus_handle_t s_i2c_bus;
 static esp_io_expander_handle_t s_expander;
 static uint8_t s_backlight_level;
 static portMUX_TYPE s_backlight_lock = portMUX_INITIALIZER_UNLOCKED;
+static shared_i2c_bus_t s_shared_i2c_bus;
+static shared_i2c_master_context_t s_shared_i2c_context;
+static bool s_i2c_ready;
 
 static esp_err_t i2c_bus_init(void) {
     const i2c_master_bus_config_t config = {
@@ -121,7 +124,12 @@ static esp_err_t i2c_bus_init(void) {
         .glitch_ignore_cnt = 7,
         .flags.enable_internal_pullup = true,
     };
-    return i2c_new_master_bus(&config, &s_i2c_bus);
+    ESP_RETURN_ON_ERROR(i2c_new_master_bus(&config, &s_i2c_bus), TAG,
+                        "create I2C master bus");
+    shared_i2c_master_bus_init(&s_shared_i2c_bus, &s_shared_i2c_context,
+                               s_i2c_bus, I2C_HZ, PIN_I2C_SDA, PIN_I2C_SCL);
+    s_i2c_ready = true;
+    return ESP_OK;
 }
 
 static esp_err_t expander_init(void) {
@@ -404,4 +412,10 @@ bool board_display_lock(uint32_t timeout_ms) {
 
 void board_display_unlock(void) {
     lvgl_port_unlock();
+}
+
+bool board_display_i2c_bus(shared_i2c_bus_t *out) {
+    if (!s_i2c_ready || out == NULL) return false;
+    *out = s_shared_i2c_bus;
+    return true;
 }

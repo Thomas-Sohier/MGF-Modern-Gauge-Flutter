@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "esp_err.h"
 #include "lvgl.h"
+#include "infrastructure/shared_i2c.h"
 
 // LILYGO T-RGB 2.1 Full Circle H597: ST7701S RGB565, CST820 and the
 // XL9535-compatible I2C expander.  Define MGF_LILYGO_T_RGB_V2=1 at build time
@@ -13,6 +14,9 @@ lv_display_t *board_display_start(void);
 // AW9364 brightness is discrete: 0 is off, 1..16 are the hardware levels.
 // The existing on/off API remains available for application callers.
 void board_display_backlight_set_brightness(uint8_t level);
+
+// Vue non propriétaire du bus I2C GPIO8/48 initialisé par l'affichage.
+bool board_display_i2c_bus(shared_i2c_bus_t *out);
 void board_display_backlight_on(void);
 void board_display_backlight_off(void);
 
