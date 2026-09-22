@@ -44,9 +44,10 @@
 
 #if MGF_USE_MEMS_KLINE
 #include "infrastructure/mems_ecu.h"
-// Variante ECU : MEMS_VARIANT_1_6 (direct) ou MEMS_VARIANT_1_9 (réveil 5 bauds).
+// Variante ECU : MEMS_VARIANT_1_9 (MGF 1995-1999, réveil 5 bauds) par défaut,
+// ou MEMS_VARIANT_1_6 (handshake direct).
 #ifndef MGF_MEMS_VARIANT
-#define MGF_MEMS_VARIANT MEMS_VARIANT_1_6
+#define MGF_MEMS_VARIANT MEMS_VARIANT_1_9
 #endif
 #endif
 

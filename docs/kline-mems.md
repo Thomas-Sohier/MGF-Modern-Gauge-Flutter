@@ -113,8 +113,10 @@ supportées sont `MGF_USE_MEMS_KLINE`, `MGF_KLINE_UART_NUM`,
 `MGF_MEMS_VARIANT`. Le header vérifie au préprocesseur les conflits avec les
 broches LCD/I²C et les ressources réservées de la T-RGB.
 
-Variante ECU par `MGF_MEMS_VARIANT` (`MEMS_VARIANT_1_6` par défaut,
-`MEMS_VARIANT_1_9` pour le réveil 5 bauds).
+Variante ECU par `MGF_MEMS_VARIANT` : `MEMS_VARIANT_1_9` par défaut (MGF
+1995-1999, réveil 5 bauds), `MEMS_VARIANT_1_6` pour un handshake direct.
+Les MGF 2000+ et MG TF utilisent le **MEMS 3**, protocole différent non
+supporté par ce firmware.
 
 À la connexion, `mems_ecu` lance une tâche FreeRTOS qui :
 1. tente le handshake, retente toutes `reconnect_delay_ms` en cas d'échec ;
