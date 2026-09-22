@@ -28,6 +28,7 @@
 #include "domain/app_settings.h"
 #include "domain/display_brightness.h"
 #include "app/dashboard_controller.h"
+#include "app/settings_coordinator.h"
 
 #if MGF_USE_MEMS_KLINE
 #include "infrastructure/mems_ecu.h"
@@ -51,6 +52,21 @@ static ecu_source_t disconnected_ecu_source(void) {
         .read = disconnected_ecu_read,
         .context = NULL,
     };
+}
+
+static bool save_settings(void *context, const app_settings_t *settings) {
+    (void)context;
+    const esp_err_t error = settings_store_save(settings);
+    if (error != ESP_OK) {
+        ESP_LOGW(TAG, "preferences not saved: %s", esp_err_to_name(error));
+        return false;
+    }
+    return true;
+}
+
+static void settings_timer_tick(lv_timer_t *timer) {
+    settings_coordinator_t *coordinator = lv_timer_get_user_data(timer);
+    settings_coordinator_tick(coordinator, lv_tick_get());
 }
 
 static rtc_t *optional_rtc_start(void) {
@@ -153,6 +169,8 @@ void app_main(void) {
     boot_screen_t *boot = NULL;
     dashboard_navigator_t *navigator = NULL;
     dashboard_controller_t *controller = NULL;
+    settings_coordinator_t *settings_coordinator = NULL;
+    lv_timer_t *settings_timer = NULL;
 #if MGF_USE_MEMS_KLINE
     mems_ecu_t *mems_ecu = NULL;
 #else
@@ -226,6 +244,25 @@ void app_main(void) {
     REGISTER_PAGE(navigator, idle, "RALENTI", 150);
     REGISTER_PAGE(navigator, admission, "ADMISSION", 150);
 
+    settings_coordinator = settings_coordinator_create(
+        &settings, save_settings, NULL);
+    if (settings_coordinator == NULL) {
+        ESP_LOGE(TAG, "could not create settings coordinator");
+        goto cleanup;
+    }
+    dashboard_navigator_set_page_changed_callback(
+        navigator, settings_coordinator_page_changed, settings_coordinator);
+    if (!dashboard_navigator_select_page(navigator,
+                                         (size_t)settings.selected_page)) {
+        ESP_LOGW(TAG, "persisted page is outside the registered navigation");
+    }
+    settings_timer = lv_timer_create(
+        settings_timer_tick, 250, settings_coordinator);
+    if (settings_timer == NULL) {
+        ESP_LOGE(TAG, "could not create settings persistence timer");
+        goto cleanup;
+    }
+
     // A missing K-line is a disconnected ECU, not a display startup failure.
     ecu_source_t ecu_source = disconnected_ecu_source();
 #if MGF_USE_MEMS_KLINE
@@ -279,6 +316,10 @@ void app_main(void) {
 cleanup:
     // All LVGL objects and LVGL timers are stopped before the port is torn down.
     if (controller != NULL) dashboard_controller_destroy(controller);
+    if (settings_timer != NULL) lv_timer_delete(settings_timer);
+    if (settings_coordinator != NULL) {
+        settings_coordinator_destroy(settings_coordinator);
+    }
 #if MGF_USE_MEMS_KLINE
     if (mems_ecu != NULL) mems_ecu_destroy(mems_ecu);
 #else

@@ -18,6 +18,7 @@ idf_component_register(
     SRCS
         "app_main.c"
         "app/dashboard_controller.c"
+        "app/settings_coordinator.c"
         "domain/app_settings.c"
         "domain/display_brightness.c"
         "domain/mems_protocol.c"

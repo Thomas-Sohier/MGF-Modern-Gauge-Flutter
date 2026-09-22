@@ -9,6 +9,7 @@
 typedef void (*dashboard_page_update_cb_t)(void *context,
                                             const ecu_data_t *data);
 typedef void (*dashboard_page_destroy_cb_t)(void *context);
+typedef void (*dashboard_page_changed_cb_t)(void *context, size_t page_index);
 
 typedef struct {
     const char *name;
@@ -35,6 +36,14 @@ bool dashboard_navigator_register_page(dashboard_navigator_t *navigator,
 
 void dashboard_navigator_next(dashboard_navigator_t *navigator);
 void dashboard_navigator_previous(dashboard_navigator_t *navigator);
+// Sélectionne une page déjà enregistrée. Retourne false pour un index hors
+// limites. Une sélection identique ne déclenche pas l'observateur.
+bool dashboard_navigator_select_page(dashboard_navigator_t *navigator,
+                                      size_t page_index);
+// Installe un observateur appelé après chaque changement réel de page.
+void dashboard_navigator_set_page_changed_callback(
+    dashboard_navigator_t *navigator, dashboard_page_changed_cb_t callback,
+    void *context);
 size_t dashboard_navigator_current(const dashboard_navigator_t *navigator);
 size_t dashboard_navigator_count(const dashboard_navigator_t *navigator);
 const char *dashboard_navigator_current_name(

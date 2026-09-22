@@ -20,6 +20,8 @@ struct dashboard_navigator_s {
     ecu_data_t latest_data;
     bool has_latest_data;
     uint32_t last_gesture_ms;
+    dashboard_page_changed_cb_t page_changed;
+    void *page_changed_context;
 };
 
 static void update_current(dashboard_navigator_t *navigator, bool force) {
@@ -51,18 +53,30 @@ static void show_current(dashboard_navigator_t *navigator) {
     }
 }
 
-void dashboard_navigator_next(dashboard_navigator_t *navigator) {
-    if (navigator == NULL || navigator->count < 2) return;
-    navigator->current = (navigator->current + 1) % navigator->count;
+bool dashboard_navigator_select_page(dashboard_navigator_t *navigator,
+                                      size_t page_index) {
+    if (navigator == NULL || page_index >= navigator->count) return false;
+    if (page_index == navigator->current) return true;
+
+    navigator->current = page_index;
     show_current(navigator);
     update_current(navigator, true);
+    if (navigator->page_changed != NULL) {
+        navigator->page_changed(navigator->page_changed_context, page_index);
+    }
+    return true;
+}
+
+void dashboard_navigator_next(dashboard_navigator_t *navigator) {
+    if (navigator == NULL || navigator->count < 2) return;
+    dashboard_navigator_select_page(navigator,
+                                    (navigator->current + 1) % navigator->count);
 }
 
 void dashboard_navigator_previous(dashboard_navigator_t *navigator) {
     if (navigator == NULL || navigator->count < 2) return;
-    navigator->current = (navigator->current + navigator->count - 1) % navigator->count;
-    show_current(navigator);
-    update_current(navigator, true);
+    dashboard_navigator_select_page(
+        navigator, (navigator->current + navigator->count - 1) % navigator->count);
 }
 
 static bool point_in_visible_disc(const dashboard_navigator_t *navigator,
@@ -178,6 +192,14 @@ bool dashboard_navigator_register_page(dashboard_navigator_t *navigator,
     if (navigator->count != 0) lv_obj_add_flag(page, LV_OBJ_FLAG_HIDDEN);
     navigator->count++;
     return true;
+}
+
+void dashboard_navigator_set_page_changed_callback(
+    dashboard_navigator_t *navigator, dashboard_page_changed_cb_t callback,
+    void *context) {
+    if (navigator == NULL) return;
+    navigator->page_changed = callback;
+    navigator->page_changed_context = context;
 }
 
 size_t dashboard_navigator_current(const dashboard_navigator_t *navigator) {

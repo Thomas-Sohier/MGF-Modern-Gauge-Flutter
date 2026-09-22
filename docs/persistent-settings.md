@@ -16,13 +16,17 @@ The intended lifecycle is:
 1. Call `settings_store_init()` once during startup.
 2. Call `settings_store_load()` once; it fills defaults when stored data is not
    usable.
-3. After a real user change, call `settings_store_save()`. It requires a prior
-   load and skips both `nvs_set_*` calls and `nvs_commit()` when the snapshot is
-   unchanged. It must not be called from the ECU/display update loop.
+3. Give the loaded snapshot to `app/settings_coordinator.[ch]`. The application
+   restores `selected_page` after registering dashboard pages and registers the
+   navigator's page-change observer.
+4. Route setting changes through the coordinator's typed setters. A 3-second
+   quiet period batches changes, and a failed save remains dirty for retry.
 
-The app currently only initializes and loads these settings. No controls or
-visual behavior are invented by this storage work; consumers can apply the
-values when those controls exist.
+The coordinator is independent of LVGL and NVS, so future brightness, theme, or
+units controls can use the same boundary without placing storage calls in UI
+code. `settings_store_save()` remains the only NVS adapter; it skips both
+`nvs_set_*` calls and `nvs_commit()` when the snapshot is unchanged. It must not
+be called from the ECU/display update loop. No settings UI is included yet.
 
 ## Bluetooth data
 
