@@ -143,7 +143,10 @@ void app_main(void) {
         board_display_backlight_off();
         return;
     }
-    board_display_backlight_on();
+    const uint8_t brightness_level = settings.brightness_percent == 0U
+        ? 0U
+        : (uint8_t)(((settings.brightness_percent - 1U) * 15U) / 99U + 1U);
+    board_display_backlight_set_brightness(brightness_level);
 
     // Le bus I2C appartient à l'affichage. Le DS3231 ne l'installe pas et
     // reste optionnel : la branche LILYGO exportera le bus GPIO8/GPIO48.
