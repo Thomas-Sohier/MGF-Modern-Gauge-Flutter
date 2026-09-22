@@ -11,8 +11,13 @@ void mems_session_init(mems_session_t *s, ecu_reader_t reader) {
 
 bool mems_session_connect(mems_session_t *s) {
     if (s == NULL) return false;
-    s->connected = ecu_reader_connect(&s->reader);
-    return s->connected;
+    s->connected = false;
+    if (!ecu_reader_connect(&s->reader)) {
+        ecu_reader_disconnect(&s->reader);
+        return false;
+    }
+    s->connected = true;
+    return true;
 }
 
 bool mems_session_poll(mems_session_t *s, ecu_data_t *out, mems_data_t *raw) {
@@ -29,7 +34,7 @@ bool mems_session_poll(mems_session_t *s, ecu_data_t *out, mems_data_t *raw) {
         !ecu_reader_send_and_receive(&s->reader, MEMS_CMD_DATA_7D, f7d,
                                      MEMS_FRAME_7D_LEN) ||
         !mems_parse_frame_7d(f7d, MEMS_FRAME_7D_LEN, &data)) {
-        s->connected = false;
+        mems_session_disconnect(s);
         return false;
     }
 

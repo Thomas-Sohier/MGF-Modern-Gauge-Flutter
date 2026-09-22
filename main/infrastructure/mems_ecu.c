@@ -66,8 +66,11 @@ static void mems_ecu_task(void *arg) {
         if (mems_session_poll(&ecu->session, &data, NULL)) {
             publish(ecu, &data);
         } else {
-            ESP_LOGW(TAG, "erreur de trame, reconnexion");
-            // La session s'est marquée déconnectée ; boucle -> reconnexion.
+            ESP_LOGW(TAG, "ECU absente ou trame expirée, reconnexion");
+            // Ne pas conserver un snapshot marqué connecté après un timeout.
+            ecu_data_t down = {0};
+            down.connected = false;
+            publish(ecu, &down);
         }
         vTaskDelay(pdMS_TO_TICKS(ecu->poll_period_ms));
     }
@@ -79,7 +82,11 @@ static void mems_ecu_task(void *arg) {
 }
 
 mems_ecu_t *mems_ecu_create(const mems_ecu_config_t *config) {
-    if (config == NULL) return NULL;
+    if (config == NULL ||
+        (config->variant != MEMS_VARIANT_1_6 &&
+         config->variant != MEMS_VARIANT_1_9)) {
+        return NULL;
+    }
 
     mems_ecu_t *ecu = calloc(1, sizeof(*ecu));
     if (ecu == NULL) return NULL;

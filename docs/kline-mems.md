@@ -133,8 +133,9 @@ Variante ECU par `MGF_MEMS_VARIANT` (`MEMS_VARIANT_1_6` par défaut,
   décodage et l'enchaînement réveil/handshake sont en revanche testés sur hôte
   (`test/test_mems.c`) contre les trames de référence du projet Go.
 - **Slow init 5 bauds (1.9)** : le timing (200 ms/bit) est bit-bangé via le GPIO
-  TX ; à vérifier à l'oscilloscope sur la carte, et selon le transceiver
-  (inversion éventuelle des niveaux). Les octets de synchro renvoyés par l'ECU
-  (`55 76 83`) sont purgés, pas vérifiés — à renforcer si nécessaire.
+  TX ; à vérifier à l’oscilloscope sur la carte, et selon le transceiver
+  (inversion éventuelle des niveaux). Les octets de synchronisation attendus
+  (`55 76 83`) sont maintenant vérifiés avec un timeout de 1 s ; une absence
+  d’ECU ou une réponse invalide laisse la source déconnectée.
 - **Init 0x7C** : la variante d'init alternative (`0x7C`/`0xE9`) présente dans le
   projet Go n'est pas portée (chemin non utilisé par leur `Connect`).

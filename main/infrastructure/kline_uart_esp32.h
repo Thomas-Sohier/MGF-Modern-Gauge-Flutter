@@ -17,8 +17,9 @@
 //
 // Écho local : selon le montage, l'UART peut relire ses propres octets émis
 // (fil unique bouclé). Mettre `local_echo = true` pour que le transport rejette
-// cet écho local après chaque écriture ; la couche session ne voit alors que
-// l'écho de commande renvoyé par l'ECU, comme attendu par le protocole MEMS.
+// cet écho local après chaque écriture ; son absence ou sa corruption fait
+// échouer l'écriture plutôt que de laisser la session consommer un flux ambigu.
+// La couche session ne voit alors que l'écho de commande renvoyé par l'ECU.
 
 typedef struct {
     uart_port_t uart_num;   // ex. UART_NUM_1

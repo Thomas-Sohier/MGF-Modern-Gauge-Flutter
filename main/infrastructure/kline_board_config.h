@@ -27,6 +27,14 @@
 #define MGF_KLINE_LOCAL_ECHO 0
 #endif
 
+#if MGF_USE_MEMS_KLINE != 0 && MGF_USE_MEMS_KLINE != 1
+#error "MGF_USE_MEMS_KLINE must be 0 or 1"
+#endif
+
+#if MGF_KLINE_LOCAL_ECHO != 0 && MGF_KLINE_LOCAL_ECHO != 1
+#error "MGF_KLINE_LOCAL_ECHO must be 0 or 1"
+#endif
+
 // There is intentionally no SDMMC owner in the LILYGO K-line profile.
 #ifndef MGF_LILYGO_SDMMC_ENABLED
 #define MGF_LILYGO_SDMMC_ENABLED 0
@@ -43,6 +51,15 @@
 
 #if MGF_KLINE_TX_GPIO == MGF_KLINE_RX_GPIO
 #error "K-line TX and RX must use different GPIOs"
+#endif
+
+// GPIO34..39 are input-only on the ESP32-S3; they can receive K-line data but
+// cannot drive the transceiver's TX input. GPIO38 is therefore RX-only in the
+// default LILYGO profile.
+#if MGF_KLINE_TX_GPIO == 34 || MGF_KLINE_TX_GPIO == 35 || \
+    MGF_KLINE_TX_GPIO == 36 || MGF_KLINE_TX_GPIO == 37 || \
+    MGF_KLINE_TX_GPIO == 38
+#error "K-line TX GPIO must be output-capable on ESP32-S3"
 #endif
 
 // LCD RGB, sync, backlight, and the LCD's serial data pins on the H597.
@@ -78,11 +95,11 @@
 #if MGF_KLINE_TX_GPIO == 0 || MGF_KLINE_TX_GPIO == 1 || \
     MGF_KLINE_TX_GPIO == 4 || MGF_KLINE_TX_GPIO == 8 || \
     MGF_KLINE_TX_GPIO == 19 || MGF_KLINE_TX_GPIO == 20 || \
-    MGF_KLINE_TX_GPIO == 39 || \
+    MGF_KLINE_TX_GPIO == 39 || MGF_KLINE_TX_GPIO == 48 || \
     MGF_KLINE_RX_GPIO == 0 || MGF_KLINE_RX_GPIO == 1 || \
     MGF_KLINE_RX_GPIO == 4 || MGF_KLINE_RX_GPIO == 8 || \
     MGF_KLINE_RX_GPIO == 19 || MGF_KLINE_RX_GPIO == 20 || \
-    MGF_KLINE_RX_GPIO == 39
+    MGF_KLINE_RX_GPIO == 39 || MGF_KLINE_RX_GPIO == 48
 #error "K-line GPIO conflicts with a reserved LILYGO T-RGB board resource"
 #endif
 

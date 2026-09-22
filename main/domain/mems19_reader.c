@@ -14,6 +14,7 @@ void mems19_reader_init(mems19_reader_t *r, ecu_reader_t base,
 
 static bool mems19_reader_connect(void *ctx) {
     mems19_reader_t *r = ctx;
+    if (r == NULL) return false;
     // Réveil 5 bauds obligatoire avant le handshake standard.
     if (r->transport.wake_up == NULL) return false;
     if (r->transport.wake_up(r->transport.ctx, MEMS_ECU_ADDRESS) < 0)
@@ -24,11 +25,13 @@ static bool mems19_reader_connect(void *ctx) {
 static bool mems19_reader_send_and_receive(void *ctx, uint8_t cmd, uint8_t *resp,
                                            size_t expected) {
     mems19_reader_t *r = ctx;
+    if (r == NULL) return false;
     return ecu_reader_send_and_receive(&r->base, cmd, resp, expected);
 }
 
 static void mems19_reader_disconnect(void *ctx) {
     mems19_reader_t *r = ctx;
+    if (r == NULL) return;
     ecu_reader_disconnect(&r->base);
 }
 

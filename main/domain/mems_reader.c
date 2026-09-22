@@ -5,13 +5,15 @@
 // Nombre de lectures infructueuses tolérées avant d'abandonner un paquet
 // (calqué sur les 5 essais de `ecureader_mems.go::readSerial`).
 #define READ_RETRY_MAX 5
+#define DEFAULT_READ_TIMEOUT_MS 100
 
 void mems_reader_init(mems_reader_t *r, kline_transport_t transport,
                       uint32_t read_timeout_ms) {
     if (r == NULL) return;
     memset(r, 0, sizeof(*r));
     r->transport = transport;
-    r->read_timeout_ms = read_timeout_ms;
+    r->read_timeout_ms = read_timeout_ms > 0 ? read_timeout_ms
+                                             : DEFAULT_READ_TIMEOUT_MS;
     r->connected = false;
 }
 
@@ -20,6 +22,7 @@ void mems_reader_init(mems_reader_t *r, kline_transport_t transport,
 static bool mems_reader_send_and_receive(void *ctx, uint8_t cmd, uint8_t *resp,
                                          size_t expected) {
     mems_reader_t *r = ctx;
+    if (r == NULL) return false;
     const kline_transport_t *t = &r->transport;
     if (t->write == NULL || t->read == NULL || resp == NULL || expected == 0)
         return false;
@@ -35,6 +38,7 @@ static bool mems_reader_send_and_receive(void *ctx, uint8_t cmd, uint8_t *resp,
             if (++retry >= READ_RETRY_MAX) return false;
             continue;
         }
+        if ((size_t)n > expected - got) return false;
         got += (size_t)n;
     }
 
@@ -43,8 +47,10 @@ static bool mems_reader_send_and_receive(void *ctx, uint8_t cmd, uint8_t *resp,
 
 static bool mems_reader_connect(void *ctx) {
     mems_reader_t *r = ctx;
+    if (r == NULL) return false;
     r->connected = false;
 
+    if (r->transport.write == NULL || r->transport.read == NULL) return false;
     if (r->transport.flush != NULL) r->transport.flush(r->transport.ctx);
 
     uint8_t buf[MEMS_RESP_ECU_ID];

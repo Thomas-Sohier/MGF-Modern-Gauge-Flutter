@@ -22,6 +22,14 @@
 #error "SDMMC must be disabled in the K-line profile"
 #endif
 
+#if MGF_USE_MEMS_KLINE != 0
+#error "the host/default K-line profile must keep the simulator enabled"
+#endif
+
+#if MGF_KLINE_LOCAL_ECHO != 0
+#error "local echo must be opt-in"
+#endif
+
 int main(void) {
     if (MGF_KLINE_TX_GPIO == MGF_KLINE_RX_GPIO) return 1;
     puts("kline config: OK");
