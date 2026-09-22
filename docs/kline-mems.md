@@ -124,9 +124,9 @@ Variante ECU par `MGF_MEMS_VARIANT` (`MEMS_VARIANT_1_6` par défaut,
 
 ## Limites connues
 
-- **Température d'huile** : MEMS 1.6 n'a pas ce capteur → `ecu_data_t.oil_temp`
-  reste à 0. La cellule « huile » de l'écran devra être repensée (autre capteur,
-  ou remplacée par une donnée MEMS réelle : pression collecteur, temp. air…).
+- **Température d'huile** : MEMS 1.6/1.9 n'a pas ce capteur → `ecu_data_t.oil_temp`
+  vaut `NAN` et la cellule « huile » affiche `--`. À remplacer par un capteur
+  externe ou par une donnée MEMS réelle (temp. air, pression collecteur…).
 - **% de gaz** : MEMS ne fournit pas de pourcentage ; estimé linéairement depuis
   la tension du potentiomètre papillon (0,6 V fermé → 4,6 V plein gaz).
 - **Non validé sur matériel** : ESP-IDF absent de l'environnement de build. Le

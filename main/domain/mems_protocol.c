@@ -120,6 +120,6 @@ void mems_to_ecu_data(const mems_data_t *in, bool connected, ecu_data_t *out) {
     if (pct > 100.0f) pct = 100.0f;
     out->throttle = pct;
 
-    // MEMS 1.6 : pas de sonde de température d'huile. Laissé à 0.
-    out->oil_temp = 0.0f;
+    // MEMS 1.6/1.9 : pas de sonde de température d'huile. oil_temp reste NAN
+    // (affiché « -- ») plutôt qu'un faux 0 °C permanent.
 }
