@@ -16,6 +16,7 @@ struct dashboard_navigator_s {
     size_t current;
     ecu_data_t latest_data;
     bool has_latest_data;
+    bool ignore_click_after_gesture;
 };
 
 static void update_current(dashboard_navigator_t *navigator, bool force) {
@@ -58,23 +59,64 @@ void dashboard_navigator_previous(dashboard_navigator_t *navigator) {
     update_current(navigator, true);
 }
 
+static bool point_in_visible_disc(const dashboard_navigator_t *navigator,
+                                  const lv_point_t *point) {
+    lv_area_t area;
+    lv_obj_get_coords(navigator->root, &area);
+    const int32_t width = lv_area_get_width(&area);
+    const int32_t height = lv_area_get_height(&area);
+    const int32_t radius = LV_MIN(width, height) / 2;
+    const int32_t cx = area.x1 + width / 2;
+    const int32_t cy = area.y1 + height / 2;
+    const int64_t dx = (int64_t)point->x - cx;
+    const int64_t dy = (int64_t)point->y - cy;
+    return dx * dx + dy * dy <= (int64_t)radius * radius;
+}
+
 static void navigation_event_cb(lv_event_t *event) {
     dashboard_navigator_t *navigator = lv_event_get_user_data(event);
     if (navigator == NULL) return;
 
     if (lv_event_get_code(event) == LV_EVENT_GESTURE) {
-        const lv_dir_t direction = lv_indev_get_gesture_dir(lv_indev_active());
-        if (direction == LV_DIR_LEFT) dashboard_navigator_next(navigator);
-        else if (direction == LV_DIR_RIGHT) dashboard_navigator_previous(navigator);
+        lv_indev_t *indev = lv_event_get_indev(event);
+        lv_point_t point;
+        if (indev == NULL) return;
+        lv_indev_get_point(indev, &point);
+        if (!point_in_visible_disc(navigator, &point)) return;
+        const lv_dir_t direction = lv_indev_get_gesture_dir(indev);
+        if (direction == LV_DIR_LEFT) {
+            dashboard_navigator_next(navigator);
+            navigator->ignore_click_after_gesture = true;
+        } else if (direction == LV_DIR_RIGHT) {
+            dashboard_navigator_previous(navigator);
+            navigator->ignore_click_after_gesture = true;
+        }
         return;
     }
 
     if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
+        if (navigator->ignore_click_after_gesture) {
+            navigator->ignore_click_after_gesture = false;
+            return;
+        }
+
+        // Les contrôles enfants, notamment les boutons musique, gardent leur
+        // événement et leur bubbling de geste sans devenir une navigation.
+        if (lv_event_get_target(event) != navigator->root) return;
+
         lv_point_t point;
-        lv_indev_get_point(lv_event_get_indev(event), &point);
+        lv_indev_t *indev = lv_event_get_indev(event);
+        if (indev == NULL) return;
+        lv_indev_get_point(indev, &point);
+        if (!point_in_visible_disc(navigator, &point)) return;
+
         const int32_t width = lv_obj_get_width(navigator->root);
-        if (point.x < width / 3) dashboard_navigator_previous(navigator);
-        else if (point.x >= (width * 2) / 3) dashboard_navigator_next(navigator);
+        if (point.x < lv_obj_get_x(navigator->root) + width / 3) {
+            dashboard_navigator_previous(navigator);
+        } else if (point.x >= lv_obj_get_x(navigator->root) +
+                   (width * 2) / 3) {
+            dashboard_navigator_next(navigator);
+        }
     }
 }
 
