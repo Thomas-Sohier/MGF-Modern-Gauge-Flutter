@@ -1,5 +1,6 @@
 #include "esp_log.h"
 #include "esp_err.h"
+#include "esp_heap_caps.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -354,6 +355,13 @@ void app_main(void) {
     REGISTER_PAGE(navigator, idle, "RALENTI", 150);
     REGISTER_PAGE_WITH_UNITS(navigator, admission, "ADMISSION", 150,
                              admission_page_settings);
+
+    // Bilan unique après création des 11 pages (toutes gardées en mémoire) :
+    // permet de suivre leur coût sans activer les diagnostics périodiques.
+    ESP_LOGI(TAG, "heap after pages: internal free/min=%u/%u, psram free=%u",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
     s_settings_apply_context = (settings_apply_context_t){
         .navigator = navigator,
