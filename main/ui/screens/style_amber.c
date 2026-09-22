@@ -270,6 +270,17 @@ void amber_screen_set_units(amber_screen_t *scr, app_settings_units_t units) {
     if (scr->has_latest_data) amber_screen_update(scr, &scr->latest_data);
 }
 
+// NAN (mesure indisponible) s'affiche « -- » plutôt que « nan°C ».
+static void format_temperature(char *buf, size_t size, float value,
+                               app_settings_units_t units) {
+    if (!isfinite(value)) {
+        snprintf(buf, size, "--");
+        return;
+    }
+    snprintf(buf, size, "%.0f°%c", value,
+             units == APP_SETTINGS_UNITS_IMPERIAL ? 'F' : 'C');
+}
+
 void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     if (scr == NULL || d == NULL || scr->canvas == NULL || scr->value == NULL) return;
     scr->latest_data = *d;
@@ -299,21 +310,24 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
 
     char buf[24];
     if (rpm_display != scr->rpm_display || !scr->has_snapshot) {
-        snprintf(buf, sizeof(buf), "%.0f", d->rpm);
+        if (isfinite(d->rpm)) snprintf(buf, sizeof(buf), "%.0f", d->rpm);
+        else snprintf(buf, sizeof(buf), "--");
         amber_value_widget_set(scr->value, buf);
     }
     if (coolant_display != scr->coolant_display || !scr->has_snapshot) {
-        snprintf(buf, sizeof(buf), "%.0f°%c", coolant,
-                 scr->units == APP_SETTINGS_UNITS_IMPERIAL ? 'F' : 'C');
+        format_temperature(buf, sizeof(buf), coolant, scr->units);
         amber_value_widget_set(scr->ind_value[M_COOLANT], buf);
     }
     if (battery_display != scr->battery_display || !scr->has_snapshot) {
-        snprintf(buf, sizeof(buf), "%.1fV", d->battery_voltage);
+        if (isfinite(d->battery_voltage)) {
+            snprintf(buf, sizeof(buf), "%.1fV", d->battery_voltage);
+        } else {
+            snprintf(buf, sizeof(buf), "--");
+        }
         amber_value_widget_set(scr->ind_value[M_BATTERY], buf);
     }
     if (oil_display != scr->oil_display || !scr->has_snapshot) {
-        snprintf(buf, sizeof(buf), "%.0f°%c", oil,
-                 scr->units == APP_SETTINGS_UNITS_IMPERIAL ? 'F' : 'C');
+        format_temperature(buf, sizeof(buf), oil, scr->units);
         amber_value_widget_set(scr->ind_value[M_OIL], buf);
     }
     if (d->connected != scr->connected_display || !scr->has_snapshot) {

@@ -74,7 +74,7 @@ static rtc_result_t ble_datetime_set(void *context,
 static bool disconnected_ecu_read(void *context, ecu_data_t *out) {
     (void)context;
     if (out == NULL) return false;
-    *out = (ecu_data_t){.connected = false};
+    *out = ecu_data_unavailable();
     return true;
 }
 

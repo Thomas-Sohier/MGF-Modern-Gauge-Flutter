@@ -90,6 +90,9 @@ bool mems_parse_frame_7d(const uint8_t *frame, size_t len, mems_data_t *out) {
 void mems_to_ecu_data(const mems_data_t *in, bool connected, ecu_data_t *out) {
     if (in == NULL || out == NULL) return;
 
+    // Les champs non fournis par MEMS (injection, trims, ralenti...) restent
+    // explicitement indisponibles plutôt que non initialisés.
+    *out = ecu_data_unavailable();
     out->connected = connected;
     out->rpm = (float)in->engine_rpm;
     out->coolant_temp = (float)in->coolant_temp;

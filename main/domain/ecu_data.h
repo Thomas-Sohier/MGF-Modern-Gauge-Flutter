@@ -1,10 +1,12 @@
 #pragma once
 
+#include <math.h>
 #include <stdbool.h>
 
-// Instantané normalisé des données ECU consommées par les écrans. Les champs
-// indisponibles sur une variante MEMS restent à zéro ; la structure est copiée
-// en bloc entre la source, le contrôleur et les vues.
+// Instantané normalisé des données ECU consommées par les écrans. Un champ
+// indisponible (ECU déconnectée, mesure absente de la variante MEMS) vaut NAN :
+// les écrans l'affichent « -- » au lieu d'une fausse valeur nulle. La structure
+// est copiée en bloc entre la source, le contrôleur et les vues.
 typedef struct {
     bool connected;
     float rpm;
@@ -42,3 +44,24 @@ typedef struct {
     float idle_valve_position;
     float idle_base_position;
 } ecu_data_t;
+
+// Instantané « rien de connu » : ECU déconnectée, toutes les mesures à NAN.
+static inline ecu_data_t ecu_data_unavailable(void) {
+    return (ecu_data_t){
+        .connected = false,
+        .rpm = NAN, .throttle = NAN, .coolant_temp = NAN,
+        .battery_voltage = NAN, .oil_temp = NAN,
+        .ambient_temp = NAN, .intake_air_temp = NAN, .fuel_rail_temp = NAN,
+        .map_sensor_kpa = NAN, .throttle_pot_voltage = NAN,
+        .ignition_advance = NAN, .ignition_advance_offset = NAN,
+        .coil_1_charge_time = NAN, .coil_2_charge_time = NAN,
+        .coil_time_microseconds = NAN,
+        .injector_1_pw = NAN, .injector_2_pw = NAN,
+        .fuelling_feedback_percent = NAN, .short_term_trim_percent = NAN,
+        .long_term_trim = NAN,
+        .lambda_mv = NAN, .o2_mv = NAN, .estimated_air_fuel = NAN,
+        .lambda_sensor_duty_cycle = NAN,
+        .idle_setpoint = NAN, .idle_adjuster_rpm = NAN, .idle_error = NAN,
+        .idle_valve_position = NAN, .idle_base_position = NAN,
+    };
+}

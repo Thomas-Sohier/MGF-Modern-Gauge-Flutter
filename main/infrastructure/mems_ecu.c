@@ -51,8 +51,7 @@ static void mems_ecu_task(void *arg) {
             ESP_LOGI(TAG, "connexion à l'ECU MEMS…");
             if (!mems_session_connect(&ecu->session)) {
                 // Publier l'état déconnecté et temporiser avant nouvel essai.
-                ecu_data_t down = {0};
-                down.connected = false;
+                const ecu_data_t down = ecu_data_unavailable();
                 publish(ecu, &down);
                 vTaskDelay(pdMS_TO_TICKS(ecu->reconnect_delay_ms));
                 continue;
@@ -68,8 +67,7 @@ static void mems_ecu_task(void *arg) {
         } else {
             ESP_LOGW(TAG, "ECU absente ou trame expirée, reconnexion");
             // Ne pas conserver un snapshot marqué connecté après un timeout.
-            ecu_data_t down = {0};
-            down.connected = false;
+            const ecu_data_t down = ecu_data_unavailable();
             publish(ecu, &down);
         }
         vTaskDelay(pdMS_TO_TICKS(ecu->poll_period_ms));
@@ -125,7 +123,7 @@ mems_ecu_t *mems_ecu_create(const mems_ecu_config_t *config) {
         reader = mems19_reader_interface(&ecu->reader19);
     }
     mems_session_init(&ecu->session, reader);
-    ecu->snapshot.connected = false;
+    ecu->snapshot = ecu_data_unavailable();
     return ecu;
 }
 

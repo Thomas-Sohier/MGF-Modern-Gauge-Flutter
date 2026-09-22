@@ -332,7 +332,11 @@ void lambda_screen_update(lambda_screen_t *screen, const ecu_data_t *data) {
         snprintf(next_afr, sizeof(next_afr), "%.2f", afr);
         snprintf(next_lambda, sizeof(next_lambda), "%.0f", lambda_mv);
         snprintf(next_o2, sizeof(next_o2), "%.0f", o2_mv);
-        snprintf(next_duty, sizeof(next_duty), "%.0f%%", duty);
+        if (isfinite(data->lambda_sensor_duty_cycle)) {
+            snprintf(next_duty, sizeof(next_duty), "%.0f%%", duty);
+        } else {
+            snprintf(next_duty, sizeof(next_duty), "--%%");
+        }
     } else {
         snprintf(next_afr, sizeof(next_afr), "--.--");
         snprintf(next_lambda, sizeof(next_lambda), "--");

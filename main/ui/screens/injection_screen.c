@@ -4,6 +4,7 @@
 #include "ui/themes/ui_theme.h"
 #include "ui/widgets/amber_ui.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -61,7 +62,8 @@ static bool set_pair_value_if_changed(char *buffer, size_t buffer_size,
                                       lv_obj_t *front, lv_obj_t *shadow,
                                       const char *format, float value) {
     char next[24];
-    snprintf(next, sizeof(next), format, value);
+    if (isfinite(value)) snprintf(next, sizeof(next), format, value);
+    else snprintf(next, sizeof(next), "--");
     return set_pair_text_if_changed(buffer, buffer_size, front, shadow, next);
 }
 

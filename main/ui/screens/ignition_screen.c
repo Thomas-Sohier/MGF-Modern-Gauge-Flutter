@@ -130,7 +130,8 @@ static void canvas_draw_cb(lv_event_t *event) {
 static bool update_pair(lv_obj_t *front, lv_obj_t *shadow, char *buffer,
                         size_t buffer_size, const char *format, float value) {
     char next[24];
-    snprintf(next, sizeof(next), format, value);
+    if (isfinite(value)) snprintf(next, sizeof(next), format, value);
+    else snprintf(next, sizeof(next), "--");
     // Les libellés sont français : la virgule décimale reste déterministe,
     // sans dépendre de la locale globale de l'ESP-IDF.
     for (char *cursor = next; *cursor != '\0'; cursor++) {

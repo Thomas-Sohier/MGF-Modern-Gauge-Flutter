@@ -76,7 +76,7 @@ static void test_to_ecu_data(void) {
     mems_parse_frame_7d(FRAME_7D, MEMS_FRAME_7D_LEN, &d);
 
     ecu_data_t e;
-    memset(&e, 0, sizeof(e));
+    memset(&e, 0xA5, sizeof(e));  // garbage: every field must be written
     mems_to_ecu_data(&d, true, &e);
     check(e.connected, "connected propagated");
     check(near(e.rpm, 1189.0f), "ecu rpm");
@@ -84,6 +84,20 @@ static void test_to_ecu_data(void) {
     check(near(e.battery_voltage, 13.0f), "ecu battery");
     check(near(e.throttle, 2.0f), "throttle % from pot (0.68-0.6)/4*100");
     check(near(e.oil_temp, 0.0f), "oil temp unset (no MEMS sensor)");
+    check(isnan(e.injector_1_pw), "unmapped injector pw is unavailable");
+    check(isnan(e.idle_setpoint), "unmapped idle setpoint is unavailable");
+    check(isnan(e.lambda_sensor_duty_cycle), "unmapped heater duty is unavailable");
+}
+
+static void test_unavailable_snapshot(void) {
+    const ecu_data_t e = ecu_data_unavailable();
+    check(!e.connected, "unavailable snapshot is disconnected");
+    const float *field = &e.rpm;
+    const size_t count =
+        (sizeof(e) - ((const char *)field - (const char *)&e)) / sizeof(float);
+    for (size_t i = 0; i < count; i++) {
+        check(isnan(field[i]), "every unavailable measurement is NAN");
+    }
 }
 
 // --- Transport factice piloté par script pour tester la session -------------
@@ -329,6 +343,7 @@ int main(void) {
     test_parse_frame_7d();
     test_parse_rejects_bad_input();
     test_to_ecu_data();
+    test_unavailable_snapshot();
     test_session_connect_and_poll();
     test_session_connect_failure();
     test_session_tolerates_partial_reads_and_timeouts();
