@@ -64,7 +64,7 @@ idf.py set-target esp32s3 && idf.py build          # firmware normal (sans BT)
 idf.py -B build-ble -D SDKCONFIG=build-ble/sdkconfig \
     -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ble" \
     -D MGF_ENABLE_BLE_CONFIG=1 build               # image de configuration BLE
-tools/check_iram.sh                                # marge IRAM (16 KiB, serrée avec BLE)
+tools/check_iram.sh                                # marge DIRAM (la région IRAM 16 KiB est toujours ~pleine, c'est normal)
 ```
 
 Options CMake : `MGF_USE_MEMS_KLINE`, `MGF_MEMS_VARIANT`, `MGF_KLINE_*`,

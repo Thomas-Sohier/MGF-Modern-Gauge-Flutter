@@ -28,7 +28,7 @@ Les préférences applicatives (luminosité, page, thème, unités) sont persist
 par ESP-IDF NVS via [`docs/persistent-settings.md`](docs/persistent-settings.md).
 Le service de configuration BLE NimBLE optionnel et son protocole versionné sont
 décrits dans [`docs/ble-config.md`](docs/ble-config.md). La feuille de route restante,
-y compris les solutions si la région IRAM déborde, est dans
+y compris le budget mémoire interne (IRAM/DIRAM), est dans
 [`docs/lilygo-roadmap.md`](docs/lilygo-roadmap.md).
 Le modèle est versionné, chargé avec des valeurs par défaut en cas de données
 invalides et n'écrit pas de valeur identique. Les bonds Bluetooth restent gérés

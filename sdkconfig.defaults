@@ -43,8 +43,8 @@ CONFIG_LV_FONT_MONTSERRAT_20=y        # fallback si le TTF échoue
 CONFIG_LV_FONT_MONTSERRAT_48=y
 
 # ── Bluetooth : désactivé dans le firmware normal ─────────────────────────────
-# La pile NimBLE occupe l'IRAM (16 KiB, quasi pleine avec BLE) et la RAM
-# interne. L'image de configuration BLE ajoute sdkconfig.ble, cf.
+# La pile NimBLE coûte ~36 Ko de DIRAM statique, plus son tas au démarrage.
+# L'image de configuration BLE ajoute sdkconfig.ble, cf.
 # docs/ble-config.md.
 CONFIG_BT_ENABLED=n
 

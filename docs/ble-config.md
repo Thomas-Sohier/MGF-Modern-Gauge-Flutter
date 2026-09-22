@@ -11,8 +11,8 @@ idf.py -B build-ble -D SDKCONFIG=build-ble/sdkconfig \
 ```
 
 Le firmware normal garde `CONFIG_BT_ENABLED=n` (`sdkconfig.defaults`) : aucune
-pile Bluetooth n'y est liée, ce qui libère l'IRAM (quasi pleine avec BLE) et
-la RAM interne. L'image BLE utilise son propre dossier de build et son propre
+pile Bluetooth n'y est liée : ~36 Ko de DIRAM statique économisés (mesuré
+sous ESP-IDF 5.4.2), plus le tas alloué par NimBLE au démarrage. L'image BLE utilise son propre dossier de build et son propre
 `sdkconfig` pour que les deux configurations ne se contaminent pas ;
 `main/CMakeLists.txt` refuse `MGF_ENABLE_BLE_CONFIG=1` sans NimBLE activé.
 Un `sdkconfig` existant n'est pas réécrit par les defaults : après ce

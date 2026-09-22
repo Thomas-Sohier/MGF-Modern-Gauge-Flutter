@@ -16,7 +16,16 @@ Ce document conserve la liste des travaux à reprendre après le premier build E
 
 ## Point de vigilance IRAM
 
-Le build avec BLE rapporte actuellement une région IRAM de 16 384 octets occupée à 16 383 octets. Cette ligne ne représente pas toute la RAM interne : elle correspond à une région particulière réservée au code critique et aux vecteurs d’interruption. Le firmware compile, mais une évolution d’ESP-IDF ou une nouvelle fonction placée en IRAM peut provoquer une erreur de linkage.
+> **Mesure ESP-IDF 5.4.2 (2026-09-22)** : la région IRAM de 16 384 octets est
+> à 16 383 octets **avec et sans BLE**. Sur ESP32-S3, l'éditeur de liens
+> remplit toujours cette région puis place le reste du code IRAM en DIRAM
+> (`.text` DIRAM : 58 843 o). Ce 99,99 % n'est donc pas une limite. Le budget
+> réel est la DIRAM : 75 395 / 341 760 o (22 %) pour le firmware normal,
+> 111 647 o (33 %) pour l'image BLE. `tools/check_iram.sh` contrôle
+> désormais la marge DIRAM (128 Kio minimum par défaut).
+
+Les pistes ci-dessous restent utiles si la DIRAM venait à manquer ou si une
+erreur `iram0_0_seg overflowed` apparaissait réellement au linkage.
 
 Erreur typique :
 
