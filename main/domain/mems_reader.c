@@ -27,6 +27,9 @@ static bool mems_reader_send_and_receive(void *ctx, uint8_t cmd, uint8_t *resp,
     if (t->write == NULL || t->read == NULL || resp == NULL || expected == 0)
         return false;
 
+    // Purge les octets tardifs d'un échange précédent en échec : sans cela,
+    // une réponse en retard décalerait toutes les trames suivantes.
+    if (t->flush != NULL) t->flush(t->ctx);
     if (t->write(t->ctx, &cmd, 1) != 1) return false;
 
     size_t got = 0;

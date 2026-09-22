@@ -64,9 +64,14 @@ static void mems_ecu_task(void *arg) {
         ecu_data_t data;
         if (mems_session_poll(&ecu->session, &data, NULL)) {
             publish(ecu, &data);
+        } else if (ecu->session.connected) {
+            // Échec isolé : on garde le dernier instantané et on retente.
+            ESP_LOGD(TAG, "trame MEMS perdue (%u/%u)",
+                     ecu->session.poll_failures,
+                     MEMS_SESSION_MAX_POLL_FAILURES);
         } else {
-            ESP_LOGW(TAG, "ECU absente ou trame expirée, reconnexion");
-            // Ne pas conserver un snapshot marqué connecté après un timeout.
+            ESP_LOGW(TAG, "ECU absente ou trames expirées, reconnexion");
+            // Ne pas conserver un snapshot marqué connecté après la perte.
             const ecu_data_t down = ecu_data_unavailable();
             publish(ecu, &down);
         }

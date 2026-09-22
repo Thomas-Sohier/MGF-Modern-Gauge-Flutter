@@ -119,8 +119,11 @@ Variante ECU par `MGF_MEMS_VARIANT` (`MEMS_VARIANT_1_6` par défaut,
 À la connexion, `mems_ecu` lance une tâche FreeRTOS qui :
 1. tente le handshake, retente toutes `reconnect_delay_ms` en cas d'échec ;
 2. une fois connectée, interroge l'ECU toutes `poll_period_ms` (200 ms) ;
-3. publie le dernier instantané derrière un mutex ; `connected` reflète l'état
-   réel (une perte de trame repasse en reconnexion et affiche « -- » sur l'OBD).
+3. publie le dernier instantané derrière un mutex ; une trame perdue isolée
+   conserve le dernier instantané, et seuls `MEMS_SESSION_MAX_POLL_FAILURES` (3)
+   échecs consécutifs repassent en reconnexion (valeurs affichées « -- »).
+   Les octets tardifs sont purgés avant chaque commande pour ne pas décaler
+   les trames suivantes.
 
 ## Limites connues
 

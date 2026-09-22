@@ -269,10 +269,57 @@ static void test_absent_ecu_and_poll_timeout_are_disconnected(void) {
     check(mems_session_connect(&s), "reconnect before poll timeout");
     mock.drop_data = 1;
     ecu_data_t unchanged = {.rpm = 1234.0f, .connected = true};
+    for (int i = 1; i < MEMS_SESSION_MAX_POLL_FAILURES; i++) {
+        check(!mems_session_poll(&s, &unchanged, NULL), "poll timeout fails");
+        check(s.connected, "isolated poll timeouts keep the link");
+    }
     check(!mems_session_poll(&s, &unchanged, NULL), "poll timeout disconnects");
-    check(!s.connected && !base.connected, "poll timeout clears connection");
+    check(!s.connected && !base.connected, "repeated poll timeouts clear connection");
     check(unchanged.rpm == 1234.0f && unchanged.connected,
           "failed poll leaves output untouched");
+}
+
+static void test_poll_success_resets_failure_count(void) {
+    mock_transport_t mock;
+    memset(&mock, 0, sizeof(mock));
+    kline_transport_t t = {
+        .write = mock_write, .read = mock_read, .flush = mock_flush, .ctx = &mock};
+
+    mems_reader_t base;
+    mems_reader_init(&base, t, 1);
+    mems_session_t s;
+    mems_session_init(&s, mems_reader_interface(&base));
+    check(mems_session_connect(&s), "connect for failure reset");
+
+    ecu_data_t e;
+    for (int round = 0; round < 3; round++) {
+        mock.drop_data = 1;
+        for (int i = 1; i < MEMS_SESSION_MAX_POLL_FAILURES; i++) {
+            check(!mems_session_poll(&s, &e, NULL), "dropped frame fails");
+        }
+        mock.drop_data = 0;
+        check(mems_session_poll(&s, &e, NULL), "recovered poll succeeds");
+        check(s.connected && s.poll_failures == 0, "success resets failures");
+    }
+}
+
+static void test_late_bytes_are_flushed_before_command(void) {
+    mock_transport_t mock;
+    memset(&mock, 0, sizeof(mock));
+    kline_transport_t t = {
+        .write = mock_write, .read = mock_read, .flush = mock_flush, .ctx = &mock};
+
+    mems_reader_t base;
+    mems_reader_init(&base, t, 1);
+    mems_session_t s;
+    mems_session_init(&s, mems_reader_interface(&base));
+    check(mems_session_connect(&s), "connect for late bytes");
+
+    const uint8_t late[3] = {0x7d, 0x20, 0x10};  // fin d'une réponse tardive
+    mock_enqueue(&mock, late, sizeof(late));
+    ecu_data_t e;
+    check(mems_session_poll(&s, &e, NULL), "late bytes do not desync poll");
+    check(near(e.rpm, 1189.0f), "poll decodes the fresh frame");
 }
 
 static void test_session_1_9_wakes_before_handshake(void) {
@@ -348,6 +395,8 @@ int main(void) {
     test_session_connect_failure();
     test_session_tolerates_partial_reads_and_timeouts();
     test_absent_ecu_and_poll_timeout_are_disconnected();
+    test_poll_success_resets_failure_count();
+    test_late_bytes_are_flushed_before_command();
     test_session_1_9_wakes_before_handshake();
     test_session_1_9_wakeup_failure();
     test_session_1_9_requires_wakeup();
