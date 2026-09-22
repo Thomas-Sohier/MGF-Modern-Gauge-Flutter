@@ -1,14 +1,12 @@
 // Harnais de simulation hôte : compile la même UI LVGL que la cible ESP32-S3,
-// ainsi que les variantes legacy dual/cream, rend une frame offscreen avec des
-// données ECU mock et exporte le rendu en PNG (golden test).
+// rend une frame offscreen avec des données ECU mock et exporte le rendu en PNG
+// (golden test).
 //
 // Usage : gen_golden <chemin_png>
 
 #include "lvgl.h"
-#include "ui/screens/rpm_screen.h"
 #include "ui/screens/boot_screen.h"
 #include "ui/screens/style_amber.h"
-#include "ui/screens/style_cream.h"
 #include "ui/screens/clock_screen.h"
 #include "ui/screens/music_screen.h"
 #include "ui/screens/navigation_screen.h"
@@ -55,9 +53,9 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 }
 
 // ── Export ARGB8888 -> PNG RGB via stb ───────────────────────────────────────
-// `round` : masque les pixels hors du disque inscrit (panneau physiquement rond
+// Masque les pixels hors du disque inscrit (panneau physiquement rond
 // de la LILYGO T-RGB H597) -> golden représentatif de l'écran réel.
-static int write_png(const lv_draw_buf_t *snap, const char *path, int round) {
+static int write_png(const lv_draw_buf_t *snap, const char *path) {
     const uint32_t w = snap->header.w;
     const uint32_t h = snap->header.h;
     const uint32_t stride = snap->header.stride;
@@ -74,7 +72,7 @@ static int write_png(const lv_draw_buf_t *snap, const char *path, int round) {
             const uint8_t *p = row + (size_t)x * 4; // ARGB8888 little-endian : B,G,R,A
             uint8_t *o = rgb + ((size_t)y * w + x) * 3;
             const float dx = (float)x - cx, dy = (float)y - cy;
-            if (round && dx * dx + dy * dy > r2) {   // hors du disque : bezel noir
+            if (dx * dx + dy * dy > r2) {   // hors du disque : bezel noir
                 o[0] = o[1] = o[2] = 0;
             } else {
                 o[0] = p[2]; // R
@@ -103,19 +101,15 @@ static void *load_file(const char *path, size_t *out_size) {
 }
 
 int main(int argc, char **argv) {
-    // Usage : gen_golden [dual|cream|boot|amber|clock|music|navigation|
-    //                     faults|temps|injection|lambda|ignition|idle|admission] png
-    const char *style = (argc > 1) ? argv[1] : "dual";
-    const char *out = (argc > 2) ? argv[2] : "rpm_screen.png";
+    // Usage : gen_golden [amber|boot|clock|music|navigation|faults|temps|
+    //                     injection|lambda|ignition|idle|admission] png
+    const char *style = (argc > 1) ? argv[1] : "amber";
+    const char *out = (argc > 2) ? argv[2] : "rpm_amber.png";
 
-    // L'ambre cible la LILYGO T-RGB H597 : écran IPS ROND 480x480 (driver
-    // ST7701S, interface RGB). On rend donc à la résolution réelle du panneau,
-    // avec masque circulaire. Les styles legacy (dual/cream) restent en
-    // 1024x600 (ancienne cible P4 paysage), non masqués.
-    const int is_legacy = strcmp(style, "dual") == 0 || strcmp(style, "cream") == 0;
-    const int is_round = !is_legacy;
-    const int32_t W = is_round ? UI_DISPLAY_SIZE_PX : 1024;
-    const int32_t H = is_round ? UI_DISPLAY_SIZE_PX : 600;
+    // Cible LILYGO T-RGB H597 : écran IPS ROND 480x480 (driver ST7701S,
+    // interface RGB). On rend à la résolution réelle, avec masque circulaire.
+    const int32_t W = UI_DISPLAY_SIZE_PX;
+    const int32_t H = UI_DISPLAY_SIZE_PX;
 
     lv_init();
     lv_tick_set_cb(tick_cb);
@@ -164,10 +158,9 @@ int main(int argc, char **argv) {
     else if (strcmp(style, "ignition") == 0) ignition_screen_update(ignition_screen_create(screen), &mock);
     else if (strcmp(style, "idle") == 0) idle_screen_update(idle_screen_create(screen), &mock);
     else if (strcmp(style, "admission") == 0) admission_screen_update(admission_screen_create(screen), &mock);
-    else if (strcmp(style, "cream") == 0) cream_screen_update(cream_screen_create(screen), &mock);
     else {
-        lv_obj_set_style_bg_color(screen, lv_color_hex(0x1C1C1E), 0);
-        rpm_screen_update(rpm_screen_create(screen), &mock);
+        fprintf(stderr, "style inconnu : %s\n", style);
+        return 2;
     }
 
     // Résout la disposition puis force un cycle de rendu.
@@ -180,7 +173,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (!write_png(snap, out, is_round)) {
+    if (!write_png(snap, out)) {
         fprintf(stderr, "ecriture PNG echouee: %s\n", out);
         lv_draw_buf_destroy(snap);
         return 1;

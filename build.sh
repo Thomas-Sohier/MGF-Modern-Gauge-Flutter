@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Compilation + régénération des goldens en une commande.
 #
-#   ./build.sh          compile l'UI et régénère test/golden/{rpm_screen,rpm_amber,rpm_cream,boot_amber}.png
+#   ./build.sh          compile l'UI et régénère test/golden/*_amber.png
 #   ./build.sh clean    repart de zéro (efface le cache sim/build/)
 #
 # LVGL n'est compilé qu'UNE fois (objets mis en cache dans sim/build/lvgl_obj/) ;
@@ -25,9 +25,9 @@ UI_SRCS=(
     "$SIM/main_sim.c"
     "$MAIN/app/dashboard_controller.c" "$MAIN/ui/navigation/dashboard_navigator.c"
     "$MAIN/ui/navigation/ui_instrumentation.c"
-    "$MAIN/ui/widgets/dual_arc_dial.c" "$MAIN/ui/screens/rpm_screen.c" "$MAIN/ui/screens/boot_screen.c" "$MAIN/infrastructure/fake_ecu.c"
-    "$MAIN/ui/icons/gauge_icons.c" "$MAIN/ui/icons/dash_icons.c"
-    "$MAIN/ui/screens/style_amber.c" "$MAIN/ui/screens/style_cream.c" "$MAIN/ui/themes/ui_theme.c"
+    "$MAIN/ui/screens/boot_screen.c" "$MAIN/infrastructure/fake_ecu.c"
+    "$MAIN/ui/icons/dash_icons.c"
+    "$MAIN/ui/screens/style_amber.c" "$MAIN/ui/themes/ui_theme.c"
     "$MAIN/ui/screens/clock_screen.c" "$MAIN/ui/screens/music_screen.c" "$MAIN/ui/screens/navigation_screen.c"
     "$MAIN/ui/screens/faults_screen.c" "$MAIN/ui/screens/temps_screen.c" "$MAIN/ui/screens/injection_screen.c"
     "$MAIN/ui/screens/lambda_screen.c" "$MAIN/ui/screens/ignition_screen.c"
@@ -84,8 +84,6 @@ gcc "${CFLAGS[@]}" \
 
 # 4. Régénération des références visuelles.
 echo ">> génération des goldens..."
-"$BUILD/gen_golden" dual  "$GDIR/rpm_screen.png"
-"$BUILD/gen_golden" cream "$GDIR/rpm_cream.png"
 "$BUILD/gen_golden" boot  "$GDIR/boot_amber.png"
 "$BUILD/gen_golden" amber "$GDIR/rpm_amber.png"
 for style in clock music navigation faults temps injection lambda ignition idle admission; do

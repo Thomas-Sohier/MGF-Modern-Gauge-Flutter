@@ -1,5 +1,4 @@
-# Firmware ESP32-S3 : seul l'écran ambre est embarqué (les styles dual/cream et
-# leurs icônes ne servent qu'au simulateur hôte, cf. sim/).
+# Firmware ESP32-S3 : écrans ambre pour le panneau rond LILYGO T-RGB.
 # Pass -DMGF_LILYGO_T_RGB_V2=1 to idf.py/cmake for the vendor V2 profile.
 # The default remains the original H597 profile.
 

@@ -24,9 +24,6 @@ Le style ambre cible le panneau rond :
 - Disque de fond + valeur centrale (grand nombre + « RPM »).
 - Quatre indicateurs vectoriels en bas : température LDR, batterie, huile et OBD.
 
-Les variantes dual/cream legacy restent disponibles dans le simulateur pour
-conserver les goldens historiques.
-
 Les préférences applicatives (luminosité, page, thème, unités) sont persistées
 par ESP-IDF NVS via [`docs/persistent-settings.md`](docs/persistent-settings.md).
 Le service de configuration BLE NimBLE optionnel et son protocole versionné sont
@@ -41,12 +38,10 @@ par la pile ESP-IDF et ne sont pas manipulés par l'application.
 
 | Flutter (Dart) | Ici (C / LVGL) | Rôle |
 |---|---|---|
-| `DualArcDial` (`CustomPainter`) | `dual_arc_dial.c` (event `LV_EVENT_DRAW_MAIN`) | dessin des deux arcs en une passe |
-| `ArcGeometry` | fonctions `segment_*` de `dual_arc_dial.c` | angles, seuil de danger, progression |
-| `hasGaugeValueChanged` | `gauge_value_changed()` | invalidation seulement si changement visible |
-| `GaugeLayout` + `_ArcFlowDelegate` | `rpm_screen.c` (placement `cos/sin`) | disposition en arc des indicateurs |
-| `MetricPrimaryDisplay` / `MetricIndicator` | labels de `rpm_screen.c` | valeur centrale + indicateurs |
-| `AppColors` / `GaugeTheme` (dark) | macros `MGF_COL_*` de `gauge_theme.h` | palette |
+| `DualArcDial` (`CustomPainter`) | `style_amber.c` (26 barres, `LV_EVENT_DRAW_MAIN`) | compte-tours ; refonte pour le cadran rond |
+| `hasGaugeValueChanged` | détection de changement dans `amber_screen_update()` | invalidation seulement si changement visible |
+| `MetricPrimaryDisplay` / `MetricIndicator` | `amber_value.c` + indicateurs de `style_amber.c` | valeur centrale + indicateurs |
+| `AppColors` / `GaugeTheme` | `ui_theme.[ch]` | palette ambre |
 | `EcuInfos` / `DialData` | `ecu_data_t` (`ecu_data.h`) | instantané ECU |
 | WebSocket `EcuService` | `fake_ecu.c` (simulée) / `mems_ecu.c` (K-line MEMS réelle, cf. [`docs/kline-mems.md`](docs/kline-mems.md)) | source de données |
 
@@ -117,24 +112,20 @@ main/
   style_amber.*     # écran ambre (cible) — cadran rond vectoriel
   dash_icons.*      # icônes vectorielles (eau, batterie, huile, OBD)
   ui_fonts.*        # police Michroma via tiny_ttf
-  # dual_arc_dial.* / rpm_screen.* / style_cream.* / gauge_icons.* : sim-only
 ```
 
 ## Simulateur hôte & golden
 
-La même UI ambre (`style_amber.c`, ses widgets et `fake_ecu.c`) se compile sur
-PC pour un rendu hors-écran. Les variantes dual/cream legacy sont générées dans
-la même passe, ce qui permet d'itérer sans matériel et de produire les captures
-de référence :
+La même UI ambre (écrans, widgets et `fake_ecu.c`) se compile sur PC pour un
+rendu hors-écran, ce qui permet d'itérer sans matériel et de produire les
+captures de référence :
 
 ```bash
-sim/build_golden.sh          # -> test/golden/{rpm_screen,rpm_amber,rpm_cream}.png
+./build.sh                   # -> test/golden/*_amber.png (LVGL en cache)
 ```
 
-Trois variantes de style sont rendues (sombre de base, ambre, crème — d'après
-`specs/image/`). Voir `sim/` (harnais + `lv_conf.h`) et `test/golden/` (images +
-données mock). Les icônes ambre sont dans `main/ui/icons/dash_icons.c`; les icônes et
-styles legacy sont dans `main/ui/icons/gauge_icons.c`, `main/ui/screens/style_cream.c`.
+Voir `sim/` (harnais + `lv_conf.h`) et `test/golden/` (images + données mock).
+Les icônes ambre sont dans `main/ui/icons/dash_icons.c`.
 
 Le style ambre utilise **Michroma** rendue à la volée par tiny_ttf
 (`main/ui/fonts/ui_fonts.c`, TTF dans `main/fonts/`, embarqué côté cible via
