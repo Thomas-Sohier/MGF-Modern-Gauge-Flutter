@@ -2,7 +2,10 @@
 
 Dossier de référence matériel pour porter le projet sur la **LILYGO T-RGB 2.1" Full Circle** (SKU H597), écran rond 480×480 piloté par ST7701S et tactile CST820.
 
-> **Point bloquant avant le portage : identifier la révision de la carte.** Le dépôt LILYGO contient une configuration originale et une configuration `V2` incompatibles (timings, ordre des lignes RGB et séquence ST7701S), sans méthode officielle d’identification visuelle. Relever le marquage PCB et tester les deux profils si nécessaire.
+> **Validation matérielle requise : identifier la révision de la carte.** Le portage
+> sélectionne l'original par défaut et permet de construire V2 avec
+> `-DMGF_LILYGO_T_RGB_V2=1`. Les deux profils restent incompatibles (timings, ordre
+> des lignes RGB et séquence ST7701S), sans méthode officielle d'identification visuelle.
 
 ## Contenu
 
@@ -27,15 +30,15 @@ Dossier de référence matériel pour porter le projet sur la **LILYGO T-RGB 2.1
 | microSD | présente mais destinée à être désactivée pour libérer la K-line |
 | USB | USB-C natif ESP32-S3, USB Serial/JTAG |
 
-## Impact sur le projet actuel
+## État du portage
 
-La carte n’est **pas compatible broche à broche** avec la Waveshare actuellement codée dans `main/infrastructure/board_display.c`. Il faudra notamment remplacer :
+`main/infrastructure/board_display.c` cible maintenant directement la T-RGB :
 
-- le TCA9554 par un XL9535/XL9555 compatible à l’adresse `0x20` ;
-- tous les GPIO RGB, synchro, rétroéclairage, I²C et tactile ;
-- le pixel clock 16 MHz et les porches provisoires par le profil LILYGO 8 MHz ou V2 10 MHz ;
-- le SPI 3 fils direct par le protocole série 9 bits transmis via l’expander ;
-- la séquence ST7701 générique par la table exacte LILYGO ;
-- la commande tout-ou-rien du rétroéclairage par le protocole à impulsions AW9364.
+- XL9535/XL9555 compatible à `0x20`, `PWR_EN`, resets et série ST7701S 9-bit via expander ;
+- GPIO RGB, synchro, rétroéclairage AW9364, I²C et tactile selon le brochage H597 ;
+- profil original 8 MHz ou V2 10 MHz, avec porches, ordre RGB et tables exactes ;
+- CST820 à `0x15` via le pilote CST816S compatible et LVGL RGB565 en PSRAM ;
+- rétroéclairage discret AW9364 via `board_display_backlight_set_brightness(0..16)`.
 
-Les broches K-line provisoires GPIO17/GPIO18 sont utilisées par le bus LCD LILYGO et devront être réaffectées. LILYGO indique par ailleurs qu’aucun GPIO n’est réellement libre.
+Les broches K-line provisoires GPIO17/GPIO18 sont utilisées par le bus LCD LILYGO et
+nécessitent une réaffectation avant l’activation de cette source sur matériel.

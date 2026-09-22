@@ -90,9 +90,9 @@ DEFINE_PAGE_ADAPTER(admission)
 } while (0)
 
 void app_main(void) {
-    ESP_LOGI(TAG, "MGF Gauge LVGL — ecran RPM ambre (ESP32-S3-Touch-LCD-2.1)");
+    ESP_LOGI(TAG, "MGF Gauge LVGL — ecran RPM ambre (LILYGO T-RGB H597)");
 
-    // Écran ST7701 RGB 480x480 rond + tactile CST820 + port LVGL (thread dédié).
+    // Écran ST7701S RGB 480x480 rond + tactile CST820 + port LVGL (thread dédié).
     if (board_display_start() == NULL) {
         ESP_LOGE(TAG, "impossible d'initialiser l'écran");
         board_display_backlight_off();

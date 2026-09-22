@@ -2,8 +2,8 @@
 
 Portage **de faisabilité** de l'écran RPM principal du projet Flutter
 [`MGF-Modern-Gauge-Flutter`](../MGF-Modern-Gauge-Flutter) vers **LVGL 9 / ESP-IDF**,
-pour tourner sur la carte **Waveshare ESP32-S3-Touch-LCD-2.1** (écran IPS **rond
-480×480**, driver ST7701, tactile CST820).
+pour tourner sur la carte **LILYGO T-RGB 2.1 Full Circle H597** (écran IPS **rond
+480×480**, driver ST7701S, tactile CST820).
 
 Objectif : vérifier qu'un microcontrôleur (Xtensa LX7 bicœur, sans GPU) peut
 rendre fidèlement et de façon fluide la jauge, sans passer par Flutter/Impeller.
@@ -40,13 +40,15 @@ conserver les goldens historiques.
 
 ## Matériel cible
 
-**Waveshare ESP32-S3-Touch-LCD-2.1** (fiche dans `specs/`) : ESP32-S3 (LX7 bicœur
-240 MHz, 16 Mo Flash, 8 Mo PSRAM), écran IPS **rond 480×480** (driver **ST7701**,
-interface RGB), tactile capacitif **CST820** (I²C), expander **TCA9554**.
+**LILYGO T-RGB 2.1 Full Circle H597** (références dans `specs/lilygo-t-rgb-2.1/`) :
+ESP32-S3R8 (LX7 bicœur 240 MHz, 16 Mo Flash, 8 Mo PSRAM), écran IPS **rond
+480×480** (driver **ST7701S**, interface RGB), tactile capacitif **CST820** (I²C),
+expander XL9535-compatible à `0x20`.
 
-Pas de BSP tout-en-un pour cette carte : le bring-up (ST7701 RGB + CST820 +
-TCA9554 + port LVGL) est fait dans `main/infrastructure/board_display.c` à partir des composants
-`esp_lcd` standard et du brochage officiel Waveshare.
+Pas de BSP tout-en-un pour cette carte : le bring-up (ST7701S RGB + CST820 +
+XL9535 + port LVGL) est fait dans `main/infrastructure/board_display.c` à partir des composants
+`esp_lcd` standard et du brochage officiel LILYGO. Les profils original et V2
+sont sélectionnables par `-DMGF_LILYGO_T_RGB_V2=1`.
 
 ## Build & flash
 
@@ -71,7 +73,7 @@ esp_io_expander_tca9554…) sont téléchargées au premier `build` dans
 ```
 main/
   app_main.c        # composition matériel/police/UI + démarrage du contrôleur
-  board_display.c   # bring-up ST7701 RGB + CST820 + TCA9554 + port LVGL (S3)
+  board_display.c   # bring-up ST7701S RGB + CST820 + XL9535 + AW9364 + LVGL (S3)
   ui_theme.[ch]     # palette ambre partagée
   ui/widgets/       # widgets de valeurs/indicateurs ambre
   ecu_data.h        # modèle ecu_data_t uniquement

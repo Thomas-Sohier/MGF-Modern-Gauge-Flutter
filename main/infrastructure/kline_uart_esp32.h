@@ -9,7 +9,7 @@
 
 // Transport K-line pour ESP32-S3 au-dessus du pilote UART ESP-IDF.
 //
-// ⚠️ Matériel requis : la carte Waveshare n'embarque PAS de transceiver K-line.
+// ⚠️ Matériel requis : la carte LILYGO n'embarque PAS de transceiver K-line.
 // La K-line (ISO-9141, 12 V, un seul fil bidirectionnel) doit passer par un
 // transceiver dédié (ex. ST L9637D) qui expose deux lignes 3.3 V TX/RX vers le
 // S3. Câbler K-line <-> transceiver <-> (tx_gpio, rx_gpio).

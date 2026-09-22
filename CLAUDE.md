@@ -7,7 +7,7 @@ piloté par des données ECU simulées. Le style de référence est **« amber �
 
 ## Matériel cible
 
-**Waveshare ESP32-S3-Touch-LCD-2.1** (fiche : `specs/ESP32-S3 ….html`).
+**LILYGO T-RGB 2.1 Full Circle H597** (références : `specs/lilygo-t-rgb-2.1/`).
 
 | | |
 |---|---|
@@ -20,20 +20,15 @@ piloté par des données ECU simulées. Le style de référence est **« amber �
 | Variantes | `-2.1` (dalle plate, SKU 28169) / `-2.1B` (2.5D incurvée, 30697) |
 
 > Le bring-up matériel S3 est fait dans `main/infrastructure/board_display.c` (pas de BSP
-> tout-en-un pour cette carte) à partir des composants esp_lcd standard et du
-> **brochage officiel Waveshare** (repris en tête du fichier). `idf_component.yml`,
-> `sdkconfig.defaults`, `main/CMakeLists.txt` et `app_main.c` ciblent le S3.
+> tout-en-un) à partir des composants esp_lcd standard et du brochage officiel LILYGO.
+> L'XL9535-compatible est porté par le composant TCA95xx 16-bit, et les tables
+> ST7701S upstream sont conservées dans `main/infrastructure/lilygo_st7701_init.h`.
+> `idf_component.yml`, `sdkconfig.defaults`, `main/CMakeLists.txt` et `app_main.c` ciblent le S3.
 >
 > ⚠️ **Non compilé/validé sur matériel** (ESP-IDF absent de l'environnement de
-> génération). Points à vérifier sur la carte réelle :
-> - **Séquence d'init ST7701** : `init_cmds = NULL` utilise la séquence par
->   défaut du composant ; si l'écran reste noir/brouillé, coller la séquence
->   spécifique du panneau Waveshare (`st7701_lcd_init_cmd_t[]`).
-> - **Timings RGB** (porches/pulses, pclk 16 MHz) : à ajuster si l'image roule.
-> - **CST820** piloté par `esp_lcd_touch_cst816s` (compatible) — vérifier
->   l'orientation (swap/mirror) et l'adresse I²C.
-> - **API I²C legacy** (`driver/i2c.h`) : si l'IDF impose le nouveau pilote
->   `i2c_master`, adapter `i2c_bus_init()`.
+> génération). Vérifier sur la carte le marquage original/V2, les deux profils
+> (séquence, ordre RGB et timings), l'adresse XL9535 `0x20`, l'orientation CST820
+> et le protocole d'impulsions AW9364.
 
 ## Build & rendu
 

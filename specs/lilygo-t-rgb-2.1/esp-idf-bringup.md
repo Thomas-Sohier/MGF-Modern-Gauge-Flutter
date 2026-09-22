@@ -86,11 +86,20 @@ Un simple `gpio_set_level(..., 1)` peut allumer l’écran mais ne fournit pas u
 9. Tester démarrage USB puis batterie, extinction, luminosité et mesure batterie.
 10. Tester microSD seulement après stabilisation écran/tactile.
 
-## Risques à traiter dans le portage actuel
+## État du portage et risques restants
 
-- `board_display.c` est entièrement câblé pour Waveshare et doit être remplacé ou séparé derrière une configuration de carte.
-- Le projet dépend actuellement de TCA9554 et d’un SPI 3 fils direct ; la T-RGB demande XL9535 et une série 9 bits via expander.
+`main/infrastructure/board_display.c` implémente désormais ce bring-up avec le pilote
+I²C master ESP-IDF, le composant TCA95xx 16-bit (compatible XL9535), le SPI 3 fils
+9-bit via expander et les deux profils exacts dans
+`main/infrastructure/lilygo_st7701_init.h`. Le profil original est la valeur par
+défaut ; passer `-DMGF_LILYGO_T_RGB_V2=1` à CMake/`idf.py` sélectionne V2.
+
 - Les broches K-line GPIO17/GPIO18 entrent en conflit avec le LCD.
-- Le pilote officiel contient deux révisions non auto-détectables.
+- Le pilote officiel contient deux révisions non auto-détectables : le marquage
+  de la carte et l'image réelle doivent confirmer le profil choisi.
 - Le schéma date de 2022 et peut ne pas refléter V2.
-- Le CST820 n’a pas de datasheet officielle jointe au dépôt LILYGO ; la compatibilité CST816 est empirique/officielle au niveau logiciel.
+- Le CST820 n’a pas de datasheet officielle jointe au dépôt LILYGO ; la compatibilité
+  CST816 est empirique/officielle au niveau logiciel. Valider IRQ, suivi de doigt,
+  orientation et reset sur carte.
+- Les porches, l'ordre RGB et les impulsions AW9364 restent à valider avec une mire
+  de couleur et des mesures de synchro sur le matériel réel.

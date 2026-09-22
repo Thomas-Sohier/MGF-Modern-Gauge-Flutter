@@ -1,10 +1,10 @@
-## Dépendances managées (téléchargées par `idf.py reconfigure` / build) pour la
-## carte Waveshare ESP32-S3-Touch-LCD-2.1 : écran ST7701 (RGB) + tactile CST820
-## (pilote CST816S) + expander TCA9554, portés à LVGL 9 via esp_lvgl_port.
+## Dépendances managées pour la LILYGO T-RGB 2.1 Full Circle H597 : ST7701S
+## RGB + tactile CST820 (pilote CST816S compatible) + XL9535-compatible
+## 16-bit (pilote TCA95xx), portés à LVGL 9 via esp_lvgl_port.
 ##
 ## Pas de BSP tout-en-un pour cette carte : le bring-up est fait dans
-## main/infrastructure/board_display.c à partir des composants esp_lcd standard et du brochage
-## officiel (cf. CLAUDE.md).
+## main/infrastructure/board_display.c à partir des composants esp_lcd standard et du
+## brochage officiel LILYGO (cf. specs/lilygo-t-rgb-2.1/).
 dependencies:
   idf:
     version: ">=5.3"
@@ -12,5 +12,5 @@ dependencies:
   espressif/esp_lvgl_port: "^2"
   espressif/esp_lcd_st7701: "^1"
   espressif/esp_lcd_panel_io_additions: "^1"
-  espressif/esp_io_expander_tca9554: "^1"
+  espressif/esp_io_expander_tca95xx_16bit: "^2"
   espressif/esp_lcd_touch_cst816s: "^1"

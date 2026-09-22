@@ -56,7 +56,7 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 
 // ── Export ARGB8888 -> PNG RGB via stb ───────────────────────────────────────
 // `round` : masque les pixels hors du disque inscrit (panneau physiquement rond
-// de l'ESP32-S3-Touch-LCD-2.1) -> golden représentatif de l'écran réel.
+// de la LILYGO T-RGB H597) -> golden représentatif de l'écran réel.
 static int write_png(const lv_draw_buf_t *snap, const char *path, int round) {
     const uint32_t w = snap->header.w;
     const uint32_t h = snap->header.h;
@@ -108,8 +108,8 @@ int main(int argc, char **argv) {
     const char *style = (argc > 1) ? argv[1] : "dual";
     const char *out = (argc > 2) ? argv[2] : "rpm_screen.png";
 
-    // L'ambre cible l'ESP32-S3-Touch-LCD-2.1 : écran IPS ROND 480x480 (driver
-    // ST7701, interface RGB). On rend donc à la résolution réelle du panneau,
+    // L'ambre cible la LILYGO T-RGB H597 : écran IPS ROND 480x480 (driver
+    // ST7701S, interface RGB). On rend donc à la résolution réelle du panneau,
     // avec masque circulaire. Les styles legacy (dual/cream) restent en
     // 1024x600 (ancienne cible P4 paysage), non masqués.
     const int is_legacy = strcmp(style, "dual") == 0 || strcmp(style, "cream") == 0;

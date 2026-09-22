@@ -7,7 +7,7 @@ const lv_font_t *ui_font_l = NULL;
 const lv_font_t *ui_font_m = NULL;
 
 // Tailles (px) des trois polices, calées sur le panneau réel 480x480 de
-// l'ESP32-S3-Touch-LCD-2.1 (les polices tiny_ttf sont en px fixes : elles
+// la LILYGO T-RGB H597 (les polices tiny_ttf sont en px fixes : elles
 // doivent correspondre à la résolution de rendu, ici 480).
 #define UI_FONT_XXL_PX      72   // valeur RPM principale
 #define UI_FONT_RPM_UNIT_PX 24   // libellé RPM

@@ -1,4 +1,4 @@
-# ── Cible : ESP32-S3 (Waveshare ESP32-S3-Touch-LCD-2.1) ──────────────────────
+# ── Cible : ESP32-S3R8 (LILYGO T-RGB 2.1 Full Circle H597) ──────────────────
 CONFIG_IDF_TARGET="esp32s3"
 
 # ── PSRAM octale 8 Mo @ 80 MHz (framebuffers RGB + buffers LVGL) ──────────────
@@ -19,6 +19,8 @@ CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 
 # ── Panneau RGB : ISR en IRAM (stabilité du rafraîchissement avec la PSRAM) ───
+# Profil LCD : original par défaut (8 MHz). Construire avec
+# -DMGF_LILYGO_T_RGB_V2=1 pour la révision V2 (10 MHz + autre ordre RGB).
 CONFIG_LCD_RGB_ISR_IRAM_SAFE=y
 
 # ── LVGL ──────────────────────────────────────────────────────────────────────

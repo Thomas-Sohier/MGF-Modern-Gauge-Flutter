@@ -1,5 +1,8 @@
 # Firmware ESP32-S3 : seul l'écran ambre est embarqué (les styles dual/cream et
 # leurs icônes ne servent qu'au simulateur hôte, cf. sim/).
+# Pass -DMGF_LILYGO_T_RGB_V2=1 to idf.py/cmake for the vendor V2 profile.
+# The default remains the original H597 profile.
+
 idf_component_register(
     SRCS
         "app_main.c"
@@ -35,14 +38,18 @@ idf_component_register(
         "ui/fonts/ui_fonts.c"
     INCLUDE_DIRS "." "app" "domain" "infrastructure" "ui" "ui/screens" "ui/widgets" "ui/icons" "ui/fonts" "ui/themes"
     REQUIRES
-        driver                        # I²C (legacy) + GPIO
+        driver                        # GPIO + ESP-IDF compatibility types
         esp_lcd
-        esp_lcd_st7701
-        esp_lcd_panel_io_additions    # SPI 3 fils (init ST7701) via expander
-        esp_io_expander_tca9554
+        esp_lcd_st7701                 # ST7701S vendor init + RGB panel
+        esp_lcd_panel_io_additions    # série 9 bits ST7701S via XL9535
+        esp_io_expander_tca95xx_16bit # XL9535-compatible 16-bit expander
         esp_lcd_touch
         esp_lcd_touch_cst816s
         esp_lvgl_port
         lvgl
     EMBED_FILES "fonts/Michroma-Regular.ttf"
 )
+
+if(MGF_LILYGO_T_RGB_V2)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE MGF_LILYGO_T_RGB_V2=1)
+endif()

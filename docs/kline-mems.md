@@ -72,7 +72,7 @@ Tables complètes des octets : `domain/mems_protocol.c`.
 
 ## Câblage (à confirmer sur la carte)
 
-La carte Waveshare **n'a pas** de transceiver K-line. Il faut un module externe
+La carte LILYGO **n'a pas** de transceiver K-line. Il faut un module externe
 (L9637D ou équivalent) entre la K-line du connecteur diagnostic et deux GPIO du
 S3. Brochage par défaut dans `app_main.c` :
 
