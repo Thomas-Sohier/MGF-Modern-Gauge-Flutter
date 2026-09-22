@@ -70,8 +70,8 @@ Les macros amont `BOARD_TFT_CS=3`, `MOSI=4`, `SCLK=5`, `RST=6` désignent en pra
 
 ## Conflits connus avec le projet
 
-- GPIO17 et GPIO18, envisagés pour la K-line dans le projet, sont des données LCD.
-- GPIO4 est utilisé par la mesure batterie.
-- GPIO8/GPIO48 doivent rester en I²C pour le tactile et l’expander.
-- GPIO43/GPIO44 ne sont pas des UART librement disponibles malgré leur rôle UART0 possible.
+- GPIO17 et GPIO18, envisagés pour la K-line dans l’ancien code, sont des données LCD et sont maintenant refusés à la compilation.
+- Le profil K-line réutilise GPIO40 (TX, ancienne CMD) et GPIO38 (RX, ancien DAT0) ; **SDMMC reste désactivé et aucun code ne doit en prendre la possession**.
+- GPIO39 (ancienne CLK), GPIO4 (mesure batterie), GPIO8/GPIO48 (I²C tactile/expander), GPIO1 (IRQ tactile), GPIO43/GPIO44 (RGB malgré leur rôle UART0 possible), USB, BOOT et les autres lignes d’écran sont réservés.
+- `main/infrastructure/kline_board_config.h` centralise les valeurs de compilation et refuse les conflits LCD/I²C/ressources connues.
 - Le portage doit considérer tous les GPIO comme occupés et prévoir un expander ou un contrôleur externe pour toute nouvelle E/S.

@@ -40,5 +40,4 @@ Dossier de référence matériel pour porter le projet sur la **LILYGO T-RGB 2.1
 - CST820 à `0x15` via le pilote CST816S compatible et LVGL RGB565 en PSRAM ;
 - rétroéclairage discret AW9364 via `board_display_backlight_set_brightness(0..16)`.
 
-Les broches K-line provisoires GPIO17/GPIO18 sont utilisées par le bus LCD LILYGO et
-nécessitent une réaffectation avant l’activation de cette source sur matériel.
+Les anciennes broches K-line GPIO17/GPIO18 sont utilisées par le bus LCD LILYGO. Le profil de compilation les remplace par GPIO40 (TX) et GPIO38 (RX), anciennes lignes microSD, et désactive explicitement SDMMC. Les contrôles de `main/infrastructure/kline_board_config.h` refusent les broches LCD, I²C et autres ressources connues.

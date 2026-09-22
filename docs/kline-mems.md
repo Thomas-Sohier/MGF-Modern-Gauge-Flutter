@@ -70,30 +70,48 @@ Le réveil est une primitive **matérielle** : le décorateur l'invoque via
 
 Tables complètes des octets : `domain/mems_protocol.c`.
 
-## Câblage (à confirmer sur la carte)
+## Câblage LILYGO T-RGB 2.1
 
-La carte LILYGO **n'a pas** de transceiver K-line. Il faut un module externe
-(L9637D ou équivalent) entre la K-line du connecteur diagnostic et deux GPIO du
-S3. Brochage par défaut dans `app_main.c` :
+La carte LILYGO **n'a pas** de transceiver K-line. La K-line du connecteur
+véhicule doit passer par un transceiver automobile externe (L9637D, MC33290 ou
+équivalent qualifié) entre la ligne 12 V et deux niveaux logiques 3,3 V. Ne
+jamais raccorder la K-line directement à l'ESP32 ; prévoir les protections
+automobiles indiquées dans [`specs/lilygo-t-rgb-2.1/future-kline-rtc.md`](../specs/lilygo-t-rgb-2.1/future-kline-rtc.md).
+
+Le profil LILYGO réutilise les anciennes broches microSD :
 
 | Signal | GPIO (défaut) |
 |---|---|
-| UART TX → transceiver | `MGF_KLINE_TX_GPIO` = 17 |
-| UART RX ← transceiver | `MGF_KLINE_RX_GPIO` = 18 |
-| UART | `UART_NUM_1` |
+| UART TX → transceiver | `MGF_KLINE_TX_GPIO` = **40** (microSD CMD) |
+| UART RX ← transceiver | `MGF_KLINE_RX_GPIO` = **38** (microSD DAT0) |
+| UART | `MGF_KLINE_UART_NUM` = **1** |
 
-Si le montage boucle le TX sur le RX (fil unique), mettre `local_echo = true`
-dans la config (`kline_uart_config_t`) pour que le transport rejette l'écho
-local ; la couche session ne voit alors que l'écho renvoyé par l'ECU.
+**SDMMC est explicitement désactivé et aucune initialisation/prise de
+possession SDMMC ne doit être ajoutée** : GPIO38 et GPIO40 appartiennent au
+transport K-line dans ce profil. GPIO39 (microSD CLK), les lignes RGB de
+l'écran, l'I²C GPIO8/GPIO48, l'IRQ tactile et les autres ressources réservées
+sont refusées par des contrôles de compilation dans
+`infrastructure/kline_board_config.h`.
 
-## Activation
+Si le montage boucle le TX sur le RX (fil unique), passer
+`-DMGF_KLINE_LOCAL_ECHO=1` pour que le transport rejette l'écho local ; la
+couche session ne voit alors que l'écho renvoyé par l'ECU.
 
-Source ECU choisie à la compilation par `MGF_USE_MEMS_KLINE` (défaut `0` =
-simulateur) :
+## Activation et configuration de compilation
+
+La source ECU reste le simulateur par défaut (`MGF_USE_MEMS_KLINE=0`). Activer
+explicitement le matériel réel et, si nécessaire, modifier les ressources :
 
 ```bash
-idf.py build -DMGF_USE_MEMS_KLINE=1   # via CMake cache, ou éditer app_main.c
+idf.py -D MGF_USE_MEMS_KLINE=1 \
+       -D MGF_KLINE_TX_GPIO=40 -D MGF_KLINE_RX_GPIO=38 build
 ```
+
+Les valeurs sont des variables CMake persistantes du composant. Les options
+supportées sont `MGF_USE_MEMS_KLINE`, `MGF_KLINE_UART_NUM`,
+`MGF_KLINE_TX_GPIO`, `MGF_KLINE_RX_GPIO`, `MGF_KLINE_LOCAL_ECHO` et
+`MGF_MEMS_VARIANT`. Le header vérifie au préprocesseur les conflits avec les
+broches LCD/I²C et les ressources réservées de la T-RGB.
 
 Variante ECU par `MGF_MEMS_VARIANT` (`MEMS_VARIANT_1_6` par défaut,
 `MEMS_VARIANT_1_9` pour le réveil 5 bauds).

@@ -9,10 +9,11 @@
 
 // Transport K-line pour ESP32-S3 au-dessus du pilote UART ESP-IDF.
 //
-// ⚠️ Matériel requis : la carte LILYGO n'embarque PAS de transceiver K-line.
-// La K-line (ISO-9141, 12 V, un seul fil bidirectionnel) doit passer par un
-// transceiver dédié (ex. ST L9637D) qui expose deux lignes 3.3 V TX/RX vers le
-// S3. Câbler K-line <-> transceiver <-> (tx_gpio, rx_gpio).
+// ⚠️ AVERTISSEMENT MATÉRIEL OBLIGATOIRE : la LILYGO T-RGB n'embarque pas de
+// transceiver K-line. La ligne ISO-9141 12 V ne doit JAMAIS être raccordée
+// directement à l'ESP32. Utiliser un transceiver automobile externe (L9637D,
+// MC33290 ou équivalent qualifié) avec protections contre les transitoires,
+// exposant des lignes TX/RX logiques compatibles 3,3 V.
 //
 // Écho local : selon le montage, l'UART peut relire ses propres octets émis
 // (fil unique bouclé). Mettre `local_echo = true` pour que le transport rejette

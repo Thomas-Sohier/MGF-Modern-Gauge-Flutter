@@ -20,28 +20,14 @@
 #include "ui/navigation/dashboard_navigator.h"
 #include "ui/fonts/ui_fonts.h"
 #include "infrastructure/fake_ecu.h"
+#include "infrastructure/kline_board_config.h"
 #include "app/dashboard_controller.h"
-
-// Source des données : 0 = simulateur interne (défaut), 1 = ECU MEMS réelle sur
-// K-line (UART + transceiver externe, cf. infrastructure/kline_uart_esp32.h).
-#ifndef MGF_USE_MEMS_KLINE
-#define MGF_USE_MEMS_KLINE 0
-#endif
 
 #if MGF_USE_MEMS_KLINE
 #include "infrastructure/mems_ecu.h"
-// Brochage du transceiver K-line — À CONFIRMER sur la carte réelle.
-#define MGF_KLINE_UART    UART_NUM_1
-#define MGF_KLINE_TX_GPIO 17
-#define MGF_KLINE_RX_GPIO 18
 // Variante ECU : MEMS_VARIANT_1_6 (direct) ou MEMS_VARIANT_1_9 (réveil 5 bauds).
 #ifndef MGF_MEMS_VARIANT
-#define MGF_MEMS_VARIANT  MEMS_VARIANT_1_6
-#endif
-// La 1.9 exige un écho local sur la ligne pendant le slow init ; le montage à
-// fil unique bouclé est courant, on active alors le rejet de l'écho local.
-#ifndef MGF_KLINE_LOCAL_ECHO
-#define MGF_KLINE_LOCAL_ECHO false
+#define MGF_MEMS_VARIANT MEMS_VARIANT_1_6
 #endif
 #endif
 
@@ -159,11 +145,11 @@ void app_main(void) {
 #if MGF_USE_MEMS_KLINE
     const mems_ecu_config_t mems_cfg = {
         .kline = {
-            .uart_num = MGF_KLINE_UART,
+            .uart_num = MGF_KLINE_UART_NUM,
             .tx_gpio = MGF_KLINE_TX_GPIO,
             .rx_gpio = MGF_KLINE_RX_GPIO,
             .baud_rate = 9600,
-            .local_echo = MGF_KLINE_LOCAL_ECHO,
+            .local_echo = MGF_KLINE_LOCAL_ECHO != 0,
         },
         .variant = MGF_MEMS_VARIANT,
         .poll_period_ms = 200,

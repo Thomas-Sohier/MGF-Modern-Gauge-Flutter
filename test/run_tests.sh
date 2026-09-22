@@ -25,3 +25,25 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/main/domain/mems_session.c" \
     -lm -o "$BUILD_DIR/test_mems"
 "$BUILD_DIR/test_mems"
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    "$ROOT/test/test_kline_config.c" -o "$BUILD_DIR/test_kline_config"
+"$BUILD_DIR/test_kline_config"
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    -DKLINE_CONFIG_EXPECT_TX=22 -DKLINE_CONFIG_EXPECT_RX=23 \
+    -DMGF_KLINE_TX_GPIO=22 -DMGF_KLINE_RX_GPIO=23 \
+    "$ROOT/test/test_kline_config.c" -o "$BUILD_DIR/test_kline_config_override"
+"$BUILD_DIR/test_kline_config_override"
+
+# Known LILYGO display/I2C resources must fail at compile time.  This catches
+# accidental regressions in the board resource policy without requiring ESP-IDF.
+for bad_gpio in 17 18 8 48; do
+    if gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+        -DMGF_KLINE_TX_GPIO="$bad_gpio" -DMGF_KLINE_RX_GPIO=22 \
+        "$ROOT/test/test_kline_config.c" -o "$BUILD_DIR/test_kline_config_invalid" \
+        >"$BUILD_DIR/test_kline_config_invalid.log" 2>&1; then
+        echo "expected GPIO$bad_gpio resource conflict to fail" >&2
+        exit 1
+    fi
+done

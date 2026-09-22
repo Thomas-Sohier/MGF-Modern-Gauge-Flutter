@@ -1,6 +1,10 @@
 # ── Cible : ESP32-S3R8 (LILYGO T-RGB 2.1 Full Circle H597) ──────────────────
 CONFIG_IDF_TARGET="esp32s3"
 
+# Le profil K-line reprend GPIO40/GPIO38, anciennes CMD/DAT0 microSD.
+# SDMMC n'est volontairement pas activé ; les pins sont possédées par l'UART.
+# Les sélecteurs MGF_KLINE_* sont des variables CMake dans main/CMakeLists.txt.
+
 # ── PSRAM octale 8 Mo @ 80 MHz (framebuffers RGB + buffers LVGL) ──────────────
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y

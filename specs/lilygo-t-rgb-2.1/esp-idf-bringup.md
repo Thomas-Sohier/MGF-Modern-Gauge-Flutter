@@ -94,9 +94,8 @@ I²C master ESP-IDF, le composant TCA95xx 16-bit (compatible XL9535), le SPI 3 f
 `main/infrastructure/lilygo_st7701_init.h`. Le profil original est la valeur par
 défaut ; passer `-DMGF_LILYGO_T_RGB_V2=1` à CMake/`idf.py` sélectionne V2.
 
-- Les broches K-line GPIO17/GPIO18 entrent en conflit avec le LCD.
-- Le pilote officiel contient deux révisions non auto-détectables : le marquage
-  de la carte et l'image réelle doivent confirmer le profil choisi.
+- L'ancien brochage K-line GPIO17/GPIO18 entre en conflit avec le LCD ; le profil firmware utilise GPIO40/TX et GPIO38/RX, anciennes lignes microSD, avec SDMMC désactivé.
+- Le pilote officiel contient deux révisions non auto-détectables : le marquage de la carte et l'image réelle doivent confirmer le profil choisi.
 - Le schéma date de 2022 et peut ne pas refléter V2.
 - Le CST820 n’a pas de datasheet officielle jointe au dépôt LILYGO ; la compatibilité
   CST816 est empirique/officielle au niveau logiciel. Valider IRQ, suivi de doigt,

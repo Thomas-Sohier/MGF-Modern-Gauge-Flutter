@@ -1,8 +1,12 @@
-# Extension future : K-line et horloge RTC sauvegardée
+# K-line LILYGO et extension RTC future
 
-Cette architecture permet d’ajouter simultanément une interface automobile K-line et une horloge conservant l’heure pendant les coupures d’alimentation, au prix de l’abandon du lecteur microSD.
+L'adaptation K-line de ce document est maintenant implémentée dans le firmware :
+GPIO40 est le TX, GPIO38 le RX, et le lecteur microSD/SDMMC reste désactivé pour
+libérer ces lignes. L'horloge RTC, la NVS et le bring-up écran LILYGO restent
+hors de cette branche.
 
-> Cette proposition reste à valider sur la carte réelle et ne fait pas encore partie de l’implémentation.
+> La partie K-line reste à valider sur carte réelle. La proposition RTC/NVS
+> ci-dessous est documentaire et n'est pas une demande d'implémentation.
 
 ## Architecture proposée
 
@@ -33,7 +37,10 @@ GPIO39, ancien clock microSD, resterait potentiellement disponible, sous réserv
 | RTC INT/SQW | non connecté initialement | évite de consommer un GPIO |
 | microSD CLK | GPIO39 libéré | réserve éventuelle |
 
-Le firmware ne devra jamais initialiser SDMMC lorsque GPIO38 et GPIO40 sont utilisés par l’UART K-line.
+Le firmware n'initialise ni ne possède jamais SDMMC lorsque GPIO38 et GPIO40
+sont utilisés par l'UART K-line. Cette règle est verrouillée par
+`MGF_LILYGO_SDMMC_ENABLED=0` dans la configuration CMake et par un contrôle du
+préprocesseur.
 
 ## Interface K-line obligatoire
 
@@ -103,7 +110,7 @@ Règles d’écriture :
 
 Avec des réglages modifiés occasionnellement et le wear leveling de la NVS, l’endurance de la flash est très largement suffisante pour la durée de vie prévue de l’appareil. LittleFS ne sera envisagé que si de vrais fichiers volumineux deviennent nécessaires.
 
-## Comportement logiciel envisagé
+## Comportement logiciel RTC envisagé (hors périmètre actuel)
 
 Au démarrage :
 

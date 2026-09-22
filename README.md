@@ -50,6 +50,24 @@ XL9535 + port LVGL) est fait dans `main/infrastructure/board_display.c` à parti
 `esp_lcd` standard et du brochage officiel LILYGO. Les profils original et V2
 sont sélectionnables par `-DMGF_LILYGO_T_RGB_V2=1`.
 
+## Profil K-line LILYGO T-RGB 2.1
+
+Le transport MEMS réel peut aussi être câblé sur la LILYGO T-RGB H597 via un
+transceiver automobile externe : GPIO40 = TX et GPIO38 = RX. Ces broches
+remplacent microSD CMD/DAT0 ; SDMMC n'est pas initialisé ni possédé par le
+firmware. Le simulateur ECU reste le défaut.
+
+```bash
+idf.py -D MGF_USE_MEMS_KLINE=1 -D MGF_KLINE_TX_GPIO=40 \
+       -D MGF_KLINE_RX_GPIO=38 build
+```
+
+Les paramètres et les garde-fous de ressources sont documentés dans
+[`docs/kline-mems.md`](docs/kline-mems.md) et
+`main/infrastructure/kline_board_config.h`. **La K-line automobile ne doit
+jamais être reliée directement à l'ESP32** : un transceiver externe adapté et
+les protections automobiles sont obligatoires.
+
 ## Build & flash
 
 Nécessite **ESP-IDF ≥ 5.3** installé et sourcé (`. $IDF_PATH/export.sh`).

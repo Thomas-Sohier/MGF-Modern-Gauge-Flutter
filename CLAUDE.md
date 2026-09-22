@@ -25,6 +25,16 @@ piloté par des données ECU simulées. Le style de référence est **« amber �
 > ST7701S upstream sont conservées dans `main/infrastructure/lilygo_st7701_init.h`.
 > `idf_component.yml`, `sdkconfig.defaults`, `main/CMakeLists.txt` et `app_main.c` ciblent le S3.
 >
+### Profil de ressources K-line LILYGO T-RGB 2.1
+
+L'adaptation K-line dédiée à la LILYGO H597 est indépendante du bring-up écran
+Waveshare conservé ci-dessus : GPIO40 = TX, GPIO38 = RX, UART1 par défaut.
+GPIO38/40 reprennent microSD DAT0/CMD ; **SDMMC n'est ni initialisé ni possédé**.
+Les valeurs CMake (`MGF_KLINE_*`) et les garde-fous LCD/I²C/réservés sont dans
+`main/infrastructure/kline_board_config.h`. Le simulateur ECU reste activé par
+défaut (`MGF_USE_MEMS_KLINE=0`). Un transceiver automobile externe et ses
+protections sont obligatoires ; la K-line 12 V ne doit jamais aller sur un GPIO.
+
 > ⚠️ **Non compilé/validé sur matériel** (ESP-IDF absent de l'environnement de
 > génération). Vérifier sur la carte le marquage original/V2, les deux profils
 > (séquence, ordre RGB et timings), l'adresse XL9535 `0x20`, l'orientation CST820
@@ -64,6 +74,7 @@ main/
   ecu_data.h        # struct ecu_data_t (instantané ECU)
   domain/ecu_source.h # abstraction de lecture par copie
   fake_ecu.[ch]     # source de données simulée + adaptateur ECU
+  infrastructure/kline_board_config.h # ressources K-line LILYGO, garde-fous
   app/dashboard_controller.[ch] # orchestration source -> écran
   ui_theme.[ch]     # palette ambre partagée
   ui/widgets/       # widgets de valeurs/indicateurs ambre
