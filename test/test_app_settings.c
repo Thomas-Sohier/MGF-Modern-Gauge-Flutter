@@ -34,6 +34,16 @@ static void test_validation_boundaries(void) {
     app_settings_defaults(&settings);
     settings.units = APP_SETTINGS_UNITS_COUNT;
     assert(!app_settings_is_valid(&settings));
+
+    app_settings_defaults(&settings);
+    settings.selected_page = (app_settings_page_t)-1;
+    assert(!app_settings_is_valid(&settings));
+    app_settings_defaults(&settings);
+    settings.theme = (app_settings_theme_t)-1;
+    assert(!app_settings_is_valid(&settings));
+    app_settings_defaults(&settings);
+    settings.units = (app_settings_units_t)-1;
+    assert(!app_settings_is_valid(&settings));
 }
 
 static void test_equality(void) {

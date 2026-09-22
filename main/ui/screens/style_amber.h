@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lvgl.h"
+#include "domain/app_settings.h"
 #include "domain/ecu_data.h"
 
 // Variante visuelle « ambre » de l'écran RPM (cf. specs/image, photo 1) :
@@ -14,6 +15,7 @@ typedef struct amber_screen_s amber_screen_t;
 // sans padding. Géométrie mise à l'échelle à la création ; recréer l'écran
 // après redimensionnement du parent. Les polices restent calibrées pour 480 px.
 amber_screen_t *amber_screen_create(lv_obj_t *parent);
+void amber_screen_set_units(amber_screen_t *scr, app_settings_units_t units);
 void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d);
 
 // Détruit l'écran et libère son état. À appeler depuis le thread LVGL avant de

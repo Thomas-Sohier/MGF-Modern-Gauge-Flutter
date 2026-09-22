@@ -202,6 +202,17 @@ void dashboard_navigator_set_page_changed_callback(
     navigator->page_changed_context = context;
 }
 
+void dashboard_navigator_set_units(dashboard_navigator_t *navigator,
+                                   app_settings_units_t units) {
+    if (navigator == NULL || units >= APP_SETTINGS_UNITS_COUNT) return;
+    for (size_t i = 0; i < navigator->count; i++) {
+        if (navigator->pages[i].descriptor.settings_changed != NULL) {
+            navigator->pages[i].descriptor.settings_changed(
+                navigator->pages[i].descriptor.context, units);
+        }
+    }
+}
+
 size_t dashboard_navigator_current(const dashboard_navigator_t *navigator) {
     return navigator == NULL ? 0 : navigator->current;
 }

@@ -19,14 +19,31 @@ The intended lifecycle is:
 3. Give the loaded snapshot to `app/settings_coordinator.[ch]`. The application
    restores `selected_page` after registering dashboard pages and registers the
    navigator's page-change observer.
-4. Route setting changes through the coordinator's typed setters. A 3-second
-   quiet period batches changes, and a failed save remains dirty for retry.
+4. Route local setting changes through `app/settings_runtime.[ch]`. The runtime
+   applies them in the LVGL task and delegates persistence to the coordinator;
+   the 3-second quiet period batches changes, and a failed save remains dirty
+   for retry.
 
-The coordinator is independent of LVGL and NVS, so future brightness, theme, or
-units controls can use the same boundary without placing storage calls in UI
-code. `settings_store_save()` remains the only NVS adapter; it skips both
-`nvs_set_*` calls and `nvs_commit()` when the snapshot is unchanged. It must not
-be called from the ECU/display update loop. No settings UI is included yet.
+`settings_runtime_read()` is used by the optional BLE service. The NimBLE
+service queues accepted writes in its own protected single-slot hand-off; the
+LVGL timer consumes that slot through `ble_config_service_take_settings_update`,
+applies brightness, units and page, then lets the coordinator save it. The
+runtime's `settings_runtime_submit()` remains the equivalent public hand-off for
+other transports. No callback in the NimBLE task calls LVGL or NVS. BLE writes
+therefore acknowledge acceptance into RAM; the NVS commit is asynchronous and
+may still be retried.
+
+Brightness is mapped from 0–100% to the AW9364's 0–16 discrete levels. Units
+currently update temperatures (°C/°F) and MAP pressure (kPa/psi) on the amber
+RPM, temperatures and admission pages; RPM, voltage, percentages and timing
+values are unchanged. The theme field remains validated and persisted, but the
+only compiled theme is amber. There is still no dedicated on-device settings
+screen; the public runtime setters are the application boundary for one.
+
+The coordinator remains independent of LVGL and NVS. `settings_store_save()`
+remains the only NVS adapter; it skips both `nvs_set_*` calls and `nvs_commit()`
+when the snapshot is unchanged. It is called by the LVGL settings timer, not by
+the ECU/display update loop or the NimBLE task.
 
 ## Bluetooth data
 

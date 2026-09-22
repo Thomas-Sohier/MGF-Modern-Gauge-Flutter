@@ -3,12 +3,15 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "domain/app_settings.h"
 #include "domain/ecu_data.h"
 #include "lvgl.h"
 
 typedef void (*dashboard_page_update_cb_t)(void *context,
                                             const ecu_data_t *data);
 typedef void (*dashboard_page_destroy_cb_t)(void *context);
+typedef void (*dashboard_page_settings_cb_t)(
+    void *context, app_settings_units_t units);
 typedef void (*dashboard_page_changed_cb_t)(void *context, size_t page_index);
 
 typedef struct {
@@ -16,6 +19,7 @@ typedef struct {
     void *context;
     dashboard_page_update_cb_t update;
     dashboard_page_destroy_cb_t destroy;
+    dashboard_page_settings_cb_t settings_changed;
     // 0 désactive les mises à jour ECU après l'activation : la page est
     // événementielle (par exemple musique ou navigation statique).
     uint32_t update_period_ms;
@@ -44,6 +48,10 @@ bool dashboard_navigator_select_page(dashboard_navigator_t *navigator,
 void dashboard_navigator_set_page_changed_callback(
     dashboard_navigator_t *navigator, dashboard_page_changed_cb_t callback,
     void *context);
+// Propagates the unit preference to pages that display physical quantities.
+// Must run in the LVGL task (or under its platform lock).
+void dashboard_navigator_set_units(dashboard_navigator_t *navigator,
+                                   app_settings_units_t units);
 size_t dashboard_navigator_current(const dashboard_navigator_t *navigator);
 size_t dashboard_navigator_count(const dashboard_navigator_t *navigator);
 const char *dashboard_navigator_current_name(

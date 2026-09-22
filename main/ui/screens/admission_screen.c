@@ -102,6 +102,9 @@ struct admission_screen_s {
     int32_t displayed[5];
     int32_t map_bucket;
     int32_t throttle_bucket;
+    app_settings_units_t units;
+    ecu_data_t latest_data;
+    bool has_latest_data;
 };
 
 static void draw_map_ring(lv_layer_t *layer, const ui_layout_t *layout,
@@ -273,6 +276,23 @@ static void text_destroy(amber_text_t *text) {
     text->shadow = NULL;
 }
 
+static float temperature_display(float celsius, app_settings_units_t units) {
+    return units == APP_SETTINGS_UNITS_IMPERIAL
+               ? celsius * 9.0f / 5.0f + 32.0f : celsius;
+}
+
+static float pressure_display(float kpa, app_settings_units_t units) {
+    return units == APP_SETTINGS_UNITS_IMPERIAL ? kpa * 0.145038f : kpa;
+}
+
+static const char *pressure_unit(app_settings_units_t units) {
+    return units == APP_SETTINGS_UNITS_IMPERIAL ? "psi" : "kPa";
+}
+
+static const char *temperature_unit(app_settings_units_t units) {
+    return units == APP_SETTINGS_UNITS_IMPERIAL ? "°F" : "°C";
+}
+
 static void set_metric_text(admission_screen_t *scr, int index,
                             const char *format, float value) {
     snprintf(scr->metric_text[index], sizeof(scr->metric_text[index]),
@@ -318,8 +338,8 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
                                         scr->status_text, 220.0f);
     scr->hero = text_create(scr->root, hero_font, CX, HERO_Y, 170, 2,
                             scr->hero_text);
-    scr->hero_unit = amber_ui_label_create(scr->root, value_font, bright,
-                                           "kPa", 70.0f);
+    scr->hero_unit = amber_ui_label_create(
+        scr->root, value_font, bright, pressure_unit(scr->units), 70.0f);
     scr->hero_label = amber_ui_label_create(scr->root, value_font, bright,
                                             "PRESSION MAP", 190.0f);
 
@@ -372,8 +392,21 @@ fail:
     return NULL;
 }
 
+void admission_screen_set_units(admission_screen_t *scr,
+                                app_settings_units_t units) {
+    if (scr == NULL || units >= APP_SETTINGS_UNITS_COUNT || scr->units == units) {
+        return;
+    }
+    scr->units = units;
+    lv_label_set_text_static(scr->hero_unit, pressure_unit(units));
+    scr->has_snapshot = false;
+    if (scr->has_latest_data) admission_screen_update(scr, &scr->latest_data);
+}
+
 void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
     if (scr == NULL || data == NULL || scr->canvas == NULL) return;
+    scr->latest_data = *data;
+    scr->has_latest_data = true;
 
     const bool connected = data->connected;
     const float map_kpa = connected && isfinite(data->map_sensor_kpa)
@@ -384,12 +417,14 @@ void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
         ? amber_clampf(data->throttle_pot_voltage, 0.0f, 5.0f) : 0.0f;
     const float intake = connected && isfinite(data->intake_air_temp)
         ? data->intake_air_temp : 0.0f;
+    const float map_display = pressure_display(map_kpa, scr->units);
+    const float intake_display = temperature_display(intake, scr->units);
     const int32_t displayed[5] = {
-        connected ? (int32_t)lroundf(map_kpa) : INT32_MIN,
+        connected ? (int32_t)lroundf(map_display) : INT32_MIN,
         connected ? (int32_t)lroundf(throttle) : INT32_MIN,
         connected ? (int32_t)lroundf(tps * 100.0f) : INT32_MIN,
-        connected ? (int32_t)lroundf(intake) : INT32_MIN,
-        connected ? (int32_t)lroundf(map_kpa) : INT32_MIN,
+        connected ? (int32_t)lroundf(intake_display) : INT32_MIN,
+        connected ? (int32_t)lroundf(map_display) : INT32_MIN,
     };
     const int32_t map_bucket = (int32_t)lroundf(map_kpa * 1000.0f);
     const int32_t throttle_bucket = (int32_t)lroundf(throttle * 1000.0f);
@@ -417,13 +452,17 @@ void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
         set_unavailable(scr);
         snprintf(scr->status_text, sizeof(scr->status_text), "HORS LIGNE");
     } else {
-        snprintf(scr->hero_text, sizeof(scr->hero_text), "%.0f", scr->map_kpa);
+        snprintf(scr->hero_text, sizeof(scr->hero_text), "%.0f", map_display);
         set_metric_text(scr, METRIC_THROTTLE, "%.0f %%", scr->throttle);
         set_metric_text(scr, METRIC_TPS, "%.2f V", scr->throttle_pot_voltage);
-        set_metric_text(scr, METRIC_INTAKE, "%.0f °C", scr->intake_air_temp);
+        snprintf(scr->metric_text[METRIC_INTAKE],
+                 sizeof(scr->metric_text[METRIC_INTAKE]), "%.0f %s",
+                 intake_display, temperature_unit(scr->units));
         // La quatrième mesure garde la pression MAP sous forme compacte,
         // tandis que la valeur héroïque reste la lecture principale.
-        set_metric_text(scr, METRIC_MAP_AUX, "%.0f kPa", scr->map_kpa);
+        snprintf(scr->metric_text[METRIC_MAP_AUX],
+                 sizeof(scr->metric_text[METRIC_MAP_AUX]), "%.0f %s",
+                 map_display, pressure_unit(scr->units));
         snprintf(scr->status_text, sizeof(scr->status_text), "MOTEUR EN LIGNE");
     }
 

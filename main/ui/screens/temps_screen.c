@@ -87,6 +87,9 @@ struct temps_screen_s {
     int32_t arc_bucket[METRIC_COUNT];
     int32_t peak_display;
     bool any_danger_display;
+    app_settings_units_t units;
+    ecu_data_t latest_data;
+    bool has_latest_data;
 };
 
 static void draw_arc(lv_layer_t *layer, int32_t cx, int32_t cy,
@@ -104,6 +107,19 @@ static void draw_arc(lv_layer_t *layer, int32_t cx, int32_t cy,
     dsc.opa = LV_OPA_COVER;
     dsc.rounded = 0;
     lv_draw_arc(layer, &dsc);
+}
+
+static float temperature_display(float celsius, app_settings_units_t units) {
+    return units == APP_SETTINGS_UNITS_IMPERIAL
+               ? celsius * 9.0f / 5.0f + 32.0f : celsius;
+}
+
+static const char *temperature_unit(app_settings_units_t units) {
+    return units == APP_SETTINGS_UNITS_IMPERIAL ? "°F" : "°C";
+}
+
+static float metric_max_display(int index, app_settings_units_t units) {
+    return temperature_display(kMetrics[index].maximum, units);
 }
 
 static float clamp_progress(float value, float maximum) {
@@ -149,7 +165,8 @@ static void canvas_draw_cb(lv_event_t *event) {
     // Une jauge dominante pour l'eau : grande réserve ambre, sans aiguilles,
     // graduations ni séparateurs qui réduiraient la zone de lecture.
     const float coolant_progress = clamp_progress(
-        scr->values[METRIC_COOLANT], kMetrics[METRIC_COOLANT].maximum);
+        scr->values[METRIC_COOLANT],
+        metric_max_display(METRIC_COOLANT, scr->units));
     draw_progress_arc(layer, cx, oy + HERO_CY * k, HERO_R_OUT * k,
                       (HERO_R_OUT - HERO_R_IN) * k, HERO_START, HERO_END,
                       coolant_progress, dim, bright);
@@ -157,13 +174,14 @@ static void canvas_draw_cb(lv_event_t *event) {
     // Deux jauges principales secondaires. Elles sont assez espacées pour
     // garder leurs valeurs et unités lisibles sur la dalle ronde.
     const float oil_progress = clamp_progress(
-        scr->values[METRIC_OIL], kMetrics[METRIC_OIL].maximum);
+        scr->values[METRIC_OIL], metric_max_display(METRIC_OIL, scr->units));
     draw_progress_arc(layer, ox + CARD_LEFT * k, oy + CARD_CY * k,
                       CARD_R_OUT * k, (CARD_R_OUT - CARD_R_IN) * k,
                       CARD_START, CARD_END, oil_progress, dim, bright);
 
     const float intake_progress = clamp_progress(
-        scr->values[METRIC_INTAKE], kMetrics[METRIC_INTAKE].maximum);
+        scr->values[METRIC_INTAKE],
+        metric_max_display(METRIC_INTAKE, scr->units));
     draw_progress_arc(layer, ox + CARD_RIGHT * k, oy + CARD_CY * k,
                       CARD_R_OUT * k, (CARD_R_OUT - CARD_R_IN) * k,
                       CARD_START, CARD_END, intake_progress, dim, bright);
@@ -231,8 +249,8 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
                                         "TEMPERATURES", 0.0f);
     scr->hero_value = amber_ui_label_create(scr->overlay, large, bright,
                                             scr->hero_text, 0.0f);
-    scr->hero_unit = amber_ui_label_create(scr->overlay, caption, bright, "°C",
-                                           0.0f);
+    scr->hero_unit = amber_ui_label_create(
+        scr->overlay, caption, bright, temperature_unit(scr->units), 0.0f);
     scr->hero_name = amber_ui_label_create(scr->overlay, caption, bright, "EAU",
                                            0.0f);
     scr->status = amber_ui_label_create(scr->overlay, caption, dim,
@@ -254,7 +272,7 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
         scr->metric_value[i] = amber_ui_label_create(
             scr->overlay, large, dim, scr->metric_text[i], 0.0f);
         scr->metric_unit[i] = amber_ui_label_create(
-            scr->overlay, caption, dim, "°C", 0.0f);
+            scr->overlay, caption, dim, temperature_unit(scr->units), 0.0f);
         scr->metric_name[i] = amber_ui_label_create(
             scr->overlay, caption, bright, kMetrics[i].name, 0.0f);
         if (scr->metric_value[i] == NULL || scr->metric_unit[i] == NULL ||
@@ -272,8 +290,23 @@ fail:
     return NULL;
 }
 
+void temps_screen_set_units(temps_screen_t *scr, app_settings_units_t units) {
+    if (scr == NULL || units >= APP_SETTINGS_UNITS_COUNT || scr->units == units) {
+        return;
+    }
+    scr->units = units;
+    lv_label_set_text_static(scr->hero_unit, temperature_unit(units));
+    for (int i = METRIC_OIL; i <= METRIC_INTAKE; i++) {
+        lv_label_set_text_static(scr->metric_unit[i], temperature_unit(units));
+    }
+    scr->has_snapshot = false;
+    if (scr->has_latest_data) temps_screen_update(scr, &scr->latest_data);
+}
+
 void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
     if (scr == NULL || data == NULL || scr->canvas == NULL) return;
+    scr->latest_data = *data;
+    scr->has_latest_data = true;
 
     const float raw_values[METRIC_COUNT] = {
         data->coolant_temp,
@@ -290,15 +323,18 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
 
     for (int i = 0; i < METRIC_COUNT; i++) {
         const float raw = raw_values[i];
+        const float display = temperature_display(raw, scr->units);
         next_available[i] = data->connected && isfinite(raw);
-        next_displayed[i] = next_available[i] ? (int32_t)lroundf(raw) : INT32_MIN;
+        next_displayed[i] = next_available[i]
+            ? (int32_t)lroundf(display) : INT32_MIN;
         next_arc_bucket[i] = next_available[i]
-            ? (int32_t)lroundf(clamp_progress(raw, kMetrics[i].maximum) * 1000.0f)
+            ? (int32_t)lroundf(clamp_progress(
+                  display, metric_max_display(i, scr->units)) * 1000.0f)
             : 0;
         next_danger[i] = next_available[i] && kMetrics[i].danger > 0.0f &&
                          raw >= kMetrics[i].danger;
         any_danger = any_danger || next_danger[i];
-        if (next_available[i] && raw > peak) peak = raw;
+        if (next_available[i] && display > peak) peak = display;
     }
     peak_display = (int32_t)lroundf(peak);
 
@@ -323,21 +359,22 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
     bool text_changed = false;
     for (int i = 0; i < METRIC_COUNT; i++) {
         const float raw = raw_values[i];
+        const float display = temperature_display(raw, scr->units);
         const bool metric_changed = !scr->has_snapshot ||
             scr->available[i] != next_available[i] ||
             scr->displayed[i] != next_displayed[i];
         scr->available[i] = next_available[i];
-        scr->values[i] = scr->available[i] ? raw : 0.0f;
+        scr->values[i] = scr->available[i] ? display : 0.0f;
         scr->danger[i] = next_danger[i];
         scr->displayed[i] = next_displayed[i];
         scr->arc_bucket[i] = next_arc_bucket[i];
         any_danger = any_danger || scr->danger[i];
-        if (scr->available[i] && raw > peak) peak = raw;
+        if (scr->available[i] && display > peak) peak = display;
 
         if (metric_changed) {
             if (scr->available[i]) {
                 snprintf(scr->metric_text[i], sizeof(scr->metric_text[i]),
-                         "%.0f", raw);
+                         "%.0f", display);
             } else {
                 snprintf(scr->metric_text[i], sizeof(scr->metric_text[i]), "--");
             }
@@ -374,10 +411,12 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
         snprintf(scr->summary_text, sizeof(scr->summary_text), "EN ATTENTE");
     } else if (any_danger) {
         snprintf(scr->status_text, sizeof(scr->status_text), "ALERTE THERMIQUE");
-        snprintf(scr->summary_text, sizeof(scr->summary_text), "MAX. %.0f °C", peak);
+        snprintf(scr->summary_text, sizeof(scr->summary_text), "MAX. %.0f %s",
+                 peak, temperature_unit(scr->units));
     } else {
         snprintf(scr->status_text, sizeof(scr->status_text), "TEMPERATURES OK");
-        snprintf(scr->summary_text, sizeof(scr->summary_text), "MAX. %.0f °C", peak);
+        snprintf(scr->summary_text, sizeof(scr->summary_text), "MAX. %.0f %s",
+                 peak, temperature_unit(scr->units));
     }
     lv_label_set_text_static(scr->status, scr->status_text);
     lv_label_set_text_static(scr->summary, scr->summary_text);

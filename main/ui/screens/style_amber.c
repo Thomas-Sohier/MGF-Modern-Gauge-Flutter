@@ -84,6 +84,9 @@ struct amber_screen_s {
     int32_t battery_display;
     int32_t oil_display;
     bool connected_display;
+    app_settings_units_t units;
+    ecu_data_t latest_data;
+    bool has_latest_data;
 };
 
 // Michroma n'existe qu'en une graisse : on simule le gras en superposant un
@@ -253,16 +256,34 @@ fail:
 
 // ── 5. SETTERS ───────────────────────────────────────────────────────────────
 
+static float temperature_display(float celsius, app_settings_units_t units) {
+    return units == APP_SETTINGS_UNITS_IMPERIAL
+               ? celsius * 9.0f / 5.0f + 32.0f : celsius;
+}
+
+void amber_screen_set_units(amber_screen_t *scr, app_settings_units_t units) {
+    if (scr == NULL || units >= APP_SETTINGS_UNITS_COUNT || scr->units == units) {
+        return;
+    }
+    scr->units = units;
+    scr->has_snapshot = false;
+    if (scr->has_latest_data) amber_screen_update(scr, &scr->latest_data);
+}
+
 void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     if (scr == NULL || d == NULL || scr->canvas == NULL || scr->value == NULL) return;
+    scr->latest_data = *d;
+    scr->has_latest_data = true;
 
+    const float coolant = temperature_display(d->coolant_temp, scr->units);
+    const float oil = temperature_display(d->oil_temp, scr->units);
     const int32_t rpm_display = isfinite(d->rpm) ? (int32_t)lroundf(d->rpm) : INT32_MIN;
-    const int32_t coolant_display = isfinite(d->coolant_temp)
-        ? (int32_t)lroundf(d->coolant_temp) : INT32_MIN;
+    const int32_t coolant_display = isfinite(coolant)
+        ? (int32_t)lroundf(coolant) : INT32_MIN;
     const int32_t battery_display = isfinite(d->battery_voltage)
         ? (int32_t)lroundf(d->battery_voltage * 10.0f) : INT32_MIN;
-    const int32_t oil_display = isfinite(d->oil_temp)
-        ? (int32_t)lroundf(d->oil_temp) : INT32_MIN;
+    const int32_t oil_display = isfinite(oil)
+        ? (int32_t)lroundf(oil) : INT32_MIN;
     const float progress = LV_CLAMP(0.0f, (d->rpm - RPM_MIN) /
                                     (RPM_MAX - RPM_MIN), 1.0f);
     const int32_t rpm_segment = isfinite(d->rpm)
@@ -282,7 +303,8 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
         amber_value_widget_set(scr->value, buf);
     }
     if (coolant_display != scr->coolant_display || !scr->has_snapshot) {
-        snprintf(buf, sizeof(buf), "%.0f°C", d->coolant_temp);
+        snprintf(buf, sizeof(buf), "%.0f°%c", coolant,
+                 scr->units == APP_SETTINGS_UNITS_IMPERIAL ? 'F' : 'C');
         amber_value_widget_set(scr->ind_value[M_COOLANT], buf);
     }
     if (battery_display != scr->battery_display || !scr->has_snapshot) {
@@ -290,7 +312,8 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
         amber_value_widget_set(scr->ind_value[M_BATTERY], buf);
     }
     if (oil_display != scr->oil_display || !scr->has_snapshot) {
-        snprintf(buf, sizeof(buf), "%.0f°C", d->oil_temp);
+        snprintf(buf, sizeof(buf), "%.0f°%c", oil,
+                 scr->units == APP_SETTINGS_UNITS_IMPERIAL ? 'F' : 'C');
         amber_value_widget_set(scr->ind_value[M_OIL], buf);
     }
     if (d->connected != scr->connected_display || !scr->has_snapshot) {
