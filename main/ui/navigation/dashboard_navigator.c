@@ -1,4 +1,5 @@
 #include "ui/navigation/dashboard_navigator.h"
+#include "ui/navigation/ui_instrumentation.h"
 
 #define DASHBOARD_MAX_PAGES 12
 
@@ -33,8 +34,10 @@ static void update_current(dashboard_navigator_t *navigator, bool force) {
     page->last_update_ms = lv_tick_get();
     page->has_presented_data = true;
     if (page->descriptor.update != NULL) {
+        const uint64_t started_at = ui_instrumentation_begin();
         page->descriptor.update(page->descriptor.context,
                                 &navigator->latest_data);
+        ui_instrumentation_end(page->descriptor.name, started_at);
     }
 }
 

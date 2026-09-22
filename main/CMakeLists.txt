@@ -14,6 +14,7 @@ idf_component_register(
         "infrastructure/mems_ecu.c"
         "ui/icons/dash_icons.c"
         "ui/navigation/dashboard_navigator.c"
+        "ui/navigation/ui_instrumentation.c"
         "ui/screens/style_amber.c"
         "ui/screens/boot_screen.c"
         "ui/screens/clock_screen.c"

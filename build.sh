@@ -24,6 +24,7 @@ CFLAGS=(-O2 -w -I"$SIM" -I"$MAIN" -I"$LVGL_DIR" -DLV_CONF_INCLUDE_SIMPLE)
 UI_SRCS=(
     "$SIM/main_sim.c"
     "$MAIN/app/dashboard_controller.c" "$MAIN/ui/navigation/dashboard_navigator.c"
+    "$MAIN/ui/navigation/ui_instrumentation.c"
     "$MAIN/ui/widgets/dual_arc_dial.c" "$MAIN/ui/screens/rpm_screen.c" "$MAIN/ui/screens/boot_screen.c" "$MAIN/infrastructure/fake_ecu.c"
     "$MAIN/ui/icons/gauge_icons.c" "$MAIN/ui/icons/dash_icons.c"
     "$MAIN/ui/screens/style_amber.c" "$MAIN/ui/screens/style_cream.c" "$MAIN/ui/themes/ui_theme.c"
