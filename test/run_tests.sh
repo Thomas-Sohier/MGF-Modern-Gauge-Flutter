@@ -10,6 +10,11 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
 "$BUILD_DIR/test_domain"
 
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    "$ROOT/test/test_app_settings.c" \
+    "$ROOT/main/domain/app_settings.c" -o "$BUILD_DIR/test_app_settings"
+"$BUILD_DIR/test_app_settings"
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_ui_layout.c" -lm -o "$BUILD_DIR/test_ui_layout"
 "$BUILD_DIR/test_ui_layout"
 

@@ -18,6 +18,7 @@ idf_component_register(
     SRCS
         "app_main.c"
         "app/dashboard_controller.c"
+        "domain/app_settings.c"
         "domain/mems_protocol.c"
         "domain/mems_reader.c"
         "domain/mems19_reader.c"
@@ -26,6 +27,7 @@ idf_component_register(
         "infrastructure/fake_ecu.c"
         "infrastructure/kline_uart_esp32.c"
         "infrastructure/mems_ecu.c"
+        "infrastructure/settings_store.c"
         "ui/icons/dash_icons.c"
         "ui/navigation/dashboard_navigator.c"
         "ui/navigation/ui_instrumentation.c"
@@ -50,6 +52,7 @@ idf_component_register(
     INCLUDE_DIRS "." "app" "domain" "infrastructure" "ui" "ui/screens" "ui/widgets" "ui/icons" "ui/fonts" "ui/themes"
     REQUIRES
         driver                        # GPIO + ESP-IDF compatibility types
+        nvs_flash                     # persistent app settings and BT stack data
         esp_lcd
         esp_lcd_st7701                 # ST7701S vendor init + RGB panel
         esp_lcd_panel_io_additions    # série 9 bits ST7701S via XL9535

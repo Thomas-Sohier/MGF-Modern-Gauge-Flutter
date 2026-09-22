@@ -1,4 +1,5 @@
 #include "esp_log.h"
+#include "esp_err.h"
 #include "lvgl.h"
 
 #include <stddef.h>
@@ -21,6 +22,8 @@
 #include "ui/fonts/ui_fonts.h"
 #include "infrastructure/fake_ecu.h"
 #include "infrastructure/kline_board_config.h"
+#include "infrastructure/settings_store.h"
+#include "domain/app_settings.h"
 #include "app/dashboard_controller.h"
 
 #if MGF_USE_MEMS_KLINE
@@ -77,6 +80,21 @@ DEFINE_PAGE_ADAPTER(admission)
 
 void app_main(void) {
     ESP_LOGI(TAG, "MGF Gauge LVGL — ecran RPM ambre (LILYGO T-RGB H597)");
+
+    // Les préférences sont chargées avant l'écran, sans bloquer le démarrage si
+    // la partition NVS est indisponible ou si ses données sont corrompues.
+    app_settings_t settings;
+    app_settings_defaults(&settings);
+    esp_err_t settings_err = settings_store_init();
+    if (settings_err == ESP_OK) {
+        settings_err = settings_store_load(&settings);
+    }
+    if (settings_err != ESP_OK) {
+        ESP_LOGW(TAG, "preferences indisponibles, valeurs par défaut (%s)",
+                 esp_err_to_name(settings_err));
+    } else {
+        ESP_LOGI(TAG, "preferences application chargées");
+    }
 
     // Écran ST7701S RGB 480x480 rond + tactile CST820 + port LVGL (thread dédié).
     if (board_display_start() == NULL) {

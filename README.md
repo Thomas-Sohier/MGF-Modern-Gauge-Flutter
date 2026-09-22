@@ -25,6 +25,12 @@ Le style ambre cible le panneau rond :
 Les variantes dual/cream legacy restent disponibles dans le simulateur pour
 conserver les goldens historiques.
 
+Les préférences applicatives (luminosité, page, thème, unités) sont persistées
+par ESP-IDF NVS via [`docs/persistent-settings.md`](docs/persistent-settings.md).
+Le modèle est versionné, chargé avec des valeurs par défaut en cas de données
+invalides et n'écrit pas de valeur identique. Les bonds Bluetooth restent gérés
+par la pile ESP-IDF et ne sont pas manipulés par l'application.
+
 ## Correspondance Flutter → LVGL
 
 | Flutter (Dart) | Ici (C / LVGL) | Rôle |
@@ -98,6 +104,8 @@ main/
   domain/ecu_source.h # abstraction de lecture par copie
   fake_ecu.[ch]      # source de données simulée
   app/dashboard_controller.[ch] # orchestration source -> écran
+  domain/app_settings.[ch]     # modèle typé + défauts/validation NVS
+  infrastructure/settings_store.[ch] # adaptateur ESP-IDF NVS
   style_amber.*     # écran ambre (cible) — cadran rond vectoriel
   dash_icons.*      # icônes vectorielles (eau, batterie, huile, OBD)
   ui_fonts.*        # police Michroma via tiny_ttf
