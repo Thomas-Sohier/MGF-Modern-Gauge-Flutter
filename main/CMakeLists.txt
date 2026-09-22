@@ -17,6 +17,12 @@ set(MGF_RUNTIME_DIAGNOSTICS 0 CACHE STRING "Enable periodic runtime diagnostics 
 set(MGF_BLE_CONFIG_SRCS)
 set(MGF_BLE_CONFIG_REQUIRES)
 if(MGF_ENABLE_BLE_CONFIG)
+    if(NOT CONFIG_BT_NIMBLE_ENABLED)
+        message(FATAL_ERROR
+            "MGF_ENABLE_BLE_CONFIG=1 requires NimBLE: build with "
+            "-D SDKCONFIG_DEFAULTS=\"sdkconfig.defaults;sdkconfig.ble\" "
+            "and a dedicated build dir/sdkconfig (see docs/ble-config.md)")
+    endif()
     list(APPEND MGF_BLE_CONFIG_SRCS "infrastructure/ble_config_service.c")
     list(APPEND MGF_BLE_CONFIG_REQUIRES bt)
 endif()

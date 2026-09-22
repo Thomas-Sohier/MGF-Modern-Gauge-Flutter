@@ -8,6 +8,11 @@
 # IDF must be exported before invoking this script (or set IDF_PY to an
 # absolute path). The default margin is deliberately non-zero: the current
 # BLE-enabled image has only one byte left in the 16 KiB IRAM region.
+# For the BLE image, point BUILD_DIR at its dedicated build directory and pass
+# the same -B/-D options through IDF_PY_ARGS, e.g.:
+#   BUILD_DIR=build-ble IDF_PY_ARGS='-B build-ble -D SDKCONFIG=build-ble/sdkconfig
+#     -D SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.ble
+#     -D MGF_ENABLE_BLE_CONFIG=1' tools/check_iram.sh
 set -euo pipefail
 
 PROJECT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -15,9 +20,10 @@ BUILD_DIR=${BUILD_DIR:-"$PROJECT_DIR/build"}
 APP_NAME=${APP_NAME:-mgf_gauge_lvgl}
 IDF_PY=${IDF_PY:-idf.py}
 IRAM_MIN_REMAIN_BYTES=${IRAM_MIN_REMAIN_BYTES:-256}
+read -r -a IDF_PY_EXTRA <<<"${IDF_PY_ARGS:-}"
 
 if [[ ${SKIP_BUILD:-0} != 1 ]]; then
-    "$IDF_PY" -C "$PROJECT_DIR" build
+    "$IDF_PY" -C "$PROJECT_DIR" "${IDF_PY_EXTRA[@]}" build
 fi
 
 map_file="$BUILD_DIR/$APP_NAME.map"
@@ -30,7 +36,7 @@ fi
 
 size_json=$(mktemp)
 trap 'rm -f "$size_json"' EXIT
-"$IDF_PY" -C "$PROJECT_DIR" size --format json --output-file "$size_json" >/dev/null
+"$IDF_PY" -C "$PROJECT_DIR" "${IDF_PY_EXTRA[@]}" size --format json --output-file "$size_json" >/dev/null
 
 python3 - "$size_json" "$IRAM_MIN_REMAIN_BYTES" <<'PY'
 import json

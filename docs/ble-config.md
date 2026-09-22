@@ -5,10 +5,19 @@ le contrôleur BLE et l'hôte **NimBLE** d'ESP-IDF (aucun profil Bluetooth
 Classic). Pour l'activer sur le firmware ESP-IDF :
 
 ```bash
-idf.py -D MGF_ENABLE_BLE_CONFIG=1 set-target esp32s3
-# activer CONFIG_BT_ENABLED et CONFIG_BT_NIMBLE_ENABLED dans menuconfig
-idf.py -D MGF_ENABLE_BLE_CONFIG=1 build
+idf.py -B build-ble -D SDKCONFIG=build-ble/sdkconfig \
+    -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ble" \
+    -D MGF_ENABLE_BLE_CONFIG=1 set-target esp32s3 build
 ```
+
+Le firmware normal garde `CONFIG_BT_ENABLED=n` (`sdkconfig.defaults`) : aucune
+pile Bluetooth n'y est liée, ce qui libère l'IRAM (quasi pleine avec BLE) et
+la RAM interne. L'image BLE utilise son propre dossier de build et son propre
+`sdkconfig` pour que les deux configurations ne se contaminent pas ;
+`main/CMakeLists.txt` refuse `MGF_ENABLE_BLE_CONFIG=1` sans NimBLE activé.
+Un `sdkconfig` existant n'est pas réécrit par les defaults : après ce
+changement, supprimer l'ancien `sdkconfig` (ou `idf.py fullclean`) pour
+régénérer le firmware normal sans Bluetooth.
 
 Le simulateur hôte et les builds firmware par défaut ne compilent pas le fichier
 NimBLE et ne dépendent donc pas de `bt`. Avec NimBLE, l'ouverture de la
@@ -16,7 +25,7 @@ publicité au boot est contrôlée séparément par
 `MGF_BLE_CONFIG_OPEN_ON_BOOT=1` (désactivée par défaut) ; les écritures restent
 limitées aux clients chiffrés et bondés.
 
-Dans `sdkconfig.defaults`, la politique fixe également
+Dans `sdkconfig.ble`, la politique fixe également
 `CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1` et `CONFIG_BT_NIMBLE_MAX_BONDS=3`.
 
 ## Politique d'ouverture

@@ -93,6 +93,11 @@ Cette étape réduit surtout flash et RAM générale, mais peut aussi supprimer 
 
 ### 6. Utiliser une configuration distincte avec et sans BLE
 
+**Appliqué** : `sdkconfig.defaults` désactive Bluetooth pour le firmware
+normal, et l'image de configuration ajoute `sdkconfig.ble` dans un dossier de
+build séparé (cf. `docs/ble-config.md`). La marge IRAM reste à surveiller sur
+l'image BLE avec `tools/check_iram.sh`.
+
 Si le BLE augmente trop les contraintes mémoire :
 
 - firmware de configuration avec BLE activé ;
