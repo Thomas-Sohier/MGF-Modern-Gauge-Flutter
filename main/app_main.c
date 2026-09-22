@@ -1,5 +1,8 @@
 #include "esp_log.h"
 #include "esp_err.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lvgl.h"
 
 #include <stdbool.h>
@@ -36,6 +39,12 @@
 #endif
 #ifndef MGF_BLE_CONFIG_OPEN_ON_BOOT
 #define MGF_BLE_CONFIG_OPEN_ON_BOOT 0
+#endif
+
+// Un échec de démarrage ne doit pas laisser un tableau de bord éteint jusqu'à
+// la prochaine coupure du contact : on libère proprement puis on redémarre.
+#ifndef MGF_BOOT_FAILURE_RESTART_MS
+#define MGF_BOOT_FAILURE_RESTART_MS 5000
 #endif
 
 #if MGF_ENABLE_BLE_CONFIG
@@ -487,4 +496,8 @@ cleanup:
         board_display_backlight_off();
         board_display_stop();
     }
+    ESP_LOGE(TAG, "startup failed; restarting in %d ms",
+             MGF_BOOT_FAILURE_RESTART_MS);
+    vTaskDelay(pdMS_TO_TICKS(MGF_BOOT_FAILURE_RESTART_MS));
+    esp_restart();
 }
