@@ -28,27 +28,29 @@
 #define RPM_MAX       8000.0f
 
 // Traits de séparation
-#define SEP_W         0.8f
+#define SEP_W         1.333f
 #define SEP_GAP       3.5f
 
 // Ligne horizontale
 #define HSEP_Y        190.0f
-#define HSEP_X1       30.0f
-#define HSEP_X2       290.0f
+#define HSEP_X1       6.667f
+#define HSEP_X2       313.333f
 
 // Séparateurs verticaux
 #define VSEP_TOP_OUT  168.0f
 #define VSEP_TOP_MID  (HSEP_Y + SEP_GAP)
-static const float kVSep[3][3] = {
-    {95.0f, VSEP_TOP_OUT, 280.0f},
-    {160.0f, VSEP_TOP_MID, 288.0f},
-    {225.0f, VSEP_TOP_OUT, 280.0f},
+static const float kVSep[3][2] = {
+    {83.333f, VSEP_TOP_OUT},
+    {160.0f, VSEP_TOP_MID},
+    {236.667f, VSEP_TOP_OUT},
 };
+#define VSEP_REF_X       83.333f
+#define VSEP_REF_BOTTOM  288.0f
 
 // Valeur centrale
 #define RPM_VAL_X     162.0f
-#define RPM_VAL_Y     142.0f
-#define RPM_UNIT_Y    180.0f
+#define RPM_VAL_Y     125.333f
+#define RPM_UNIT_Y    170.0f
 
 // ── 1. CONSTANTES : indicateurs bas ──────────────────────────────────────────
 enum { M_COOLANT = 0, M_BATTERY, M_OIL, M_OBD, M_COUNT };
@@ -58,12 +60,12 @@ typedef struct {
 } ind_def_t;
 
 static const ind_def_t kInd[M_COUNT] = {
-    {DASH_ICON_COOLANT,  62.5f,  187.0f, 222.0f},
-    {DASH_ICON_BATTERY,  127.5f, 217.0f, 252.0f},
-    {DASH_ICON_OIL,      192.5f, 217.0f, 252.0f},
-    {DASH_ICON_OBD_LINK, 257.5f,  187.0f, 222.0f},
+    {DASH_ICON_COOLANT,  45.0f,  190.333f, 225.333f},
+    {DASH_ICON_BATTERY, 121.667f, 220.333f, 255.333f},
+    {DASH_ICON_OIL,     198.333f, 220.333f, 255.333f},
+    {DASH_ICON_OBD_LINK,275.0f,  190.333f, 225.333f},
 };
-#define IND_ICON_SZ   40.0f
+#define IND_ICON_SZ   48.0f
 
 // ── État / mise à l'échelle ──────────────────────────────────────────────────
 struct amber_screen_s {
@@ -88,6 +90,16 @@ static ui_layout_t layout_of(const lv_area_t *area) {
     layout.ox += area->x1;
     layout.oy += area->y1;
     return layout;
+}
+
+static float circle_bottom_y(float x) {
+    const float dx = x - DIAL_CX;
+    return DIAL_CY + sqrtf(DIAL_CX * DIAL_CX - dx * dx);
+}
+
+static float separator_bottom_y(float x) {
+    const float reference_gap = circle_bottom_y(VSEP_REF_X) - VSEP_REF_BOTTOM;
+    return circle_bottom_y(x) - reference_gap;
 }
 
 // ── 3. DESSIN : primitives ───────────────────────────────────────────────────
@@ -163,19 +175,20 @@ static void canvas_draw_cb(lv_event_t *e) {
     const float hy_out = ui_layout_y(&t, VSEP_TOP_OUT);
     const float hy_mid = ui_layout_y(&t, HSEP_Y);
     draw_line(layer, ui_layout_x(&t, HSEP_X1), hy_out,
-              ui_layout_x(&t, 95.0f - SEP_GAP), hy_out,
+              ui_layout_x(&t, 83.333f - SEP_GAP), hy_out,
               SEP_W * t.scale, ui_theme_amber_separator());
-    draw_line(layer, ui_layout_x(&t, 95.0f + SEP_GAP), hy_mid,
-              ui_layout_x(&t, 225.0f - SEP_GAP), hy_mid,
+    draw_line(layer, ui_layout_x(&t, 83.333f + SEP_GAP), hy_mid,
+              ui_layout_x(&t, 236.667f - SEP_GAP), hy_mid,
               SEP_W * t.scale, ui_theme_amber_separator());
-    draw_line(layer, ui_layout_x(&t, 225.0f + SEP_GAP), hy_out,
+    draw_line(layer, ui_layout_x(&t, 236.667f + SEP_GAP), hy_out,
               ui_layout_x(&t, HSEP_X2), hy_out,
               SEP_W * t.scale, ui_theme_amber_separator());
 
     // Séparateurs verticaux
     for (int i = 0; i < 3; i++) {
-        draw_line(layer, ui_layout_x(&t, kVSep[i][0]), ui_layout_y(&t, kVSep[i][1]),
-                  ui_layout_x(&t, kVSep[i][0]), ui_layout_y(&t, kVSep[i][2]),
+        const float x = kVSep[i][0];
+        draw_line(layer, ui_layout_x(&t, x), ui_layout_y(&t, kVSep[i][1]),
+                  ui_layout_x(&t, x), ui_layout_y(&t, separator_bottom_y(x)),
                   SEP_W * t.scale, ui_theme_amber_separator());
     }
 }
@@ -200,12 +213,12 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
     if (scr->canvas == NULL) goto fail;
 
     scr->value = amber_value_widget_create(
-        parent, amber_ui_font_hero(),
+        parent, ui_font_or(ui_font_xxl, amber_ui_font_hero()),
         RPM_VAL_X, RPM_VAL_Y, BOLD_XL, "0");
     if (scr->value == NULL) goto fail;
 
     scr->unit = amber_value_widget_create(
-        parent, ui_font_or(ui_font_m, &lv_font_montserrat_20),
+        parent, ui_font_or(ui_font_rpm_unit, amber_ui_font_value()),
         DIAL_CX, RPM_UNIT_Y, BOLD_SM, "RPM");
     if (scr->unit == NULL) goto fail;
 
@@ -218,7 +231,7 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
                                 kInd[i].icon_y, 0.0f, 0.0f);
 
         scr->ind_value[i] = amber_value_widget_create(
-            parent, ui_font_or(ui_font_m, &lv_font_montserrat_20),
+            parent, amber_ui_font_value(),
             kInd[i].x, kInd[i].label_y, BOLD_SM, "");
         if (scr->ind_value[i] == NULL) goto fail;
     }
