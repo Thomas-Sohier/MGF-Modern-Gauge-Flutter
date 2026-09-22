@@ -1,20 +1,10 @@
-#ifndef LV_USE_VECTOR_GRAPHIC
-#define LV_USE_VECTOR_GRAPHIC 1
-#endif
-#ifndef LV_USE_MATRIX
-#define LV_USE_MATRIX 1
-#endif
-#ifndef LV_USE_FLOAT
-#define LV_USE_FLOAT 1
-#endif
 #include "ui/screens/boot_screen.h"
+
 #include "ui/themes/ui_theme.h"
-#include "ui/fonts/ui_fonts.h"
+#include "ui/widgets/amber_draw.h"
 #include "ui/widgets/amber_ui.h"
 
-#define BOOT_LOGO_SIZE 240
-
-LV_DRAW_BUF_DEFINE_STATIC(draw_buf, BOOT_LOGO_SIZE, BOOT_LOGO_SIZE, LV_COLOR_FORMAT_ARGB8888);
+#define BOOT_CENTER 160.0f
 
 struct boot_screen {
     lv_obj_t *root;
@@ -22,97 +12,121 @@ struct boot_screen {
     lv_obj_t *label;
 };
 
-static lv_vector_path_t *create_logo_path(void);
+static void draw_segmented_frame(lv_layer_t *layer, const ui_layout_t *layout) {
+    const lv_color_t dim = ui_theme_amber_dim();
+    const lv_color_t separator = ui_theme_amber_separator();
+    const lv_color_t bright = ui_theme_amber_bright();
 
-static void add_segment(lv_vector_path_t *path, float x1, float y1, float x2, float y2) {
-    lv_fpoint_t a = {x1, y1};
-    lv_fpoint_t b = {x2, y2};
-    lv_vector_path_move_to(path, &a);
-    lv_vector_path_line_to(path, &b);
+    // Anneau fin, volontairement interrompu en bas : il respecte la marge du
+    // panneau rond et laisse respirer le libellé de démarrage.
+    amber_draw_arc_wrapped(layer, layout, BOOT_CENTER, BOOT_CENTER, 140.0f,
+                           1.0f, 208.0f, 304.0f, dim, false);
+    amber_draw_arc_wrapped(layer, layout, BOOT_CENTER, BOOT_CENTER, 140.0f,
+                           1.0f, 152.0f, 42.0f, separator, false);
+    amber_draw_arc_wrapped(layer, layout, BOOT_CENTER, BOOT_CENTER, 140.0f,
+                           1.0f, 238.0f, 38.0f, bright, false);
+
+    // Deux repères horizontaux ancrent le signe sans fermer une grille autour
+    // du cadran.
+    amber_draw_line(layer, layout, 48.0f, 136.0f, 78.0f, 136.0f, 1.0f,
+                    separator, false);
+    amber_draw_line(layer, layout, 242.0f, 136.0f, 272.0f, 136.0f, 1.0f,
+                    separator, false);
+    amber_draw_dot(layer, layout, 83.0f, 136.0f, 1.5f, dim);
+    amber_draw_dot(layer, layout, 237.0f, 136.0f, 1.5f, dim);
 }
 
-static bool render_logo(lv_obj_t *canvas) {
-    lv_layer_t layer;
-    lv_canvas_init_layer(canvas, &layer);
+static void draw_badge(lv_layer_t *layer, const ui_layout_t *layout) {
+    const lv_color_t separator = ui_theme_amber_separator();
+    const float points[][2] = {
+        {108.0f, 93.0f}, {212.0f, 93.0f}, {228.0f, 109.0f},
+        {228.0f, 163.0f}, {212.0f, 179.0f}, {108.0f, 179.0f},
+        {92.0f, 163.0f}, {92.0f, 109.0f},
+    };
 
-    lv_vector_dsc_t *dsc = lv_vector_dsc_create(&layer);
-    if (dsc == NULL) {
-        lv_canvas_finish_layer(canvas, &layer);
-        return false;
+    for (unsigned i = 0; i < sizeof(points) / sizeof(points[0]); i++) {
+        const unsigned next = (i + 1u) % (sizeof(points) / sizeof(points[0]));
+        amber_draw_line(layer, layout, points[i][0], points[i][1],
+                        points[next][0], points[next][1], 1.4f, separator,
+                        false);
     }
 
-    lv_vector_path_t *path = create_logo_path();
-    if (path == NULL) {
-        lv_vector_dsc_delete(dsc);
-        lv_canvas_finish_layer(canvas, &layer);
-        return false;
-    }
-
-    lv_vector_dsc_set_stroke_color(dsc, ui_theme_amber_bright());
-    lv_vector_dsc_set_stroke_opa(dsc, LV_OPA_COVER);
-    lv_vector_dsc_set_stroke_width(dsc, 8.0f);
-    lv_vector_dsc_set_stroke_cap(dsc, LV_VECTOR_STROKE_CAP_BUTT);
-    lv_vector_dsc_set_stroke_join(dsc, LV_VECTOR_STROKE_JOIN_MITER);
-    lv_vector_dsc_add_path(dsc, path);
-    lv_draw_vector(dsc);
-
-    lv_vector_path_delete(path);
-    lv_vector_dsc_delete(dsc);
-    lv_canvas_finish_layer(canvas, &layer);
-    return true;
+    // Une traverse discrète donne au monogramme une assise automobile, sans
+    // ajouter d'état ou d'information non disponible au démarrage.
+    amber_draw_line(layer, layout, 105.0f, 163.0f, 215.0f, 163.0f, 0.8f,
+                    separator, false);
 }
 
-static lv_vector_path_t *create_logo_path(void) {
-    lv_vector_path_t *path = lv_vector_path_create(LV_VECTOR_PATH_QUALITY_MEDIUM);
-    if (path == NULL) return NULL;
-    const float bw = 78.0f, bh = 51.0f, cut = 15.0f;
-    add_segment(path, 42, 69, 198, 69); add_segment(path, 198, 69, 213, 84);
-    add_segment(path, 213, 84, 213, 156); add_segment(path, 213, 156, 198, 171);
-    add_segment(path, 198, 171, 42, 171); add_segment(path, 42, 171, 27, 156);
-    add_segment(path, 27, 156, 27, 84); add_segment(path, 27, 84, 42, 69);
+static void draw_mgf_mark(lv_layer_t *layer, const ui_layout_t *layout) {
+    const lv_color_t bright = ui_theme_amber_bright();
+    const float width = 3.0f;
 
-    add_segment(path, 72, 145, 72, 95); add_segment(path, 72, 95, 95, 120);
-    add_segment(path, 95, 120, 120, 95); add_segment(path, 120, 95, 120, 145);
-    add_segment(path, 168, 95, 139, 95); add_segment(path, 139, 95, 139, 120);
-    add_segment(path, 139, 120, 168, 120); add_segment(path, 168, 120, 168, 145);
-    add_segment(path, 168, 145, 125, 145);
-    (void)bw; (void)bh; (void)cut;
-    return path;
+    // M
+    amber_draw_line(layer, layout, 107.0f, 151.0f, 107.0f, 119.0f, width,
+                    bright, true);
+    amber_draw_line(layer, layout, 107.0f, 119.0f, 120.0f, 134.0f, width,
+                    bright, true);
+    amber_draw_line(layer, layout, 120.0f, 134.0f, 133.0f, 119.0f, width,
+                    bright, true);
+    amber_draw_line(layer, layout, 133.0f, 119.0f, 133.0f, 151.0f, width,
+                    bright, true);
+
+    // G : l'ouverture et la traverse restent très lisibles à faible luminosité.
+    amber_draw_arc_wrapped(layer, layout, 157.0f, 135.0f, 16.0f, width,
+                           42.0f, 276.0f, bright, true);
+    amber_draw_line(layer, layout, 157.0f, 135.0f, 174.0f, 135.0f, width,
+                    bright, true);
+
+    // F
+    amber_draw_line(layer, layout, 184.0f, 151.0f, 184.0f, 119.0f, width,
+                    bright, true);
+    amber_draw_line(layer, layout, 184.0f, 119.0f, 211.0f, 119.0f, width,
+                    bright, true);
+    amber_draw_line(layer, layout, 184.0f, 135.0f, 204.0f, 135.0f, width,
+                    bright, true);
+}
+
+static void boot_canvas_draw_cb(lv_event_t *event) {
+    if (lv_event_get_code(event) != LV_EVENT_DRAW_MAIN) return;
+
+    lv_layer_t *layer = lv_event_get_layer(event);
+    lv_obj_t *canvas = lv_event_get_target(event);
+    if (layer == NULL || canvas == NULL) return;
+
+    lv_area_t area;
+    lv_obj_get_coords(canvas, &area);
+    const ui_layout_t layout = amber_draw_layout(&area);
+    draw_segmented_frame(layer, &layout);
+    draw_badge(layer, &layout);
+    draw_mgf_mark(layer, &layout);
 }
 
 boot_screen_t *boot_screen_create(lv_obj_t *parent) {
     if (parent == NULL) return NULL;
+
     boot_screen_t *screen = lv_malloc(sizeof(*screen));
     if (screen == NULL) return NULL;
     lv_memzero(screen, sizeof(*screen));
+
     screen->root = amber_ui_root_create(parent);
-    if (screen->root == NULL) { lv_free(screen); return NULL; }
+    if (screen->root == NULL) goto fail;
 
-    LV_DRAW_BUF_INIT_STATIC(draw_buf);
-    screen->canvas = lv_canvas_create(screen->root);
-    if (screen->canvas == NULL) {
-        boot_screen_destroy(screen);
-        return NULL;
-    }
-    lv_canvas_set_draw_buf(screen->canvas, &draw_buf);
-    lv_obj_set_size(screen->canvas, BOOT_LOGO_SIZE, BOOT_LOGO_SIZE);
-    lv_canvas_fill_bg(screen->canvas, ui_theme_amber_bg(), LV_OPA_COVER);
-    lv_obj_update_layout(screen->canvas);
-    if (!render_logo(screen->canvas)) {
-        boot_screen_destroy(screen);
-        return NULL;
-    }
-    lv_obj_center(screen->canvas);
-    lv_obj_set_y(screen->canvas, -20);
+    screen->canvas = amber_ui_canvas_create(screen->root, NULL,
+                                            boot_canvas_draw_cb);
+    if (screen->canvas == NULL) goto fail;
 
-    screen->label = lv_label_create(screen->root);
-    if (screen->label == NULL) { boot_screen_destroy(screen); return NULL; }
-    lv_label_set_text(screen->label, "DEMARRAGE SYSTEME");
-    lv_obj_set_style_text_color(screen->label, ui_theme_amber_dim(), 0);
-    lv_obj_set_style_text_font(screen->label, ui_font_or(ui_font_m, LV_FONT_DEFAULT), 0);
-    lv_obj_center(screen->label);
-    lv_obj_set_y(screen->label, 58);
+    screen->label = amber_ui_label_create(
+        screen->root, amber_ui_font_caption(), ui_theme_amber_dim(),
+        "DEMARRAGE", 0.0f);
+    if (screen->label == NULL) goto fail;
+    amber_ui_place_centered(screen->label, screen->root, BOOT_CENTER, 224.0f,
+                            0.0f, 0.0f);
+
     return screen;
+
+fail:
+    boot_screen_destroy(screen);
+    return NULL;
 }
 
 void boot_screen_destroy(boot_screen_t *screen) {

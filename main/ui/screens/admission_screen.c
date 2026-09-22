@@ -14,36 +14,36 @@
 #define CY 160.0f
 
 #define MAP_MAX             200.0f
-#define MAP_RING_R          149.0f
-#define MAP_RING_W            5.0f
-#define MAP_RING_SEGMENTS    28
-#define MAP_RING_GAP          1.8f
-#define MAP_RING_START      135.0f
-#define MAP_RING_SWEEP       270.0f
-#define MAP_TICK_COUNT       10
+#define MAP_RING_R          148.0f
+#define MAP_RING_W            3.5f
+#define MAP_RING_SEGMENTS    16
+#define MAP_RING_GAP          3.0f
+#define MAP_RING_START      190.0f
+#define MAP_RING_SWEEP       160.0f
+#define MAP_TICK_COUNT        5
 
-// Zones fixes dans le disque de 320 px : en-tête, valeur principale,
-// schéma de flux, puis deux rangées de mesures. Les libellés ne partagent
-// jamais la ligne de base d'une autre information.
+// Repère compact dans le disque de 320 px : la valeur MAP occupe le centre,
+// un seul repère de pression l'encadre, puis quatre mesures sont regroupées
+// dans une grille ouverte. Chaque ligne reste à distance de la circonférence.
 #define HEADER_Y             25.0f
-#define STATUS_Y             48.0f
+#define STATUS_Y             46.0f
 #define HEADER_LINE_Y        57.0f
 
-#define HERO_Y               86.0f
-#define HERO_UNIT_Y         109.0f
-#define HERO_LABEL_Y        126.0f
+#define HERO_Y               91.0f
+#define HERO_UNIT_Y         123.0f
+#define HERO_LABEL_Y        139.0f
 
-#define AIRFLOW_CY          180.0f
-#define AIRFLOW_LINE_W        0.8f
-#define AIRFLOW_ICON_W        1.4f
+#define AIRFLOW_CY          166.0f
+#define AIRFLOW_LINE_W        1.0f
+#define AIRFLOW_ICON_W        1.8f
 
-#define MATRIX_LINE_Y        216.0f
-#define MATRIX_SPLIT_Y       257.0f
+#define MATRIX_LINE_Y        201.0f
+#define MATRIX_SPLIT_Y       249.0f
 #define MATRIX_BOTTOM_Y      294.0f
-#define VALUE_TOP_Y          225.0f
-#define VALUE_BOTTOM_Y       263.0f
-#define LABEL_TOP_Y          244.0f
-#define LABEL_BOTTOM_Y       282.0f
+#define VALUE_TOP_Y          217.0f
+#define VALUE_BOTTOM_Y       264.0f
+#define LABEL_TOP_Y          238.0f
+#define LABEL_BOTTOM_Y       285.0f
 
 #define METRIC_COUNT 4
 enum {
@@ -53,12 +53,10 @@ enum {
     METRIC_MAP_AUX
 };
 
-// Les quatre indicateurs du modèle Flutter sont répartis en deux niveaux.
-// MAP est volontairement héroïque au centre et reste disponible dans la bande
-// télémétrique basse, comme dans le sélecteur multi-métrique d'origine.
-// Les rangées inférieures sont resserrées vers le centre pour rester dans la
-// safe area circulaire, surtout aux deux coins bas du panneau.
-static const float kMetricX[METRIC_COUNT] = {94.0f, 226.0f, 108.0f, 212.0f};
+// Les quatre indicateurs restent lisibles dans deux colonnes centrées. MAP est
+// répété en bas pour conserver le contexte de la grille sans concurrencer la
+// lecture héroïque centrale.
+static const float kMetricX[METRIC_COUNT] = {96.0f, 224.0f, 96.0f, 224.0f};
 static const float kMetricY[METRIC_COUNT] = {
     VALUE_TOP_Y, VALUE_TOP_Y, VALUE_BOTTOM_Y, VALUE_BOTTOM_Y
 };
@@ -114,8 +112,9 @@ static void draw_map_ring(lv_layer_t *layer, const ui_layout_t *layout,
     const float pitch = bar + MAP_RING_GAP;
     const int lit = (int)lroundf(progress * MAP_RING_SEGMENTS);
 
-    // Couronne ouverte en bas : comme un compte-tours, la pression monte de
-    // 7 h 30 vers 4 h 30 et laisse respirer le schéma de collecteur.
+    // Une couronne courte et discrète donne une échelle sans enfermer la
+    // lecture centrale. Les extrémités et graduations restent dans la marge
+    // circulaire sûre du panneau.
     for (int i = 0; i < MAP_RING_SEGMENTS; i++) {
         const float start = MAP_RING_START + (float)i * pitch;
         amber_draw_arc_wrapped(layer, layout, CX, CY, MAP_RING_R, MAP_RING_W,
@@ -125,14 +124,10 @@ static void draw_map_ring(lv_layer_t *layer, const ui_layout_t *layout,
     for (int i = 0; i <= MAP_TICK_COUNT; i++) {
         const float angle = MAP_RING_START + MAP_RING_SWEEP *
                             (float)i / MAP_TICK_COUNT;
-        amber_draw_tick(layer, layout, CX, CY, angle, MAP_RING_R - 5.0f,
-                        MAP_RING_R + 3.0f,
-                        i == 0 || i == MAP_TICK_COUNT ? 1.2f : 0.8f,
-                        separator, false);
+        amber_draw_tick(layer, layout, CX, CY, angle, MAP_RING_R - 3.0f,
+                        MAP_RING_R + 2.0f, i == 0 || i == MAP_TICK_COUNT
+                        ? 1.0f : 0.7f, separator, false);
     }
-
-    // La couronne est la seule indication graphique de la pression ; le
-    // centre reste réservé à sa valeur et au schéma de circulation.
 }
 
 static void draw_flow_arrow(lv_layer_t *layer, const ui_layout_t *layout,
@@ -143,8 +138,8 @@ static void draw_flow_arrow(lv_layer_t *layer, const ui_layout_t *layout,
                     color, true);
 }
 
-static void draw_manifold(lv_layer_t *layer, const ui_layout_t *layout,
-                          const admission_screen_t *scr) {
+static void draw_airflow_gauge(lv_layer_t *layer, const ui_layout_t *layout,
+                               const admission_screen_t *scr) {
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
     const lv_color_t separator = ui_theme_amber_separator();
@@ -152,68 +147,39 @@ static void draw_manifold(lv_layer_t *layer, const ui_layout_t *layout,
                                 ? bright : dim;
     const float throttle = scr->connected
         ? amber_clampf(scr->throttle / 100.0f, 0.0f, 1.0f) : 0.0f;
+    const float map_progress = scr->connected
+        ? amber_clampf(scr->map_kpa / MAP_MAX, 0.0f, 1.0f) : 0.0f;
+    const float butterfly_x = 95.0f;
+    const float bar_left = 124.0f;
+    const float bar_right = 271.0f;
+    const float bar_fill = bar_left + (bar_right - bar_left) * map_progress;
 
-    // Trois filets d'admission et deux flèches rendent le sens de circulation
-    // explicite : entrée -> papillon -> plénum -> quatre conduits.
-    amber_draw_line(layer, layout, 35.0f, 169.0f, 82.0f, 169.0f,
-                    AIRFLOW_LINE_W, dim, false);
-    amber_draw_line(layer, layout, 35.0f, 180.0f, 82.0f, 180.0f,
-                    AIRFLOW_LINE_W, flow, false);
-    amber_draw_line(layer, layout, 35.0f, 191.0f, 82.0f, 191.0f,
-                    AIRFLOW_LINE_W, dim, false);
-    draw_flow_arrow(layer, layout, 64.0f, 180.0f, flow);
-    draw_flow_arrow(layer, layout, 78.0f, 180.0f, flow);
+    // Pictogramme compact : arrivée d'air, papillon, puis une seule barre
+    // horizontale de pression. Il remplace le conduit détaillé sans perdre le
+    // sens du flux ni le lien visuel avec la valeur MAP centrale.
+    amber_draw_line(layer, layout, 48.0f, AIRFLOW_CY, 82.0f, AIRFLOW_CY,
+                    AIRFLOW_LINE_W, flow, true);
+    draw_flow_arrow(layer, layout, 73.0f, AIRFLOW_CY, flow);
 
-    // Corps du papillon : anneau et volet pivotant. L'angle du volet est la
-    // représentation directe de throttle, sans aiguille superposée au MAP.
-    amber_draw_circle(layer, layout, 99.0f, AIRFLOW_CY, 17.0f, 1.0f,
-                      separator);
-    const float plate_dx = 3.0f + throttle * 9.0f;
-    amber_draw_line(layer, layout, 99.0f - plate_dx, 190.0f,
-                    99.0f + plate_dx, 170.0f, 2.2f, flow, true);
-    amber_draw_circle(layer, layout, 99.0f, AIRFLOW_CY, 2.0f, 1.0f, bright);
+    amber_draw_circle(layer, layout, butterfly_x, AIRFLOW_CY, 12.0f,
+                      AIRFLOW_LINE_W, separator);
+    const float plate_dx = 3.0f + throttle * 5.0f;
+    amber_draw_line(layer, layout, butterfly_x - plate_dx, AIRFLOW_CY + 8.0f,
+                    butterfly_x + plate_dx, AIRFLOW_CY - 8.0f, 2.0f, flow,
+                    true);
+    amber_draw_dot(layer, layout, butterfly_x, AIRFLOW_CY, 2.0f, bright);
 
-    // Plénum en capsule ouverte : les quatre branches verticales rappellent
-    // un collecteur réel tout en gardant une silhouette parfaitement centrée.
-    amber_draw_line(layer, layout, 119.0f, 161.0f, 211.0f, 161.0f,
-                    AIRFLOW_LINE_W, separator, false);
-    amber_draw_line(layer, layout, 119.0f, 199.0f, 211.0f, 199.0f,
-                    AIRFLOW_LINE_W, separator, false);
-    amber_draw_arc(layer, layout, 211.0f, 180.0f, 19.0f, AIRFLOW_LINE_W,
-                   270.0f, 360.0f, separator, false);
-    amber_draw_arc(layer, layout, 211.0f, 180.0f, 19.0f, AIRFLOW_LINE_W,
-                   0.0f, 90.0f, separator, false);
-
-    // Liaison papillon-plénum, avec une accentuation centrale lorsque le
-    // papillon est ouvert.
-    amber_draw_line(layer, layout, 116.0f, 180.0f, 143.0f, 180.0f,
-                    1.2f, flow, false);
-    draw_flow_arrow(layer, layout, 130.0f, 180.0f, flow);
-
-    const float runner_x[4] = {145.0f, 157.0f, 169.0f, 181.0f};
-    for (int i = 0; i < 4; i++) {
-        const lv_color_t runner = (scr->connected && i == 1) ? bright : dim;
-        amber_draw_line(layer, layout, runner_x[i], 199.0f, runner_x[i], 211.0f,
-                        AIRFLOW_LINE_W, runner, false);
-        amber_draw_line(layer, layout, runner_x[i] - 2.5f, 211.0f,
-                        runner_x[i] + 2.5f, 211.0f, AIRFLOW_LINE_W, runner,
-                        false);
+    amber_draw_line(layer, layout, 114.0f, AIRFLOW_CY, bar_right,
+                    AIRFLOW_CY, 2.0f, dim, true);
+    if (scr->connected) {
+        amber_draw_line(layer, layout, bar_left, AIRFLOW_CY, bar_fill,
+                        AIRFLOW_CY, AIRFLOW_LINE_W + 1.0f, bright, true);
     }
-
-    // Les séparateurs restent dans les gouttières : aucune ligne ne traverse
-    // une valeur ou son libellé. Le disque les découpe naturellement en bas.
-    amber_draw_line(layer, layout, 32.0f, MATRIX_LINE_Y, 143.0f, MATRIX_LINE_Y,
-                    AIRFLOW_LINE_W, separator, false);
-    amber_draw_line(layer, layout, 177.0f, MATRIX_LINE_Y, 288.0f, MATRIX_LINE_Y,
-                    AIRFLOW_LINE_W, separator, false);
-    amber_draw_line(layer, layout, 32.0f, MATRIX_SPLIT_Y, 143.0f, MATRIX_SPLIT_Y,
-                    AIRFLOW_LINE_W, separator, false);
-    amber_draw_line(layer, layout, 177.0f, MATRIX_SPLIT_Y, 288.0f, MATRIX_SPLIT_Y,
-                    AIRFLOW_LINE_W, separator, false);
-    amber_draw_line(layer, layout, 160.0f, MATRIX_LINE_Y + 4.0f, 160.0f,
-                    MATRIX_SPLIT_Y - 5.0f, AIRFLOW_LINE_W, separator, false);
-    amber_draw_line(layer, layout, 160.0f, MATRIX_SPLIT_Y + 5.0f, 160.0f,
-                    MATRIX_BOTTOM_Y - 5.0f, AIRFLOW_LINE_W, separator, false);
+    for (int i = 0; i <= 4; i++) {
+        const float x = bar_left + (bar_right - bar_left) * (float)i / 4.0f;
+        amber_draw_line(layer, layout, x, AIRFLOW_CY - 4.0f, x,
+                        AIRFLOW_CY + 4.0f, AIRFLOW_LINE_W, separator, false);
+    }
 }
 
 static void canvas_draw_cb(lv_event_t *event) {
@@ -230,11 +196,27 @@ static void canvas_draw_cb(lv_event_t *event) {
     const lv_color_t separator = ui_theme_amber_separator();
 
     draw_map_ring(layer, &layout, scr);
-    amber_draw_line(layer, &layout, 28.0f, HEADER_LINE_Y, 126.0f,
+    amber_draw_line(layer, &layout, 38.0f, HEADER_LINE_Y, 128.0f,
                     HEADER_LINE_Y, AIRFLOW_LINE_W, separator, false);
-    amber_draw_line(layer, &layout, 194.0f, HEADER_LINE_Y, 292.0f,
+    amber_draw_line(layer, &layout, 192.0f, HEADER_LINE_Y, 282.0f,
                     HEADER_LINE_Y, AIRFLOW_LINE_W, separator, false);
-    draw_manifold(layer, &layout, scr);
+    draw_airflow_gauge(layer, &layout, scr);
+
+    // Grille ouverte et légère : les ruptures autour du croisement évitent de
+    // couper les valeurs, tout en donnant quatre cellules immédiatement
+    // repérables à la lecture.
+    amber_draw_line(layer, &layout, 43.0f, MATRIX_LINE_Y, 143.0f,
+                    MATRIX_LINE_Y, AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, &layout, 177.0f, MATRIX_LINE_Y, 277.0f,
+                    MATRIX_LINE_Y, AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, &layout, 43.0f, MATRIX_SPLIT_Y, 143.0f,
+                    MATRIX_SPLIT_Y, AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, &layout, 177.0f, MATRIX_SPLIT_Y, 277.0f,
+                    MATRIX_SPLIT_Y, AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, &layout, 160.0f, MATRIX_LINE_Y + 5.0f, 160.0f,
+                    MATRIX_SPLIT_Y - 5.0f, AIRFLOW_LINE_W, separator, false);
+    amber_draw_line(layer, &layout, 160.0f, MATRIX_SPLIT_Y + 5.0f, 160.0f,
+                    MATRIX_BOTTOM_Y - 4.0f, AIRFLOW_LINE_W, separator, false);
 }
 
 static amber_text_t text_create(lv_obj_t *parent, const lv_font_t *font,
@@ -256,6 +238,7 @@ static amber_text_t text_create(lv_obj_t *parent, const lv_font_t *font,
         text.shadow = NULL;
         return text;
     }
+    lv_obj_add_flag(text.shadow, LV_OBJ_FLAG_HIDDEN);
     const float offset = (float)spread * amber_ui_bold_spread(1);
     amber_ui_place_centered(text.shadow, parent, x, y, (float)width, offset);
     amber_ui_place_centered(text.front, parent, x, y, (float)width, -offset);
@@ -323,28 +306,27 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
     const lv_font_t *caption_font = ui_font_or(ui_font_m,
                                                &lv_font_montserrat_14);
     const lv_color_t bright = ui_theme_amber_bright();
-    const lv_color_t dim = ui_theme_amber_dim();
 
-    scr->header = amber_ui_label_create(scr->root, caption_font, bright,
+    scr->header = amber_ui_label_create(scr->root, value_font, bright,
                                         "ADMISSION", 180.0f);
-    scr->status = amber_ui_label_create(scr->root, caption_font, dim,
+    scr->status = amber_ui_label_create(scr->root, caption_font, bright,
                                         scr->status_text, 220.0f);
     scr->hero = text_create(scr->root, hero_font, CX, HERO_Y, 170, 2,
                             scr->hero_text);
     scr->hero_unit = amber_ui_label_create(scr->root, value_font, bright,
                                            "kPa", 70.0f);
-    scr->hero_label = amber_ui_label_create(scr->root, caption_font, bright,
-                                            "PRESSION COLLECTEUR", 240.0f);
+    scr->hero_label = amber_ui_label_create(scr->root, value_font, bright,
+                                            "PRESSION MAP", 190.0f);
 
     static const char *const kMetricLabels[METRIC_COUNT] = {
         "PAPILLON", "TPS", "AIR", "MAP"
     };
     for (int i = 0; i < METRIC_COUNT; i++) {
         scr->metric[i] = text_create(scr->root, value_font, kMetricX[i],
-                                     kMetricY[i], 112, 1,
+                                     kMetricY[i], 118, 1,
                                      scr->metric_text[i]);
         scr->metric_label[i] = amber_ui_label_create(
-            scr->root, caption_font, dim, kMetricLabels[i], 88.0f);
+            scr->root, value_font, bright, kMetricLabels[i], 112.0f);
     }
 
     if (scr->header == NULL || scr->status == NULL ||
@@ -367,15 +349,15 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
     amber_ui_place_centered(scr->hero_unit, scr->root, CX, HERO_UNIT_Y,
                              70.0f, 0.0f);
     amber_ui_place_centered(scr->hero_label, scr->root, CX, HERO_LABEL_Y,
-                             240.0f, 0.0f);
+                             190.0f, 0.0f);
     for (int i = 0; i < METRIC_COUNT; i++) {
         const float offset = amber_ui_bold_spread(1);
         amber_ui_place_centered(scr->metric[i].shadow, scr->root,
-                                kMetricX[i], kMetricY[i], 112.0f, offset);
+                                kMetricX[i], kMetricY[i], 118.0f, offset);
         amber_ui_place_centered(scr->metric[i].front, scr->root,
-                                kMetricX[i], kMetricY[i], 112.0f, -offset);
+                                kMetricX[i], kMetricY[i], 118.0f, -offset);
         amber_ui_place_centered(scr->metric_label[i], scr->root,
-                                kMetricX[i], kMetricLabelY[i], 88.0f, 0.0f);
+                                kMetricX[i], kMetricLabelY[i], 112.0f, 0.0f);
     }
 
     return scr;
@@ -411,7 +393,7 @@ void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
         // La quatrième mesure garde la pression MAP sous forme compacte,
         // tandis que la valeur héroïque reste la lecture principale.
         set_metric_text(scr, METRIC_MAP_AUX, "%.0f kPa", scr->map_kpa);
-        snprintf(scr->status_text, sizeof(scr->status_text), "DONNÉES EN DIRECT");
+        snprintf(scr->status_text, sizeof(scr->status_text), "MOTEUR EN LIGNE");
     }
 
     text_set(&scr->hero, scr->root, scr->hero_text);

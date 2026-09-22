@@ -17,7 +17,7 @@
 #define CLOCK_CX       (UI_REFERENCE_SIZE * 0.5f)
 #define CLOCK_CY       CLOCK_CX
 #define CLOCK_RADIUS   157.0f
-#define LABEL_RADIUS   (CLOCK_RADIUS * 0.70f)
+#define LABEL_RADIUS   (CLOCK_RADIUS * 0.61f)
 #define TICK_RADIUS    (CLOCK_RADIUS * 0.87f)
 #define CARDINAL_COUNT 4
 
@@ -100,10 +100,10 @@ static void draw_face(lv_layer_t *layer, const ui_layout_t *layout) {
     const lv_color_t dim = ui_theme_amber_dim();
     const lv_color_t separator = ui_theme_amber_separator();
 
-    // Deux anneaux très fins donnent une profondeur discrète sans fermer la
-    // grille ambre du cadran.
-    draw_arc(layer, cx, cy, radius, 1.0f * scale, separator);
-    draw_arc(layer, cx, cy, radius - 3.0f * scale, 0.7f * scale, dim);
+    // Un seul anneau garde la marge avec le masque circulaire et évite une
+    // double bordure qui rivaliserait avec les repères.
+    draw_arc(layer, cx, cy, radius - 1.0f * scale, 1.3f * scale,
+             separator);
 
     for (int i = 0; i < 60; i++) {
         const float angle = (-90.0f + (float)i * 6.0f) * (float)M_PI / 180.0f;
@@ -112,11 +112,11 @@ static void draw_face(lv_layer_t *layer, const ui_layout_t *layout) {
 
         if (i % 5 == 0) {
             const bool cardinal = (i % 15) == 0;
-            const float inner = (cardinal ? 0.76f : 0.81f) * radius;
-            const float outer = (cardinal ? 0.94f : 0.91f) * radius;
+            const float inner = (cardinal ? 0.75f : 0.80f) * radius;
+            const float outer = (cardinal ? 0.94f : 0.92f) * radius;
             draw_line(layer, cx + cosine * inner, cy + sine * inner,
                       cx + cosine * outer, cy + sine * outer,
-                      (cardinal ? 2.0f : 1.2f) * scale,
+                      (cardinal ? 2.4f : 1.7f) * scale,
                       cardinal ? bright : separator);
         } else {
             draw_circle(layer, cx + cosine * TICK_RADIUS * scale,
@@ -150,16 +150,19 @@ static void draw_hands(lv_layer_t *layer, const ui_layout_t *layout,
     const lv_color_t separator = ui_theme_amber_separator();
     const lv_color_t bg = ui_theme_amber_bg();
 
-    // Ombres ambre décalées : même palette, sans masque ni effet coûteux.
+    // Ombres ambre décalées : une bordure étroite détache les aiguilles sans
+    // ajouter de contour clair ni d'effet coûteux. L'heure reste plus massive.
+    const float hour_width = radius * 0.11f;
+    const float minute_width = radius * 0.105f;
     draw_hand(layer, cx, cy, hour_angle, radius * 0.55f,
-              radius * 0.10f + 2.0f * scale, 2.0f * scale, dim);
+              hour_width + 1.6f * scale, 1.0f * scale, dim);
     draw_hand(layer, cx, cy, minute_angle, radius * 0.80f,
-              radius * 0.095f + 2.0f * scale, 2.0f * scale, dim);
+              minute_width + 1.6f * scale, 1.0f * scale, dim);
 
     draw_hand(layer, cx, cy, hour_angle, radius * 0.55f,
-              radius * 0.10f, 0.0f, bright);
+              hour_width, 0.0f, bright);
     draw_hand(layer, cx, cy, minute_angle, radius * 0.80f,
-              radius * 0.095f, 0.0f, bright);
+              minute_width, 0.0f, bright);
 
     // Pivot en trois couches : disque séparateur, centre sombre et crêtes
     // radiales inspirées du widget Flutter, toutes en teintes ambre.

@@ -1,6 +1,5 @@
 #include "ui/screens/music_screen.h"
 
-#include "ui/fonts/ui_fonts.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/ui_layout.h"
 #include "ui/widgets/amber_ui.h"
@@ -10,21 +9,21 @@
 
 // Repère de conception partagé avec style_amber.c (320 x 320).
 #define MUSIC_CX              160.0f
-#define MUSIC_CY              160.0f
-#define RING_RADIUS           151.0f
-#define RING_WIDTH              8.0f
-#define DISC_CY               101.0f
-#define DISC_RADIUS            57.0f
-#define DISC_INNER_RADIUS      47.0f
-#define DISC_CORE_RADIUS       35.0f
-#define TITLE_Y               169.0f
-#define ARTIST_Y              187.0f
-#define CONTROL_Y             235.0f
-#define TIME_Y                235.0f
-#define CONTROL_LEFT          111.0f
-#define CONTROL_RIGHT         209.0f
-#define PLAY_RADIUS            27.0f
-#define SIDE_CONTROL_RADIUS    15.0f
+#define ART_CY                 65.0f
+#define ART_RADIUS             34.0f
+#define TITLE_Y               125.0f
+#define ARTIST_Y              163.0f
+#define PROGRESS_Y            195.0f
+#define TIME_Y                216.0f
+#define CONTROL_Y             263.0f
+#define CONTROL_LEFT           92.0f
+#define CONTROL_RIGHT         228.0f
+#define PLAY_RADIUS            30.0f
+#define SIDE_CONTROL_RADIUS    22.0f
+#define CONTROL_TARGET_SIZE    44.0f
+#define PROGRESS_LEFT          54.0f
+#define PROGRESS_RIGHT        266.0f
+#define MUSIC_TEXT_WIDTH      276.0f
 
 #define DEMO_PROGRESS           0.62f
 #define DEMO_TITLE              "MIDNIGHT DRIVE"
@@ -39,7 +38,11 @@ struct music_screen_s {
     lv_obj_t *artist;
     lv_obj_t *position;
     lv_obj_t *duration;
+    lv_obj_t *previous_button;
+    lv_obj_t *play_button;
+    lv_obj_t *next_button;
     float progress;
+    bool playing;
 };
 
 static ui_layout_t layout_of(const lv_area_t *area) {
@@ -66,91 +69,48 @@ static void draw_line(lv_layer_t *layer, float x1, float y1, float x2, float y2,
     lv_draw_line(layer, &dsc);
 }
 
-static void draw_arc(lv_layer_t *layer, int32_t cx, int32_t cy, float radius,
-                     float width, float start, float end, lv_color_t color,
-                     bool rounded) {
-    lv_draw_arc_dsc_t dsc;
-    lv_draw_arc_dsc_init(&dsc);
-    dsc.center.x = cx;
-    dsc.center.y = cy;
-    dsc.radius = (int32_t)lroundf(radius);
-    dsc.width = LV_MAX(1, (int32_t)lroundf(width));
-    dsc.start_angle = (uint16_t)lroundf(start);
-    dsc.end_angle = (uint16_t)lroundf(end);
-    dsc.color = color;
-    dsc.opa = LV_OPA_COVER;
-    dsc.rounded = rounded;
-    lv_draw_arc(layer, &dsc);
-}
-
-static void draw_full_arc(lv_layer_t *layer, int32_t cx, int32_t cy,
-                          float radius, float width, lv_color_t color) {
-    draw_arc(layer, cx, cy, radius, width, 0.0f, 360.0f, color, false);
-}
-
-// LVGL accepte des angles dans [0, 360]. Cette petite découpe conserve le
-// départ à 12 h lorsque l'arc de progression franchit 3 h.
-static void draw_wrapped_arc(lv_layer_t *layer, int32_t cx, int32_t cy,
-                             float radius, float width, float start,
-                             float sweep, lv_color_t color) {
-    if (sweep <= 0.0f) return;
-    if (sweep >= 360.0f) {
-        draw_full_arc(layer, cx, cy, radius, width, color);
-        return;
-    }
-
-    const float first_end = 360.0f - start;
-    if (sweep <= first_end) {
-        draw_arc(layer, cx, cy, radius, width, start, start + sweep, color,
-                 false);
-        return;
-    }
-
-    draw_arc(layer, cx, cy, radius, width, start, 360.0f, color, false);
-    draw_arc(layer, cx, cy, radius, width, 0.0f, sweep - first_end, color,
-             false);
-}
-
 static void draw_filled_circle(lv_layer_t *layer, int32_t cx, int32_t cy,
                                float radius, lv_color_t color) {
-    // Un arc plein évite une dépendance à une primitive de remplissage et
-    // reste disponible dans les configurations LVGL vectorielles minimales.
-    draw_full_arc(layer, cx, cy, radius, radius * 2.0f, color);
+    lv_draw_rect_dsc_t dsc;
+    lv_draw_rect_dsc_init(&dsc);
+    dsc.bg_color = color;
+    dsc.bg_opa = LV_OPA_COVER;
+    dsc.radius = (int32_t)lroundf(radius);
+
+    const int32_t r = (int32_t)lroundf(radius);
+    const lv_area_t area = {cx - r, cy - r, cx + r, cy + r};
+    lv_draw_rect(layer, &dsc, &area);
 }
 
-static void draw_disc(lv_layer_t *layer, const ui_layout_t *layout) {
+static void draw_art(lv_layer_t *layer, const ui_layout_t *layout) {
     const int32_t cx = (int32_t)lroundf(ui_layout_x(layout, MUSIC_CX));
-    const int32_t cy = (int32_t)lroundf(ui_layout_y(layout, DISC_CY));
+    const int32_t cy = (int32_t)lroundf(ui_layout_y(layout, ART_CY));
     const float scale = layout->scale;
 
-    draw_filled_circle(layer, cx, cy, DISC_RADIUS * scale,
-                       ui_theme_amber_bg());
-    draw_full_arc(layer, cx, cy, DISC_RADIUS * scale, 1.4f * scale,
-                  ui_theme_amber_separator());
-    draw_full_arc(layer, cx, cy, DISC_INNER_RADIUS * scale, 1.0f * scale,
-                  ui_theme_amber_dim());
-    draw_full_arc(layer, cx, cy, DISC_CORE_RADIUS * scale, 0.8f * scale,
-                  ui_theme_amber_separator());
+    // Une seule pastille pleine : l'icône reste lisible sans empiler des
+    // anneaux décoratifs qui concurrencent le titre et la progression.
+    draw_filled_circle(layer, cx, cy, ART_RADIUS * scale,
+                       ui_theme_amber_dim());
 
-    // Note double vectorielle, utilisée comme pochette de démonstration.
-    const float x1 = ui_layout_x(layout, 164.0f);
-    const float x2 = ui_layout_x(layout, 178.0f);
-    const float y_top = ui_layout_y(layout, 82.0f);
-    const float y_bar = ui_layout_y(layout, 79.0f);
-    const float y_bottom = ui_layout_y(layout, 106.0f);
-    const float note_width = 2.4f * scale;
+    // Pochette de démonstration réduite à une note, entièrement vectorielle.
+    const float x1 = ui_layout_x(layout, 153.0f);
+    const float x2 = ui_layout_x(layout, 170.0f);
+    const float y_top = ui_layout_y(layout, 48.0f);
+    const float y_bar = ui_layout_y(layout, 45.0f);
+    const float y_bottom = ui_layout_y(layout, 75.0f);
+    const float note_width = 2.8f * scale;
     draw_line(layer, x1, y_top, x1, y_bottom, note_width,
               ui_theme_amber_bright());
     draw_line(layer, x1, y_top, x2, y_bar, note_width,
               ui_theme_amber_bright());
     draw_line(layer, x2, y_bar, x2, y_bottom - 2.0f * scale, note_width,
               ui_theme_amber_bright());
-    draw_filled_circle(layer, (int32_t)lroundf(ui_layout_x(layout, 161.0f)),
-                       (int32_t)lroundf(ui_layout_y(layout, 108.0f)),
-                       5.0f * scale, ui_theme_amber_bright());
-    draw_filled_circle(layer, (int32_t)lroundf(ui_layout_x(layout, 175.0f)),
-                       (int32_t)lroundf(ui_layout_y(layout, 105.0f)),
-                       5.0f * scale, ui_theme_amber_bright());
+    draw_filled_circle(layer, (int32_t)lroundf(ui_layout_x(layout, 149.0f)),
+                       (int32_t)lroundf(ui_layout_y(layout, 78.0f)),
+                       5.5f * scale, ui_theme_amber_bright());
+    draw_filled_circle(layer, (int32_t)lroundf(ui_layout_x(layout, 166.0f)),
+                       (int32_t)lroundf(ui_layout_y(layout, 75.0f)),
+                       5.5f * scale, ui_theme_amber_bright());
 }
 
 static void draw_chevron(lv_layer_t *layer, const ui_layout_t *layout,
@@ -173,61 +133,64 @@ static void draw_controls(lv_layer_t *layer, const ui_layout_t *layout,
     const int32_t cx = (int32_t)lroundf(ui_layout_x(layout, MUSIC_CX));
     const int32_t cy = (int32_t)lroundf(ui_layout_y(layout, CONTROL_Y));
     const float scale = layout->scale;
+    const lv_color_t bright = ui_theme_amber_bright();
+    const lv_color_t dim = ui_theme_amber_dim();
+    const lv_color_t bg = ui_theme_amber_bg();
 
-    // Boutons latéraux vectoriels : cercle fin, puis précédent / suivant.
-    draw_full_arc(layer, (int32_t)lroundf(ui_layout_x(layout, CONTROL_LEFT)), cy,
-                  SIDE_CONTROL_RADIUS * scale, 1.0f * scale,
-                  ui_theme_amber_separator());
-    draw_full_arc(layer, (int32_t)lroundf(ui_layout_x(layout, CONTROL_RIGHT)), cy,
-                  SIDE_CONTROL_RADIUS * scale, 1.0f * scale,
-                  ui_theme_amber_separator());
+    // Les pastilles sont à la fois le repère visuel et la cible tactile :
+    // 44 unités logiques donnent 66 px sur le panneau 480 px.
+    draw_filled_circle(layer, (int32_t)lroundf(ui_layout_x(layout, CONTROL_LEFT)),
+                       cy, SIDE_CONTROL_RADIUS * scale, dim);
+    draw_filled_circle(layer, (int32_t)lroundf(ui_layout_x(layout, CONTROL_RIGHT)),
+                       cy, SIDE_CONTROL_RADIUS * scale, dim);
     draw_chevron(layer, layout, CONTROL_LEFT, CONTROL_Y, false);
     draw_chevron(layer, layout, CONTROL_RIGHT, CONTROL_Y, true);
     draw_line(layer, ui_layout_x(layout, CONTROL_LEFT - 10.0f),
-              ui_layout_y(layout, CONTROL_Y - 8.0f),
+              ui_layout_y(layout, CONTROL_Y - 9.0f),
               ui_layout_x(layout, CONTROL_LEFT - 10.0f),
-              ui_layout_y(layout, CONTROL_Y + 8.0f),
-              2.2f * scale, ui_theme_amber_bright());
+              ui_layout_y(layout, CONTROL_Y + 9.0f),
+              2.8f * scale, bright);
     draw_line(layer, ui_layout_x(layout, CONTROL_RIGHT + 10.0f),
-              ui_layout_y(layout, CONTROL_Y - 8.0f),
+              ui_layout_y(layout, CONTROL_Y - 9.0f),
               ui_layout_x(layout, CONTROL_RIGHT + 10.0f),
-              ui_layout_y(layout, CONTROL_Y + 8.0f),
-              2.2f * scale, ui_theme_amber_bright());
+              ui_layout_y(layout, CONTROL_Y + 9.0f),
+              2.8f * scale, bright);
 
-    // Bouton principal plein ambre, avec symbole pause/play brun-noir.
-    draw_filled_circle(layer, cx, cy, PLAY_RADIUS * scale,
-                       ui_theme_amber_bright());
+    // Bouton principal plus grand, avec symbole pause/play brun-noir.
+    draw_filled_circle(layer, cx, cy, PLAY_RADIUS * scale, bright);
     if (playing) {
-        draw_line(layer, ui_layout_x(layout, 155.0f),
-                  ui_layout_y(layout, CONTROL_Y - 8.0f),
-                  ui_layout_x(layout, 155.0f),
-                  ui_layout_y(layout, CONTROL_Y + 8.0f),
-                  3.0f * scale, ui_theme_amber_bg());
-        draw_line(layer, ui_layout_x(layout, 165.0f),
-                  ui_layout_y(layout, CONTROL_Y - 8.0f),
-                  ui_layout_x(layout, 165.0f),
-                  ui_layout_y(layout, CONTROL_Y + 8.0f),
-                  3.0f * scale, ui_theme_amber_bg());
+        draw_line(layer, ui_layout_x(layout, 154.0f),
+                  ui_layout_y(layout, CONTROL_Y - 9.0f),
+                  ui_layout_x(layout, 154.0f),
+                  ui_layout_y(layout, CONTROL_Y + 9.0f),
+                  3.6f * scale, bg);
+        draw_line(layer, ui_layout_x(layout, 166.0f),
+                  ui_layout_y(layout, CONTROL_Y - 9.0f),
+                  ui_layout_x(layout, 166.0f),
+                  ui_layout_y(layout, CONTROL_Y + 9.0f),
+                  3.6f * scale, bg);
     } else {
-        draw_line(layer, ui_layout_x(layout, 156.0f),
-                  ui_layout_y(layout, CONTROL_Y - 10.0f),
-                  ui_layout_x(layout, 156.0f),
-                  ui_layout_y(layout, CONTROL_Y + 10.0f),
-                  3.0f * scale, ui_theme_amber_bg());
-        draw_line(layer, ui_layout_x(layout, 156.0f),
-                  ui_layout_y(layout, CONTROL_Y - 10.0f),
-                  ui_layout_x(layout, 170.0f),
+        draw_line(layer, ui_layout_x(layout, 155.0f),
+                  ui_layout_y(layout, CONTROL_Y - 11.0f),
+                  ui_layout_x(layout, 155.0f),
+                  ui_layout_y(layout, CONTROL_Y + 11.0f),
+                  3.6f * scale, bg);
+        draw_line(layer, ui_layout_x(layout, 155.0f),
+                  ui_layout_y(layout, CONTROL_Y - 11.0f),
+                  ui_layout_x(layout, 172.0f),
                   ui_layout_y(layout, CONTROL_Y),
-                  3.0f * scale, ui_theme_amber_bg());
-        draw_line(layer, ui_layout_x(layout, 170.0f),
+                  3.6f * scale, bg);
+        draw_line(layer, ui_layout_x(layout, 172.0f),
                   ui_layout_y(layout, CONTROL_Y),
-                  ui_layout_x(layout, 156.0f),
-                  ui_layout_y(layout, CONTROL_Y + 10.0f),
-                  3.0f * scale, ui_theme_amber_bg());
+                  ui_layout_x(layout, 155.0f),
+                  ui_layout_y(layout, CONTROL_Y + 11.0f),
+                  3.6f * scale, bg);
     }
 }
 
 static void canvas_draw_cb(lv_event_t *event) {
+    if (lv_event_get_code(event) != LV_EVENT_DRAW_MAIN) return;
+
     lv_obj_t *canvas = lv_event_get_target(event);
     lv_layer_t *layer = lv_event_get_layer(event);
     music_screen_t *scr = lv_obj_get_user_data(canvas);
@@ -236,17 +199,60 @@ static void canvas_draw_cb(lv_event_t *event) {
     lv_area_t area;
     lv_obj_get_coords(canvas, &area);
     const ui_layout_t layout = layout_of(&area);
-    const int32_t cx = (int32_t)lroundf(ui_layout_x(&layout, MUSIC_CX));
-    const int32_t cy = (int32_t)lroundf(ui_layout_y(&layout, MUSIC_CY));
     const float scale = layout.scale;
+    const float progress = scr->progress < 0.0f ? 0.0f
+                           : scr->progress > 1.0f ? 1.0f : scr->progress;
 
-    draw_full_arc(layer, cx, cy, RING_RADIUS * scale, RING_WIDTH * scale,
-                  ui_theme_amber_dim());
-    draw_wrapped_arc(layer, cx, cy, RING_RADIUS * scale, RING_WIDTH * scale,
-                     270.0f, 360.0f * scr->progress,
-                     ui_theme_amber_bright());
-    draw_disc(layer, &layout);
-    draw_controls(layer, &layout, true);
+    // Un seul indicateur horizontal : discret au repos, lisible quand il est
+    // rempli, sans fermer le masque circulaire par un anneau périphérique.
+    draw_line(layer, ui_layout_x(&layout, PROGRESS_LEFT),
+              ui_layout_y(&layout, PROGRESS_Y),
+              ui_layout_x(&layout, PROGRESS_RIGHT),
+              ui_layout_y(&layout, PROGRESS_Y),
+              3.0f * scale, ui_theme_amber_dim());
+    draw_line(layer, ui_layout_x(&layout, PROGRESS_LEFT),
+              ui_layout_y(&layout, PROGRESS_Y),
+              ui_layout_x(&layout, PROGRESS_LEFT +
+                                  (PROGRESS_RIGHT - PROGRESS_LEFT) * progress),
+              ui_layout_y(&layout, PROGRESS_Y),
+              5.0f * scale, ui_theme_amber_bright());
+    draw_art(layer, &layout);
+    draw_controls(layer, &layout, scr->playing);
+}
+
+static void music_button_event_cb(lv_event_t *event) {
+    if (lv_event_get_code(event) != LV_EVENT_CLICKED) return;
+
+    lv_obj_t *button = lv_event_get_target(event);
+    music_screen_t *scr = lv_obj_get_user_data(button);
+    if (scr == NULL) return;
+
+    if (button == scr->play_button) {
+        scr->playing = !scr->playing;
+        lv_obj_invalidate(scr->canvas);
+    }
+    // Previous/next are deliberately consumed here: the demo has one stable
+    // track, and a tap must not become a dashboard page-navigation click.
+}
+
+static lv_obj_t *create_touch_target(lv_obj_t *parent, music_screen_t *scr,
+                                     float x, float y) {
+    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
+                                              lv_obj_get_height(parent));
+    const int32_t size = (int32_t)lroundf(CONTROL_TARGET_SIZE * layout.scale);
+    lv_obj_t *button = lv_obj_create(parent);
+    if (button == NULL) return NULL;
+
+    lv_obj_remove_style_all(button);
+    lv_obj_set_size(button, size, size);
+    lv_obj_set_pos(button,
+                   (int32_t)lroundf(ui_layout_x(&layout, x)) - size / 2,
+                   (int32_t)lroundf(ui_layout_y(&layout, y)) - size / 2);
+    lv_obj_clear_flag(button, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(button, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_set_user_data(button, scr);
+    lv_obj_add_event_cb(button, music_button_event_cb, LV_EVENT_CLICKED, NULL);
+    return button;
 }
 
 music_screen_t *music_screen_create(lv_obj_t *parent) {
@@ -256,52 +262,52 @@ music_screen_t *music_screen_create(lv_obj_t *parent) {
     if (scr == NULL) return NULL;
     lv_memzero(scr, sizeof(*scr));
     scr->progress = DEMO_PROGRESS;
+    scr->playing = true;
 
-    lv_obj_set_style_bg_color(parent, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
-    lv_obj_update_layout(parent);
-
-    const int32_t side = LV_MIN(lv_obj_get_content_width(parent),
-                                lv_obj_get_content_height(parent));
-    if (side <= 0) goto fail;
-
-    scr->root = lv_obj_create(parent);
+    scr->root = amber_ui_root_create(parent);
     if (scr->root == NULL) goto fail;
-    lv_obj_remove_style_all(scr->root);
-    lv_obj_set_size(scr->root, side, side);
-    lv_obj_center(scr->root);
-    lv_obj_set_style_bg_color(scr->root, ui_theme_amber_bg(), 0);
-    lv_obj_set_style_bg_opa(scr->root, LV_OPA_COVER, 0);
-    lv_obj_clear_flag(scr->root, LV_OBJ_FLAG_SCROLLABLE);
 
     scr->canvas = amber_ui_canvas_create(scr->root, scr, canvas_draw_cb);
     if (scr->canvas == NULL) goto fail;
 
+    // Le titre reste nettement plus grand que les métadonnées, mais 48 px
+    // garde la chaîne complète dans le diamètre utile du panneau rond.
     scr->title = amber_value_widget_create(
-        scr->root, amber_ui_font_value(), MUSIC_CX,
+        scr->root, &lv_font_montserrat_48, MUSIC_CX,
         TITLE_Y, 1, DEMO_TITLE);
     if (scr->title == NULL) goto fail;
 
     scr->artist = amber_ui_label_create(
-        scr->root, ui_font_or(ui_font_m, &lv_font_montserrat_20),
-        ui_theme_amber_dim(), DEMO_ARTIST, 0.0f);
-    amber_ui_place_centered(scr->artist, scr->root, MUSIC_CX, ARTIST_Y, 0.0f,
-                            0.0f);
+        scr->root, amber_ui_font_value(), ui_theme_amber_dim(), DEMO_ARTIST,
+        MUSIC_TEXT_WIDTH);
+    amber_ui_place_centered(scr->artist, scr->root, MUSIC_CX, ARTIST_Y,
+                            MUSIC_TEXT_WIDTH, 0.0f);
     if (scr->artist == NULL) goto fail;
 
     scr->position = amber_ui_label_create(
-        scr->root, ui_font_or(ui_font_m, &lv_font_montserrat_20),
-        ui_theme_amber_dim(), DEMO_POSITION, 0.0f);
-    amber_ui_place_centered(scr->position, scr->root, 65.0f, TIME_Y, 0.0f,
-                            0.0f);
+        scr->root, amber_ui_font_value(), ui_theme_amber_bright(),
+        DEMO_POSITION, 0.0f);
+    amber_ui_place_centered(scr->position, scr->root, PROGRESS_LEFT, TIME_Y,
+                            0.0f, 0.0f);
     if (scr->position == NULL) goto fail;
 
     scr->duration = amber_ui_label_create(
-        scr->root, ui_font_or(ui_font_m, &lv_font_montserrat_20),
-        ui_theme_amber_dim(), DEMO_DURATION, 0.0f);
-    amber_ui_place_centered(scr->duration, scr->root, 255.0f, TIME_Y, 0.0f,
-                            0.0f);
+        scr->root, amber_ui_font_value(), ui_theme_amber_dim(), DEMO_DURATION,
+        0.0f);
+    amber_ui_place_centered(scr->duration, scr->root, PROGRESS_RIGHT, TIME_Y,
+                            0.0f, 0.0f);
     if (scr->duration == NULL) goto fail;
+
+    // Cibles séparées du canvas : elles restent tactiles même si le dessin est
+    // redimensionné, et ne perturbent pas le geste de navigation du dashboard.
+    scr->previous_button = create_touch_target(
+        scr->root, scr, CONTROL_LEFT, CONTROL_Y);
+    if (scr->previous_button == NULL) goto fail;
+    scr->play_button = create_touch_target(scr->root, scr, MUSIC_CX, CONTROL_Y);
+    if (scr->play_button == NULL) goto fail;
+    scr->next_button = create_touch_target(
+        scr->root, scr, CONTROL_RIGHT, CONTROL_Y);
+    if (scr->next_button == NULL) goto fail;
 
     return scr;
 

@@ -14,7 +14,6 @@
 #define SCREEN_CX 160.0f
 #define SCREEN_CY 160.0f
 
-#define OUTER_R 151.0f
 #define RPM_RING_R 141.0f
 #define RPM_RING_W 7.0f
 #define RPM_MAX 2000.0f
@@ -23,32 +22,25 @@
 #define RPM_SEGMENTS 28
 #define RPM_SEGMENT_GAP 1.8f
 
-// Rails latéraux très courts : ils donnent le contexte de régulation sans
-// concurrencer la valeur RPM ni les quatre cartes de télémétrie.
-#define SIDE_METER_X_LEFT 45.0f
-#define SIDE_METER_X_RIGHT 275.0f
-#define SIDE_METER_Y0 105.0f
-#define SIDE_METER_Y1 147.0f
-#define SIDE_METER_SEGMENTS 6
-#define SIDE_METER_W 3.0f
-
-// La grille est volontairement en deux rangées. Chaque libellé dispose ainsi
-// d'une largeur réelle, et aucun texte ne vient toucher la couronne ronde.
-#define TITLE_Y 36.0f
+// La couronne reste en retrait du bord réel du panneau. Le centre est réservé
+// à la lecture immédiate : RPM, erreur, puis les quatre valeurs de régulation.
+#define TITLE_Y 35.0f
 #define SUBTITLE_Y 61.0f
-#define HERO_Y 119.0f
-#define HERO_UNIT_Y 148.0f
-#define ERROR_Y 169.0f
-#define GRID_Y 187.0f
-#define METRIC_VALUE_TOP_Y 203.0f
-#define METRIC_NAME_TOP_Y 221.0f
-#define METRIC_VALUE_BOTTOM_Y 243.0f
-#define METRIC_NAME_BOTTOM_Y 261.0f
-#define STATUS_Y 289.0f
+#define HERO_Y 116.0f
+#define HERO_UNIT_Y 151.0f
+#define ERROR_Y 175.0f
+#define GRID_Y 238.0f
+#define METRIC_VALUE_TOP_Y 204.0f
+#define METRIC_NAME_TOP_Y 226.0f
+#define METRIC_VALUE_BOTTOM_Y 253.0f
+#define METRIC_NAME_BOTTOM_Y 276.0f
+#define STATUS_Y 296.0f
 
 #define LINE_W 0.8f
-#define TICK_W 1.1f
 #define BOLD_SPREAD_PX 2
+// LVGL exprime l'échelle de transformation avec 256 = 100 %.
+#define HERO_SCALE 288
+#define METRIC_SCALE 320
 
 #define METRIC_COUNT 4
 enum {
@@ -99,110 +91,34 @@ struct idle_screen_s {
     bool connected;
 };
 
-static void draw_segment_meter(lv_layer_t *layer, const ui_layout_t *layout,
-                               float x, float value, float low, float high,
-                               bool connected) {
-    const lv_color_t bright = ui_theme_amber_bright();
-    const lv_color_t dim = ui_theme_amber_dim();
-    const float step = (SIDE_METER_Y1 - SIDE_METER_Y0) /
-                       (float)SIDE_METER_SEGMENTS;
-    const int lit = (int)lroundf(amber_progress(value, low, high) *
-                                 (float)SIDE_METER_SEGMENTS);
-
-    for (int i = 0; i < SIDE_METER_SEGMENTS; i++) {
-        const float y = SIDE_METER_Y1 - ((float)i + 0.5f) * step;
-        const lv_color_t color = connected && i < lit ? bright : dim;
-        amber_draw_line(layer, layout, x - SIDE_METER_W, y, x + SIDE_METER_W,
-                        y, 2.5f, color, false);
-    }
-
-}
-
 static void draw_rpm_ring(lv_layer_t *layer, const ui_layout_t *layout,
                           const idle_screen_t *screen) {
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
-    const lv_color_t separator = ui_theme_amber_separator();
     const float actual = amber_progress(screen->rpm, 0.0f, RPM_MAX);
     const int lit = (int)lroundf(actual * RPM_SEGMENTS);
     const float pitch = RPM_RING_SWEEP / (float)RPM_SEGMENTS;
     const float bar = pitch - RPM_SEGMENT_GAP;
 
-    // Trois couronnes donnent au cadran une profondeur mécanique tout en
-    // conservant des extrémités nettes, comme des cellules usinées.
-    amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, OUTER_R, 0.8f,
-                   0.0f, 360.0f, separator, false);
-    amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, OUTER_R - 4.0f, 0.55f,
-                   0.0f, 360.0f, dim, false);
-
+    // Une seule couronne segmentée suffit à situer le régime. Les graduations
+    // latérales, l'aiguille et l'arc intérieur sont volontairement absents :
+    // ils détournaient l'œil des chiffres utiles à la conduite.
     for (int i = 0; i < RPM_SEGMENTS; i++) {
         const float start = RPM_RING_START + (float)i * pitch;
         const lv_color_t color = screen->connected && i < lit ? bright : dim;
         amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, RPM_RING_R,
                        RPM_RING_W, start, start + bar, color, false);
     }
-
-    // Graduations et repères de plage : elles sont visibles à bas régime et
-    // restent volontairement monochromes lorsque la liaison est absente.
-    for (int i = 0; i <= 8; i++) {
-        const float fraction = (float)i / 8.0f;
-        const float angle = RPM_RING_START + RPM_RING_SWEEP * fraction;
-        const bool major = (i % 2) == 0;
-        amber_draw_tick(layer, layout, SCREEN_CX, SCREEN_CY, angle, 146.0f,
-                        major ? 151.0f : 149.0f, major ? 1.4f : TICK_W,
-                        screen->connected && fraction <= actual ? bright : dim,
-                        false);
-    }
-
-    // Aiguille de consigne : trait fin interrompu par un point, distinct de la
-    // progression réelle pour comparer instantanément cible et régime.
-    const float target_angle = RPM_RING_START + RPM_RING_SWEEP *
-                               amber_progress(screen->setpoint, 0.0f, RPM_MAX);
-    amber_draw_tick(layer, layout, SCREEN_CX, SCREEN_CY, target_angle, 132.0f,
-                    151.5f, 1.0f, separator, false);
-    const float radians = target_angle * 0.01745329252f;
-    amber_draw_dot(layer, layout, SCREEN_CX + cosf(radians) * 153.0f,
-                   SCREEN_CY + sinf(radians) * 153.0f, 1.7f, separator);
-
-    // Anneau de correction compact : la position autour du zéro reflète
-    // l'ajusteur en tr/min sans introduire une couleur d'alerte.
-    const float correction = amber_clampf(screen->adjuster, -300.0f, 300.0f);
-    const float correction_span = 54.0f;
-    const float correction_angle = 270.0f + correction / 300.0f * correction_span;
-    amber_draw_arc(layer, layout, SCREEN_CX, SCREEN_CY, 111.0f, 1.2f,
-                   270.0f - correction_span, 270.0f + correction_span, dim,
-                   false);
-    amber_draw_tick(layer, layout, SCREEN_CX, SCREEN_CY, correction_angle,
-                    106.0f, 116.0f, 1.7f,
-                    screen->connected ? bright : dim, false);
-    amber_draw_dot(layer, layout, SCREEN_CX, SCREEN_CY, 2.0f, separator);
 }
 
 static void draw_panel_lines(lv_layer_t *layer, const ui_layout_t *layout) {
     const lv_color_t separator = ui_theme_amber_separator();
 
-    // Les repères restent ouverts : ils structurent l'information sans créer
-    // de cadres qui viendraient toucher les textes ou la couronne.
-    amber_draw_line(layer, layout, 58.0f, 70.0f, 116.0f, 70.0f, LINE_W,
+    // Une croix ouverte suffit à lire les quatre cases. Elle reste dans la
+    // zone sûre du disque et ne ferme aucun cadre autour des textes.
+    amber_draw_line(layer, layout, 160.0f, 194.0f, 160.0f, 282.0f, LINE_W,
                     separator, false);
-    amber_draw_line(layer, layout, 204.0f, 70.0f, 262.0f, 70.0f, LINE_W,
-                    separator, false);
-
-    amber_draw_line(layer, layout, 56.0f, GRID_Y, 123.0f, GRID_Y, LINE_W,
-                    separator, false);
-    amber_draw_line(layer, layout, 197.0f, GRID_Y, 264.0f, GRID_Y, LINE_W,
-                    separator, false);
-    amber_draw_line(layer, layout, 128.0f, GRID_Y, 192.0f, GRID_Y, 0.55f,
-                    ui_theme_amber_dim(), false);
-
-    // Deux colonnes, deux rangées : la séparation tombe dans les espaces,
-    // jamais au travers d'un nombre ou d'un libellé.
-    amber_draw_line(layer, layout, 160.0f, GRID_Y + 6.0f, 160.0f, 268.0f,
-                    LINE_W, separator, false);
-    amber_draw_line(layer, layout, 61.0f, 232.0f, 259.0f, 232.0f, LINE_W,
-                    separator, false);
-
-    amber_draw_line(layer, layout, 67.0f, 274.0f, 253.0f, 274.0f, LINE_W,
+    amber_draw_line(layer, layout, 64.0f, GRID_Y, 256.0f, GRID_Y, LINE_W,
                     separator, false);
 }
 
@@ -219,10 +135,6 @@ static void canvas_draw_cb(lv_event_t *event) {
     const ui_layout_t layout = amber_draw_layout(&area);
 
     draw_rpm_ring(layer, &layout, screen);
-    draw_segment_meter(layer, &layout, SIDE_METER_X_LEFT, screen->valve,
-                       0.0f, 100.0f, screen->connected);
-    draw_segment_meter(layer, &layout, SIDE_METER_X_RIGHT, screen->base,
-                       0.0f, 100.0f, screen->connected);
     draw_panel_lines(layer, &layout);
 }
 
@@ -288,7 +200,7 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
     screen->title = amber_ui_label_create(screen->root, font_caption, bright,
                                           "RALENTI", 0.0f);
     screen->subtitle = amber_ui_label_create(screen->root, font_caption, dim,
-                                             "BOUCLE FERMEE", 0.0f);
+                                             "", 0.0f);
 
     // Le décalage du calque dim simule le faux-gras Michroma sans modifier la
     // police, comme sur le cadran RPM ambre de référence.
@@ -298,7 +210,7 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
                                          screen->hero_text, 0.0f);
     screen->hero_unit = amber_ui_label_create(screen->root, font_caption,
                                               bright, "RPM", 0.0f);
-    screen->error = amber_ui_label_create(screen->root, font_value, dim,
+    screen->error = amber_ui_label_create(screen->root, font_value, bright,
                                           screen->error_text, 0.0f);
     screen->status = amber_ui_label_create(screen->root, font_caption, dim,
                                            screen->status_text, 0.0f);
@@ -331,10 +243,19 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
         screen->status == NULL) {
         goto fail;
     }
+    lv_obj_add_flag(screen->hero_shadow, LV_OBJ_FLAG_HIDDEN);
+
     for (int i = 0; i < METRIC_COUNT; i++) {
         if (screen->metric_value[i] == NULL || screen->metric_name[i] == NULL) {
             goto fail;
         }
+    }
+
+    lv_obj_set_style_transform_scale(screen->hero_shadow, HERO_SCALE, 0);
+    lv_obj_set_style_transform_scale(screen->hero, HERO_SCALE, 0);
+    lv_obj_set_style_transform_scale(screen->error, HERO_SCALE, 0);
+    for (int i = 0; i < METRIC_COUNT; i++) {
+        lv_obj_set_style_transform_scale(screen->metric_value[i], METRIC_SCALE, 0);
     }
 
     amber_ui_place_centered(screen->title, screen->root, SCREEN_CX, TITLE_Y,

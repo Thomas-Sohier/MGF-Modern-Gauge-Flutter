@@ -37,7 +37,7 @@
 #define HSEP_X2       290.0f
 
 // Séparateurs verticaux
-#define VSEP_TOP_OUT  160.0f
+#define VSEP_TOP_OUT  168.0f
 #define VSEP_TOP_MID  (HSEP_Y + SEP_GAP)
 static const float kVSep[3][3] = {
     {95.0f, VSEP_TOP_OUT, 280.0f},

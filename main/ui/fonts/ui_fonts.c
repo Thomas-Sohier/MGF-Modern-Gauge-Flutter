@@ -9,7 +9,7 @@ const lv_font_t *ui_font_m = NULL;
 // doivent correspondre à la résolution de rendu, ici 480).
 #define UI_FONT_XL_PX 56   // « 800 »
 #define UI_FONT_L_PX  20
-#define UI_FONT_M_PX  21   // RPM / valeurs, adapté aux colonnes 480 px
+#define UI_FONT_M_PX  16   // légendes compactes, adaptées aux zones sûres du disque
 
 void ui_fonts_init(const void *ttf_data, size_t ttf_size) {
     if (ui_font_xl || !ttf_data || ttf_size == 0) return; // déjà fait / pas de données

@@ -71,6 +71,11 @@ amber_value_widget_t *amber_value_widget_create(lv_obj_t *parent,
         return NULL;
     }
 
+    // Un calque décalé produit un texte doublé avec Michroma, particulièrement
+    // visible quand sa couleur diffère. Conserver l'objet pour la compatibilité
+    // du widget, mais rendre uniquement le calque frontal net.
+    lv_obj_add_flag(value->shadow, LV_OBJ_FLAG_HIDDEN);
+
     place_centered(value->shadow, value, +spread);
     place_centered(value->front, value, -spread);
     return value;

@@ -9,36 +9,31 @@
 #include <stdio.h>
 
 // Repère unique du cadran ambre : 320 unités, quelle que soit la taille du
-// parent. Le panneau réel est un disque de 480 px.
+// parent. La composition reste à l'intérieur d'une marge circulaire sûre.
 #define CX 160.0f
 #define CY 160.0f
 
-#define OUTER_R 151.0f
-#define OUTER_W 3.0f
-#define AFR_SEGMENTS 32
 #define AFR_MIN 10.0f
 #define AFR_MAX 20.0f
-#define AFR_DANGER 17.0f
+#define AFR_SEGMENTS 12
+#define AFR_BAR_X1 66.0f
+#define AFR_BAR_X2 254.0f
+#define AFR_BAR_Y 70.0f
+#define AFR_BAR_GAP 5.0f
+#define AFR_BAR_W 6.0f
 
-#define METER_MIN_Y 74.0f
-#define METER_MAX_Y 124.0f
-#define METER_SEGMENTS 9
-#define METER_X_LEFT 31.0f
-#define METER_X_RIGHT 289.0f
-#define METER_W 10.0f
-
-#define DUTY_R 116.0f
-#define DUTY_SEGMENTS 18
-#define DUTY_START 24.0f
-#define DUTY_END 156.0f
-
-#define LINE_W 0.8f
-#define ICON_W 1.2f
+#define O2_SEGMENTS 5
+#define O2_BAR_GAP 4.0f
+#define O2_BAR_W 4.5f
+#define O2_LEFT_X1 48.0f
+#define O2_LEFT_X2 112.0f
+#define O2_RIGHT_X1 208.0f
+#define O2_RIGHT_X2 272.0f
+#define O2_BAR_Y 253.0f
 
 // Une paire de labels permet de conserver le faux-gras du style amber sans
-// dépendre d'une variante bold de Michroma. Les textes sont toujours statiques
-// : les buffers appartiennent à lambda_screen_s et vivent aussi longtemps que
-// les labels.
+// dépendre d'une variante bold de Michroma. Les buffers appartiennent à la
+// vue et vivent aussi longtemps que les labels.
 typedef struct {
     lv_obj_t *shadow;
     lv_obj_t *front;
@@ -49,8 +44,6 @@ struct lambda_screen_s {
     lv_obj_t *canvas;
 
     amber_text_t title;
-    amber_text_t subtitle;
-    amber_text_t signal;
     amber_text_t afr;
     amber_text_t afr_unit;
     amber_text_t lambda_value;
@@ -60,13 +53,13 @@ struct lambda_screen_s {
     amber_text_t o2_unit;
     amber_text_t o2_label;
     amber_text_t duty_value;
-    amber_text_t duty_unit;
     amber_text_t duty_label;
 
     char afr_buf[12];
     char lambda_buf[12];
     char o2_buf[12];
     char duty_buf[12];
+    char duty_state_buf[28];
     bool connected;
     float afr_value;
     float lambda_mv;
@@ -74,85 +67,37 @@ struct lambda_screen_s {
     float duty;
 };
 
-static void draw_afr_ring(lv_layer_t *layer, const ui_layout_t *layout,
-                          const lambda_screen_t *screen) {
+static void draw_segment_bar(lv_layer_t *layer, const ui_layout_t *layout,
+                             float x1, float x2, float y, int segments,
+                             float gap, float width, int lit, bool connected) {
+    const float step = (x2 - x1) / (float)segments;
+    const float segment_width = step - gap;
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
-    const lv_color_t separator = ui_theme_amber_separator();
-    const float progress = amber_progress(screen->afr_value, AFR_MIN, AFR_MAX);
-    const int lit = (int)lroundf(progress * AFR_SEGMENTS);
-    const float gap = 2.0f;
-    const float bar = (360.0f - AFR_SEGMENTS * gap) / AFR_SEGMENTS;
 
-    // Couronne d'instrument : chaque cellule a des bords francs et un espace
-    // constant, comme le compte-tours du style amber.
-    for (int i = 0; i < AFR_SEGMENTS; i++) {
-        const float start = (float)i * (bar + gap) + gap * 0.5f;
-        const lv_color_t color = (screen->connected && i < lit) ? bright : dim;
-        amber_draw_arc(layer, layout, CX, CY, OUTER_R, OUTER_W, start,
-                       start + bar, color, false);
-    }
-
-    // Fenêtre de mélange nominale : deux repères fins, jamais une couleur
-    // d'alerte. Ils rendent la zone de référence lisible sous toute intensité.
-    const float nominal_low = amber_progress(14.0f, AFR_MIN, AFR_MAX) * 360.0f;
-    const float nominal_high = amber_progress(15.2f, AFR_MIN, AFR_MAX) * 360.0f;
-    amber_draw_arc(layer, layout, CX, CY, OUTER_R + 2.5f, 0.8f,
-                   nominal_low - 2.0f, nominal_low + 2.0f, separator, false);
-    amber_draw_arc(layer, layout, CX, CY, OUTER_R + 2.5f, 0.8f,
-                   nominal_high - 2.0f, nominal_high + 2.0f, separator, false);
-
-    // Le seuil AFR est une rupture de structure. Hors plage, un second trait
-    // autour du curseur renforce l'information sans introduire rouge ou vert.
-    const float danger_angle = amber_progress(AFR_DANGER, AFR_MIN, AFR_MAX) * 360.0f;
-    amber_draw_tick(layer, layout, CX, CY, danger_angle, OUTER_R - 4.0f,
-                    OUTER_R + 4.0f, ICON_W, separator, false);
-    if (screen->afr_value >= AFR_DANGER) {
-        amber_draw_tick(layer, layout, CX, CY, danger_angle - 3.0f,
-                        OUTER_R - 7.0f, OUTER_R + 4.0f, ICON_W, bright, false);
-        amber_draw_tick(layer, layout, CX, CY, danger_angle + 3.0f,
-                        OUTER_R - 7.0f, OUTER_R + 4.0f, ICON_W, bright, false);
+    for (int i = 0; i < segments; i++) {
+        const float start = x1 + i * step + gap * 0.5f;
+        const float end = start + segment_width;
+        const lv_color_t color = connected && i < lit ? bright : dim;
+        amber_draw_line(layer, layout, start, y, end, y, width, color, false);
     }
 }
 
-static void draw_sensor_meter(lv_layer_t *layer, const ui_layout_t *layout,
-                              float x, float value, lv_color_t color) {
-    const int lit = (int)lroundf(amber_progress(value, 0.0f, 1000.0f) * METER_SEGMENTS);
-    const float step = (METER_MAX_Y - METER_MIN_Y) / METER_SEGMENTS;
-
-    for (int i = 0; i < METER_SEGMENTS; i++) {
-        const float y = METER_MAX_Y - (i + 0.5f) * step;
-        const lv_color_t segment = i < lit ? color : ui_theme_amber_dim();
-        amber_draw_line(layer, layout, x - METER_W * 0.5f, y,
-                        x + METER_W * 0.5f, y, 2.0f, segment, false);
-    }
-
-    // Petite échelle externe : elle distingue la télémétrie de la valeur AFR.
-    amber_draw_line(layer, layout, x - METER_W * 0.5f - 4.0f, METER_MIN_Y,
-                    x - METER_W * 0.5f - 4.0f, METER_MAX_Y,
-                    LINE_W, ui_theme_amber_separator(), false);
+static void draw_afr_meter(lv_layer_t *layer, const ui_layout_t *layout,
+                           const lambda_screen_t *screen) {
+    const int lit = (int)lroundf(amber_progress(screen->afr_value, AFR_MIN,
+                                                AFR_MAX) * AFR_SEGMENTS);
+    draw_segment_bar(layer, layout, AFR_BAR_X1, AFR_BAR_X2, AFR_BAR_Y,
+                     AFR_SEGMENTS, AFR_BAR_GAP, AFR_BAR_W, lit,
+                     screen->connected);
 }
 
-static void draw_duty_meter(lv_layer_t *layer, const ui_layout_t *layout,
-                            const lambda_screen_t *screen) {
-    const float progress = amber_progress(screen->duty, 0.0f, 100.0f);
-    const int lit = (int)lroundf(progress * DUTY_SEGMENTS);
-    const float gap = 2.0f;
-    const float step = (DUTY_END - DUTY_START) / DUTY_SEGMENTS;
-
-    for (int i = 0; i < DUTY_SEGMENTS; i++) {
-        const float start = DUTY_START + i * step + gap * 0.5f;
-        const float end = DUTY_START + (i + 1) * step - gap * 0.5f;
-        const lv_color_t color = (screen->connected && i < lit)
-                                     ? ui_theme_amber_bright()
-                                     : ui_theme_amber_dim();
-        amber_draw_arc(layer, layout, CX, CY, DUTY_R, 2.0f, start, end,
-                       color, false);
-    }
-
-    // Repère zéro central, volontairement séparé de la couronne.
-    amber_draw_dot(layer, layout, CX, CY + DUTY_R, 1.4f,
-                   ui_theme_amber_separator());
+static void draw_o2_meter(lv_layer_t *layer, const ui_layout_t *layout,
+                          float x1, float x2, float value, bool connected) {
+    const int lit = (int)lroundf(amber_progress(value, 0.0f, 1000.0f) *
+                               O2_SEGMENTS);
+    draw_segment_bar(layer, layout, x1, x2, O2_BAR_Y, O2_SEGMENTS,
+                     O2_BAR_GAP, O2_BAR_W, lit, connected);
 }
 
 static void canvas_draw_cb(lv_event_t *event) {
@@ -165,31 +110,13 @@ static void canvas_draw_cb(lv_event_t *event) {
     lv_obj_get_coords(canvas, &area);
     const ui_layout_t layout = amber_draw_layout(&area);
 
-    draw_afr_ring(layer, &layout, screen);
-    draw_sensor_meter(layer, &layout, METER_X_LEFT, screen->lambda_mv,
-                      screen->connected ? ui_theme_amber_bright()
-                                         : ui_theme_amber_dim());
-    draw_sensor_meter(layer, &layout, METER_X_RIGHT, screen->o2_mv,
-                      screen->connected ? ui_theme_amber_bright()
-                                         : ui_theme_amber_dim());
-    draw_duty_meter(layer, &layout, screen);
-
-    // Architecture ouverte : les filets s'arrêtent avant les blocs de texte.
-    amber_draw_line(layer, &layout, 48.0f, 61.0f, 125.0f, 61.0f,
-                    LINE_W, ui_theme_amber_separator(), false);
-    amber_draw_line(layer, &layout, 195.0f, 61.0f, 272.0f, 61.0f,
-                    LINE_W, ui_theme_amber_separator(), false);
-    amber_draw_line(layer, &layout, 78.0f, 190.0f, 122.0f, 190.0f,
-                    LINE_W, ui_theme_amber_separator(), false);
-    amber_draw_line(layer, &layout, 198.0f, 190.0f, 242.0f, 190.0f,
-                    LINE_W, ui_theme_amber_separator(), false);
-
-    // Un noyau en deux arcs apporte une profondeur de cadran sans fermer la
-    // lecture de la valeur centrale.
-    amber_draw_arc(layer, &layout, CX, CY, 82.0f, LINE_W, 196.0f, 344.0f,
-                   ui_theme_amber_separator(), false);
-    amber_draw_arc(layer, &layout, CX, CY, 88.0f, 0.7f, 16.0f, 164.0f,
-                   ui_theme_amber_dim(), false);
+    // Une seule lecture graphique par niveau : un indicateur AFR dominant et
+    // deux petites barres de tension, sans couronne ni graduation redondante.
+    draw_afr_meter(layer, &layout, screen);
+    draw_o2_meter(layer, &layout, O2_LEFT_X1, O2_LEFT_X2,
+                  screen->lambda_mv, screen->connected);
+    draw_o2_meter(layer, &layout, O2_RIGHT_X1, O2_RIGHT_X2,
+                  screen->o2_mv, screen->connected);
 }
 
 static void text_style(amber_text_t *text, lv_color_t front,
@@ -217,141 +144,112 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
 
     const lv_font_t *title_font = ui_font_or(ui_font_m, &lv_font_montserrat_20);
     const lv_font_t *body_font = amber_ui_font_value();
-    const lv_font_t *caption_font = &lv_font_montserrat_14;
+    const lv_font_t *caption_font = amber_ui_font_caption();
     const lv_font_t *hero_font = amber_ui_font_hero();
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
     const lv_color_t separator = ui_theme_amber_separator();
 
     screen->title.shadow = amber_ui_label_create(
-        screen->root, title_font, separator, "LARGE BANDE / AFR", 0.0f);
+        screen->root, title_font, separator, "AFR", 120.0f);
     screen->title.front = amber_ui_label_create(
-        screen->root, title_font, bright, "LARGE BANDE / AFR", 0.0f);
-    amber_ui_place_centered(screen->title.shadow, screen->root, CX, 30.0f,
-                            0.0f, amber_ui_bold_spread(1));
-    amber_ui_place_centered(screen->title.front, screen->root, CX, 30.0f,
-                            0.0f, -amber_ui_bold_spread(1));
-
-    screen->subtitle.shadow = amber_ui_label_create(
-        screen->root, caption_font, dim, "RESEAU DE SONDES", 0.0f);
-    screen->subtitle.front = amber_ui_label_create(
-        screen->root, caption_font, dim, "RESEAU DE SONDES", 0.0f);
-    amber_ui_place_centered(screen->subtitle.shadow, screen->root, CX, 48.0f,
-                            0.0f, 0.0f);
-    amber_ui_place_centered(screen->subtitle.front, screen->root, CX, 48.0f,
-                            0.0f, 0.0f);
-
-    screen->signal.shadow = amber_ui_label_create(
-        screen->root, caption_font, separator, "SIGNAL ACTIF", 0.0f);
-    screen->signal.front = amber_ui_label_create(
-        screen->root, caption_font, bright, "SIGNAL ACTIF", 0.0f);
-    amber_ui_place_centered(screen->signal.shadow, screen->root, CX, 65.0f,
-                            0.0f, 0.0f);
-    amber_ui_place_centered(screen->signal.front, screen->root, CX, 65.0f,
-                            0.0f, 0.0f);
+        screen->root, title_font, bright, "AFR", 120.0f);
+    amber_ui_place_centered(screen->title.shadow, screen->root, CX, 29.0f,
+                            120.0f, amber_ui_bold_spread(1));
+    amber_ui_place_centered(screen->title.front, screen->root, CX, 29.0f,
+                            120.0f, -amber_ui_bold_spread(1));
 
     screen->afr.shadow = amber_ui_label_create(
-        screen->root, hero_font, dim, "0.00", 0.0f);
+        screen->root, hero_font, separator, "--.--", 150.0f);
     screen->afr.front = amber_ui_label_create(
-        screen->root, hero_font, bright, "0.00", 0.0f);
-    amber_ui_place_centered(screen->afr.shadow, screen->root, CX, 141.0f,
-                            0.0f, amber_ui_bold_spread(2));
-    amber_ui_place_centered(screen->afr.front, screen->root, CX, 141.0f,
-                            0.0f, -amber_ui_bold_spread(2));
+        screen->root, hero_font, bright, "--.--", 150.0f);
+    amber_ui_place_centered(screen->afr.shadow, screen->root, CX, 130.0f,
+                            150.0f, amber_ui_bold_spread(2));
+    amber_ui_place_centered(screen->afr.front, screen->root, CX, 130.0f,
+                            150.0f, -amber_ui_bold_spread(2));
 
     screen->afr_unit.shadow = amber_ui_label_create(
-        screen->root, body_font, separator, "AIR / CARB.", 0.0f);
+        screen->root, body_font, separator, "AIR / CARBURANT", 220.0f);
     screen->afr_unit.front = amber_ui_label_create(
-        screen->root, body_font, bright, "AIR / CARB.", 0.0f);
-    amber_ui_place_centered(screen->afr_unit.shadow, screen->root, CX, 177.0f,
-                            0.0f, amber_ui_bold_spread(1));
-    amber_ui_place_centered(screen->afr_unit.front, screen->root, CX, 177.0f,
-                            0.0f, -amber_ui_bold_spread(1));
-
-    screen->lambda_value.shadow = amber_ui_label_create(
-        screen->root, body_font, separator, "0", 0.0f);
-    screen->lambda_value.front = amber_ui_label_create(
-        screen->root, body_font, bright, "0", 0.0f);
-    amber_ui_place_centered(screen->lambda_value.shadow, screen->root, 67.0f,
-                            95.0f, 0.0f, amber_ui_bold_spread(1));
-    amber_ui_place_centered(screen->lambda_value.front, screen->root, 67.0f,
-                            95.0f, 0.0f, -amber_ui_bold_spread(1));
-
-    screen->lambda_unit.shadow = amber_ui_label_create(
-        screen->root, caption_font, dim, "mV", 0.0f);
-    screen->lambda_unit.front = amber_ui_label_create(
-        screen->root, caption_font, dim, "mV", 0.0f);
-    amber_ui_place_centered(screen->lambda_unit.shadow, screen->root, 67.0f,
-                            111.0f, 0.0f, 0.0f);
-    amber_ui_place_centered(screen->lambda_unit.front, screen->root, 67.0f,
-                            111.0f, 0.0f, 0.0f);
+        screen->root, body_font, bright, "AIR / CARBURANT", 220.0f);
+    amber_ui_place_centered(screen->afr_unit.shadow, screen->root, CX, 166.0f,
+                            220.0f, amber_ui_bold_spread(1));
+    amber_ui_place_centered(screen->afr_unit.front, screen->root, CX, 166.0f,
+                            220.0f, -amber_ui_bold_spread(1));
 
     screen->lambda_label.shadow = amber_ui_label_create(
-        screen->root, caption_font, dim, "LAMBDA", 0.0f);
+        screen->root, caption_font, dim, "O2 GAUCHE", 112.0f);
     screen->lambda_label.front = amber_ui_label_create(
-        screen->root, caption_font, dim, "LAMBDA", 0.0f);
-    amber_ui_place_centered(screen->lambda_label.shadow, screen->root, 67.0f,
-                            130.0f, 0.0f, 0.0f);
-    amber_ui_place_centered(screen->lambda_label.front, screen->root, 67.0f,
-                            130.0f, 0.0f, 0.0f);
-
-    screen->o2_value.shadow = amber_ui_label_create(
-        screen->root, body_font, separator, "0", 0.0f);
-    screen->o2_value.front = amber_ui_label_create(
-        screen->root, body_font, bright, "0", 0.0f);
-    amber_ui_place_centered(screen->o2_value.shadow, screen->root, 253.0f,
-                            95.0f, 0.0f, amber_ui_bold_spread(1));
-    amber_ui_place_centered(screen->o2_value.front, screen->root, 253.0f,
-                            95.0f, 0.0f, -amber_ui_bold_spread(1));
-
-    screen->o2_unit.shadow = amber_ui_label_create(
-        screen->root, caption_font, dim, "mV", 0.0f);
-    screen->o2_unit.front = amber_ui_label_create(
-        screen->root, caption_font, dim, "mV", 0.0f);
-    amber_ui_place_centered(screen->o2_unit.shadow, screen->root, 253.0f,
-                            111.0f, 0.0f, 0.0f);
-    amber_ui_place_centered(screen->o2_unit.front, screen->root, 253.0f,
-                            111.0f, 0.0f, 0.0f);
+        screen->root, caption_font, dim, "O2 GAUCHE", 112.0f);
+    amber_ui_place_centered(screen->lambda_label.shadow, screen->root, 80.0f,
+                            202.0f, 112.0f, 0.0f);
+    amber_ui_place_centered(screen->lambda_label.front, screen->root, 80.0f,
+                            202.0f, 112.0f, 0.0f);
 
     screen->o2_label.shadow = amber_ui_label_create(
-        screen->root, caption_font, dim, "SONDE O2", 0.0f);
+        screen->root, caption_font, dim, "O2 DROITE", 112.0f);
     screen->o2_label.front = amber_ui_label_create(
-        screen->root, caption_font, dim, "SONDE O2", 0.0f);
-    amber_ui_place_centered(screen->o2_label.shadow, screen->root, 253.0f,
-                            130.0f, 0.0f, 0.0f);
-    amber_ui_place_centered(screen->o2_label.front, screen->root, 253.0f,
-                            130.0f, 0.0f, 0.0f);
+        screen->root, caption_font, dim, "O2 DROITE", 112.0f);
+    amber_ui_place_centered(screen->o2_label.shadow, screen->root, 240.0f,
+                            202.0f, 112.0f, 0.0f);
+    amber_ui_place_centered(screen->o2_label.front, screen->root, 240.0f,
+                            202.0f, 112.0f, 0.0f);
+
+    screen->lambda_value.shadow = amber_ui_label_create(
+        screen->root, body_font, separator, "--", 100.0f);
+    screen->lambda_value.front = amber_ui_label_create(
+        screen->root, body_font, bright, "--", 100.0f);
+    amber_ui_place_centered(screen->lambda_value.shadow, screen->root, 80.0f,
+                            222.0f, 100.0f, amber_ui_bold_spread(1));
+    amber_ui_place_centered(screen->lambda_value.front, screen->root, 80.0f,
+                            222.0f, 100.0f, -amber_ui_bold_spread(1));
+
+    screen->o2_value.shadow = amber_ui_label_create(
+        screen->root, body_font, separator, "--", 100.0f);
+    screen->o2_value.front = amber_ui_label_create(
+        screen->root, body_font, bright, "--", 100.0f);
+    amber_ui_place_centered(screen->o2_value.shadow, screen->root, 240.0f,
+                            222.0f, 100.0f, amber_ui_bold_spread(1));
+    amber_ui_place_centered(screen->o2_value.front, screen->root, 240.0f,
+                            222.0f, 100.0f, -amber_ui_bold_spread(1));
+
+    screen->lambda_unit.shadow = amber_ui_label_create(
+        screen->root, caption_font, dim, "mV", 48.0f);
+    screen->lambda_unit.front = amber_ui_label_create(
+        screen->root, caption_font, dim, "mV", 48.0f);
+    amber_ui_place_centered(screen->lambda_unit.shadow, screen->root, 80.0f,
+                            240.0f, 48.0f, 0.0f);
+    amber_ui_place_centered(screen->lambda_unit.front, screen->root, 80.0f,
+                            240.0f, 48.0f, 0.0f);
+
+    screen->o2_unit.shadow = amber_ui_label_create(
+        screen->root, caption_font, dim, "mV", 48.0f);
+    screen->o2_unit.front = amber_ui_label_create(
+        screen->root, caption_font, dim, "mV", 48.0f);
+    amber_ui_place_centered(screen->o2_unit.shadow, screen->root, 240.0f,
+                            240.0f, 48.0f, 0.0f);
+    amber_ui_place_centered(screen->o2_unit.front, screen->root, 240.0f,
+                            240.0f, 48.0f, 0.0f);
 
     screen->duty_value.shadow = amber_ui_label_create(
-        screen->root, body_font, separator, "0", 0.0f);
+        screen->root, body_font, separator, "--%", 100.0f);
     screen->duty_value.front = amber_ui_label_create(
-        screen->root, body_font, bright, "0", 0.0f);
-    amber_ui_place_centered(screen->duty_value.shadow, screen->root, CX, 230.0f,
-                            0.0f, amber_ui_bold_spread(1));
-    amber_ui_place_centered(screen->duty_value.front, screen->root, CX, 230.0f,
-                            0.0f, -amber_ui_bold_spread(1));
-
-    screen->duty_unit.shadow = amber_ui_label_create(
-        screen->root, caption_font, dim, "%", 0.0f);
-    screen->duty_unit.front = amber_ui_label_create(
-        screen->root, caption_font, dim, "%", 0.0f);
-    amber_ui_place_centered(screen->duty_unit.shadow, screen->root, CX, 247.0f,
-                            0.0f, 0.0f);
-    amber_ui_place_centered(screen->duty_unit.front, screen->root, CX, 247.0f,
-                            0.0f, 0.0f);
+        screen->root, body_font, bright, "--%", 100.0f);
+    amber_ui_place_centered(screen->duty_value.shadow, screen->root, CX, 269.0f,
+                            100.0f, amber_ui_bold_spread(1));
+    amber_ui_place_centered(screen->duty_value.front, screen->root, CX, 269.0f,
+                            100.0f, -amber_ui_bold_spread(1));
 
     screen->duty_label.shadow = amber_ui_label_create(
-        screen->root, caption_font, dim, "CHAUFFAGE", 0.0f);
+        screen->root, caption_font, separator, "CHAUFFAGE INACTIF", 200.0f);
     screen->duty_label.front = amber_ui_label_create(
-        screen->root, caption_font, dim, "CHAUFFAGE", 0.0f);
-    amber_ui_place_centered(screen->duty_label.shadow, screen->root, CX, 266.0f,
-                            0.0f, 0.0f);
-    amber_ui_place_centered(screen->duty_label.front, screen->root, CX, 266.0f,
-                            0.0f, 0.0f);
+        screen->root, caption_font, dim, "CHAUFFAGE INACTIF", 200.0f);
+    amber_ui_place_centered(screen->duty_label.shadow, screen->root, CX, 291.0f,
+                            200.0f, 0.0f);
+    amber_ui_place_centered(screen->duty_label.front, screen->root, CX, 291.0f,
+                            200.0f, 0.0f);
 
     if (screen->title.shadow == NULL || screen->title.front == NULL ||
-        screen->subtitle.shadow == NULL || screen->subtitle.front == NULL ||
-        screen->signal.shadow == NULL || screen->signal.front == NULL ||
         screen->afr.shadow == NULL || screen->afr.front == NULL ||
         screen->afr_unit.shadow == NULL || screen->afr_unit.front == NULL ||
         screen->lambda_value.shadow == NULL ||
@@ -363,9 +261,22 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
         screen->o2_unit.shadow == NULL || screen->o2_unit.front == NULL ||
         screen->o2_label.shadow == NULL || screen->o2_label.front == NULL ||
         screen->duty_value.shadow == NULL || screen->duty_value.front == NULL ||
-        screen->duty_unit.shadow == NULL || screen->duty_unit.front == NULL ||
         screen->duty_label.shadow == NULL || screen->duty_label.front == NULL) {
         goto fail;
+    }
+
+    // Le décalage de deux couleurs faisait apparaître une seconde glyph plutôt
+    // qu'une graisse homogène. Sur cet écran, les labels restent donc sur un
+    // seul calque net ; les objets shadow sont conservés pour garder l'API de
+    // mise à jour simple et pourront disparaître lors d'un refactoring global.
+    amber_text_t *const texts[] = {
+        &screen->title,       &screen->afr,          &screen->afr_unit,
+        &screen->lambda_value, &screen->lambda_unit, &screen->lambda_label,
+        &screen->o2_value,    &screen->o2_unit,      &screen->o2_label,
+        &screen->duty_value,  &screen->duty_label,
+    };
+    for (size_t i = 0; i < sizeof(texts) / sizeof(texts[0]); i++) {
+        lv_obj_add_flag(texts[i]->shadow, LV_OBJ_FLAG_HIDDEN);
     }
 
     return screen;
@@ -380,8 +291,9 @@ void lambda_screen_update(lambda_screen_t *screen, const ecu_data_t *data) {
 
     screen->connected = data->connected;
     screen->afr_value = isfinite(data->estimated_air_fuel)
-                            ? data->estimated_air_fuel
-                            : 0.0f;
+                            ? amber_clampf(data->estimated_air_fuel, AFR_MIN,
+                                           AFR_MAX)
+                            : AFR_MIN;
     screen->lambda_mv = isfinite(data->lambda_mv)
                             ? amber_clampf(data->lambda_mv, 0.0f, 1000.0f)
                             : 0.0f;
@@ -389,56 +301,73 @@ void lambda_screen_update(lambda_screen_t *screen, const ecu_data_t *data) {
                         ? amber_clampf(data->o2_mv, 0.0f, 1000.0f)
                         : 0.0f;
     screen->duty = isfinite(data->lambda_sensor_duty_cycle)
-                       ? amber_clampf(data->lambda_sensor_duty_cycle, 0.0f, 100.0f)
+                       ? amber_clampf(data->lambda_sensor_duty_cycle, 0.0f,
+                                      100.0f)
                        : 0.0f;
 
-    snprintf(screen->afr_buf, sizeof(screen->afr_buf), "%.2f",
-             screen->afr_value);
-    snprintf(screen->lambda_buf, sizeof(screen->lambda_buf), "%.0f",
-             screen->lambda_mv);
-    snprintf(screen->o2_buf, sizeof(screen->o2_buf), "%.0f", screen->o2_mv);
-    snprintf(screen->duty_buf, sizeof(screen->duty_buf), "%.0f", screen->duty);
+    if (screen->connected) {
+        snprintf(screen->afr_buf, sizeof(screen->afr_buf), "%.2f",
+                 screen->afr_value);
+        snprintf(screen->lambda_buf, sizeof(screen->lambda_buf), "%.0f",
+                 screen->lambda_mv);
+        snprintf(screen->o2_buf, sizeof(screen->o2_buf), "%.0f", screen->o2_mv);
+        snprintf(screen->duty_buf, sizeof(screen->duty_buf), "%.0f%%",
+                 screen->duty);
+    } else {
+        snprintf(screen->afr_buf, sizeof(screen->afr_buf), "--.--");
+        snprintf(screen->lambda_buf, sizeof(screen->lambda_buf), "--");
+        snprintf(screen->o2_buf, sizeof(screen->o2_buf), "--");
+        snprintf(screen->duty_buf, sizeof(screen->duty_buf), "--%%");
+    }
+
+    const char *heater_state = !screen->connected
+                                   ? "CHAUFFAGE INDISPONIBLE"
+                               : screen->duty > 0.0f
+                                   ? "CHAUFFAGE ACTIF"
+                                   : "CHAUFFAGE INACTIF";
+    snprintf(screen->duty_state_buf, sizeof(screen->duty_state_buf), "%s",
+             heater_state);
 
     lv_label_set_text_static(screen->afr.shadow, screen->afr_buf);
     lv_label_set_text_static(screen->afr.front, screen->afr_buf);
-    amber_ui_place_centered(screen->afr.shadow, screen->root, CX, 141.0f,
-                            0.0f, amber_ui_bold_spread(2));
-    amber_ui_place_centered(screen->afr.front, screen->root, CX, 141.0f,
-                            0.0f, -amber_ui_bold_spread(2));
+    amber_ui_place_centered(screen->afr.shadow, screen->root, CX, 130.0f,
+                            150.0f, amber_ui_bold_spread(2));
+    amber_ui_place_centered(screen->afr.front, screen->root, CX, 130.0f,
+                            150.0f, -amber_ui_bold_spread(2));
 
     lv_label_set_text_static(screen->lambda_value.shadow, screen->lambda_buf);
     lv_label_set_text_static(screen->lambda_value.front, screen->lambda_buf);
-    amber_ui_place_centered(screen->lambda_value.shadow, screen->root, 67.0f,
-                            95.0f, 0.0f, amber_ui_bold_spread(1));
-    amber_ui_place_centered(screen->lambda_value.front, screen->root, 67.0f,
-                            95.0f, 0.0f, -amber_ui_bold_spread(1));
+    amber_ui_place_centered(screen->lambda_value.shadow, screen->root, 80.0f,
+                            222.0f, 100.0f, amber_ui_bold_spread(1));
+    amber_ui_place_centered(screen->lambda_value.front, screen->root, 80.0f,
+                            222.0f, 100.0f, -amber_ui_bold_spread(1));
 
     lv_label_set_text_static(screen->o2_value.shadow, screen->o2_buf);
     lv_label_set_text_static(screen->o2_value.front, screen->o2_buf);
-    amber_ui_place_centered(screen->o2_value.shadow, screen->root, 253.0f,
-                            95.0f, 0.0f, amber_ui_bold_spread(1));
-    amber_ui_place_centered(screen->o2_value.front, screen->root, 253.0f,
-                            95.0f, 0.0f, -amber_ui_bold_spread(1));
+    amber_ui_place_centered(screen->o2_value.shadow, screen->root, 240.0f,
+                            222.0f, 100.0f, amber_ui_bold_spread(1));
+    amber_ui_place_centered(screen->o2_value.front, screen->root, 240.0f,
+                            222.0f, 100.0f, -amber_ui_bold_spread(1));
 
     lv_label_set_text_static(screen->duty_value.shadow, screen->duty_buf);
     lv_label_set_text_static(screen->duty_value.front, screen->duty_buf);
-    amber_ui_place_centered(screen->duty_value.shadow, screen->root, CX, 230.0f,
-                            0.0f, amber_ui_bold_spread(1));
-    amber_ui_place_centered(screen->duty_value.front, screen->root, CX, 230.0f,
-                            0.0f, -amber_ui_bold_spread(1));
+    amber_ui_place_centered(screen->duty_value.shadow, screen->root, CX, 269.0f,
+                            100.0f, amber_ui_bold_spread(1));
+    amber_ui_place_centered(screen->duty_value.front, screen->root, CX, 269.0f,
+                            100.0f, -amber_ui_bold_spread(1));
 
-    const char *signal = screen->connected ? "SIGNAL LIVE" : "SIGNAL LOST";
-    lv_label_set_text_static(screen->signal.shadow, signal);
-    lv_label_set_text_static(screen->signal.front, signal);
-    amber_ui_place_centered(screen->signal.shadow, screen->root, CX, 65.0f,
-                            0.0f, 0.0f);
-    amber_ui_place_centered(screen->signal.front, screen->root, CX, 65.0f,
-                            0.0f, 0.0f);
-
-    text_style(&screen->signal,
-               screen->connected ? ui_theme_amber_bright()
-                                  : ui_theme_amber_dim(),
+    lv_label_set_text_static(screen->duty_label.shadow, screen->duty_state_buf);
+    lv_label_set_text_static(screen->duty_label.front, screen->duty_state_buf);
+    amber_ui_place_centered(screen->duty_label.shadow, screen->root, CX, 291.0f,
+                            200.0f, 0.0f);
+    amber_ui_place_centered(screen->duty_label.front, screen->root, CX, 291.0f,
+                            200.0f, 0.0f);
+    text_style(&screen->duty_label,
+               screen->connected && screen->duty > 0.0f
+                   ? ui_theme_amber_bright()
+                   : ui_theme_amber_dim(),
                ui_theme_amber_separator());
+
     lv_obj_invalidate(screen->canvas);
 }
 
