@@ -9,7 +9,6 @@
 #include "host/ble_gatt.h"
 #include "host/ble_hs.h"
 #include "host/ble_store.h"
-#include "host/ble_store_util.h"
 #include "host/ble_uuid.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
@@ -379,7 +378,7 @@ esp_err_t ble_config_service_forget_bonds(void) {
     if (!s_started || s_open || s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
         return ESP_ERR_INVALID_STATE;
     }
-    return ble_store_util_delete_all() == 0 ? ESP_OK : ESP_FAIL;
+    return ble_store_clear() == 0 ? ESP_OK : ESP_FAIL;
 }
 
 bool ble_config_service_take_settings_update(app_settings_t *settings) {

@@ -14,7 +14,6 @@ set(MGF_ENABLE_BLE_CONFIG 0 CACHE STRING "Enable optional NimBLE configuration s
 set(MGF_BLE_CONFIG_OPEN_ON_BOOT 0 CACHE STRING "Open BLE configuration advertising at boot (0/1; service images only)")
 set(MGF_RUNTIME_DIAGNOSTICS 0 CACHE STRING "Enable periodic runtime diagnostics (0/1)")
 set(MGF_BLE_CONFIG_SRCS)
-set(MGF_BLE_CONFIG_REQUIRES)
 if(MGF_ENABLE_BLE_CONFIG)
     if(NOT CONFIG_BT_NIMBLE_ENABLED)
         message(FATAL_ERROR
@@ -23,8 +22,8 @@ if(MGF_ENABLE_BLE_CONFIG)
             "and a dedicated build dir/sdkconfig (see docs/ble-config.md)")
     endif()
     list(APPEND MGF_BLE_CONFIG_SRCS "infrastructure/ble_config_service.c")
-    list(APPEND MGF_BLE_CONFIG_REQUIRES bt)
 endif()
+
 # GPIO38/GPIO40 replace microSD DAT0/CMD. Do not add an SDMMC owner here.
 set(MGF_LILYGO_SDMMC_ENABLED 0 CACHE INTERNAL "SDMMC is unavailable in the K-line profile" FORCE)
 
@@ -76,7 +75,10 @@ idf_component_register(
     REQUIRES
         driver                        # GPIO + ESP-IDF compatibility types
         nvs_flash                     # persistent app settings and BT stack data
-        ${MGF_BLE_CONFIG_REQUIRES}
+        # bt is always required: ESP-IDF resolves REQUIRES in an early pass
+        # that sees neither -D cache variables nor sdkconfig, so it cannot be
+        # conditional. With CONFIG_BT_ENABLED=n it builds next to nothing.
+        bt
         esp_lcd
         esp_lcd_st7701                 # ST7701S vendor init + RGB panel
         esp_lcd_panel_io_additions    # série 9 bits ST7701S via XL9535
