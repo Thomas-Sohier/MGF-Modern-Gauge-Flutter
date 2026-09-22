@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "host/ble_gap.h"
 #include "host/ble_gatt.h"
@@ -57,11 +58,12 @@ static int append_settings(struct os_mbuf *om) {
                ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
-static int write_settings(struct ble_gatt_access_ctxt *ctxt) {
+static int write_settings(uint16_t conn_handle,
+                          struct ble_gatt_access_ctxt *ctxt) {
     uint8_t payload[BLE_CONFIG_SETTINGS_PAYLOAD_SIZE];
     app_settings_t settings;
     uint16_t copied_len;
-    if (!connection_is_bonded_and_encrypted(ctxt->conn_handle)) {
+    if (!connection_is_bonded_and_encrypted(conn_handle)) {
         return BLE_ATT_ERR_INSUFFICIENT_AUTHEN;
     }
     if (OS_MBUF_PKTLEN(ctxt->om) != sizeof(payload)) {
@@ -85,11 +87,12 @@ static int write_settings(struct ble_gatt_access_ctxt *ctxt) {
     return 0;
 }
 
-static int write_datetime(struct ble_gatt_access_ctxt *ctxt) {
+static int write_datetime(uint16_t conn_handle,
+                          struct ble_gatt_access_ctxt *ctxt) {
     uint8_t payload[BLE_CONFIG_DATETIME_PAYLOAD_SIZE];
     ble_config_datetime_t datetime;
     uint16_t copied_len;
-    if (!connection_is_bonded_and_encrypted(ctxt->conn_handle)) {
+    if (!connection_is_bonded_and_encrypted(conn_handle)) {
         return BLE_ATT_ERR_INSUFFICIENT_AUTHEN;
     }
     if (OS_MBUF_PKTLEN(ctxt->om) != sizeof(payload)) {
@@ -124,16 +127,15 @@ static int gatt_access(uint16_t conn_handle, uint16_t attr_handle,
         case BLE_GATT_ACCESS_OP_READ_CHR:
             return append_settings(ctxt->om);
         case BLE_GATT_ACCESS_OP_WRITE_CHR:
-            return write_settings(ctxt);
+            return write_settings(conn_handle, ctxt);
         default:
             return BLE_ATT_ERR_UNLIKELY;
         }
     }
     if (ble_uuid_cmp(ctxt->chr->uuid, &s_datetime_uuid.u) == 0) {
         return ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR
-                   ? write_datetime(ctxt) : BLE_ATT_ERR_UNLIKELY;
+                   ? write_datetime(conn_handle, ctxt) : BLE_ATT_ERR_UNLIKELY;
     }
-    (void)conn_handle;
     return BLE_ATT_ERR_UNLIKELY;
 }
 
