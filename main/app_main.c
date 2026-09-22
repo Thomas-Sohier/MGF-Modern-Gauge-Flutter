@@ -77,8 +77,8 @@ static rtc_t *optional_rtc_start(void) {
 }
 
 // TTF Michroma embarqué (cf. EMBED_FILES dans main/CMakeLists.txt).
-extern const uint8_t michroma_start[] asm("_binary_fonts_Michroma_Regular_ttf_start");
-extern const uint8_t michroma_end[]   asm("_binary_fonts_Michroma_Regular_ttf_end");
+extern const uint8_t michroma_start[] asm("_binary_Michroma_Regular_ttf_start");
+extern const uint8_t michroma_end[]   asm("_binary_Michroma_Regular_ttf_end");
 
 #define DEFINE_PAGE_ADAPTER(prefix)                                           \
     static void prefix##_page_update(void *context, const ecu_data_t *data) { \

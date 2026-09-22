@@ -65,17 +65,19 @@ typedef struct {
     uint16_t init_cmds_size;
 } lilygo_display_profile_t;
 
-static const int s_rgb_data_original[] = {
-    7, 6, 5, 3, 2,
-    14, 13, 12, 11, 10, 9,
-    21, 18, 17, 16, 15,
-};
-
+#if MGF_LILYGO_T_RGB_V2
 static const int s_rgb_data_v2[] = {
     43, 7, 6, 5, 3,
     14, 13, 12, 11, 10, 9,
     44, 21, 18, 17, 16,
 };
+#else
+static const int s_rgb_data_original[] = {
+    7, 6, 5, 3, 2,
+    14, 13, 12, 11, 10, 9,
+    21, 18, 17, 16, 15,
+};
+#endif
 
 #if MGF_LILYGO_T_RGB_V2
 static const lilygo_display_profile_t s_profile = {
