@@ -134,11 +134,10 @@ fail:
 }
 
 void navigation_screen_update(navigation_screen_t *scr, const ecu_data_t *data) {
-    if (scr == NULL || data == NULL || scr->canvas == NULL) return;
-
     // ecu_data_t ne contient pas encore de navigation. Le scénario de démo est
-    // donc stable ; l'invalidation garde toutefois le contrat d'écran commun.
-    lv_obj_invalidate(scr->canvas);
+    // stable et ne doit pas être invalidé à chaque lecture ECU.
+    (void)scr;
+    (void)data;
 }
 
 void navigation_screen_destroy(navigation_screen_t *scr) {

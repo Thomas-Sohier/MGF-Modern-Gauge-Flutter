@@ -317,12 +317,10 @@ fail:
 }
 
 void music_screen_update(music_screen_t *scr, const ecu_data_t *d) {
-    if (scr == NULL || d == NULL || scr->canvas == NULL) return;
-
-    // Le morceau de démonstration est volontairement stable : cette fonction
-    // ne touche qu'au rendu et ne modifie jamais la hiérarchie LVGL.
-    scr->progress = DEMO_PROGRESS;
-    lv_obj_invalidate(scr->canvas);
+    // L'écran est événementiel : l'état ECU n'influence pas le morceau de
+    // démonstration. Le bouton lecture reste le seul chemin d'invalidation.
+    (void)scr;
+    (void)d;
 }
 
 void music_screen_destroy(music_screen_t *scr) {
