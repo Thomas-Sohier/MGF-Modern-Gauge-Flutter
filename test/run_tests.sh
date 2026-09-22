@@ -14,6 +14,10 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
 "$BUILD_DIR/test_ui_layout"
 
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    "$ROOT/test/test_dashboard_timing.c" -o "$BUILD_DIR/test_dashboard_timing"
+"$BUILD_DIR/test_dashboard_timing"
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_mems.c" \
     "$ROOT/main/domain/mems_protocol.c" \
     "$ROOT/main/domain/mems_reader.c" \

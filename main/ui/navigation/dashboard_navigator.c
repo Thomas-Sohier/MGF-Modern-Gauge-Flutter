@@ -1,4 +1,5 @@
 #include "ui/navigation/dashboard_navigator.h"
+#include "ui/navigation/dashboard_timing.h"
 #include "ui/navigation/ui_instrumentation.h"
 
 #define DASHBOARD_MAX_PAGES 12
@@ -27,7 +28,8 @@ static void update_current(dashboard_navigator_t *navigator, bool force) {
     const uint32_t period = page->descriptor.update_period_ms;
     if (!force && (period == 0 ||
                    (page->has_presented_data &&
-                    lv_tick_elaps(page->last_update_ms) < period))) {
+                    !dashboard_period_elapsed(lv_tick_get(),
+                                              page->last_update_ms, period)))) {
         return;
     }
 
