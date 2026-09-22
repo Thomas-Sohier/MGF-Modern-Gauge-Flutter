@@ -3,6 +3,7 @@
 #include "ui/navigation/ui_instrumentation.h"
 
 #define DASHBOARD_MAX_PAGES 12
+#define GESTURE_CLICK_SUPPRESSION_MS 300U
 
 typedef struct {
     lv_obj_t *object;
@@ -18,7 +19,7 @@ struct dashboard_navigator_s {
     size_t current;
     ecu_data_t latest_data;
     bool has_latest_data;
-    bool ignore_click_after_gesture;
+    uint32_t last_gesture_ms;
 };
 
 static void update_current(dashboard_navigator_t *navigator, bool force) {
@@ -89,25 +90,30 @@ static void navigation_event_cb(lv_event_t *event) {
         lv_indev_get_point(indev, &point);
         if (!point_in_visible_disc(navigator, &point)) return;
         const lv_dir_t direction = lv_indev_get_gesture_dir(indev);
+        const uint32_t now = lv_tick_get();
         if (direction == LV_DIR_LEFT) {
             dashboard_navigator_next(navigator);
-            navigator->ignore_click_after_gesture = true;
+            navigator->last_gesture_ms = now;
         } else if (direction == LV_DIR_RIGHT) {
             dashboard_navigator_previous(navigator);
-            navigator->ignore_click_after_gesture = true;
+            navigator->last_gesture_ms = now;
         }
         return;
     }
 
     if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
-        if (navigator->ignore_click_after_gesture) {
-            navigator->ignore_click_after_gesture = false;
-            return;
-        }
-
         // Les contrôles enfants, notamment les boutons musique, gardent leur
         // événement et leur bubbling de geste sans devenir une navigation.
         if (lv_event_get_target(event) != navigator->root) return;
+
+        // LVGL peut ne pas émettre CLICKED après un geste. Le délai borné
+        // expire tout de même, et la soustraction reste sûre au wrap du tick.
+        const uint32_t now = lv_tick_get();
+        if (!dashboard_period_elapsed(now, navigator->last_gesture_ms,
+                                       GESTURE_CLICK_SUPPRESSION_MS)) {
+            navigator->last_gesture_ms = now - GESTURE_CLICK_SUPPRESSION_MS;
+            return;
+        }
 
         lv_point_t point;
         lv_indev_t *indev = lv_event_get_indev(event);
@@ -141,6 +147,7 @@ dashboard_navigator_t *dashboard_navigator_create(lv_obj_t *parent) {
     lv_obj_center(navigator->root);
     lv_obj_clear_flag(navigator->root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(navigator->root, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+    navigator->last_gesture_ms = lv_tick_get() - GESTURE_CLICK_SUPPRESSION_MS;
     lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_GESTURE, navigator);
     lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_CLICKED, navigator);
     return navigator;

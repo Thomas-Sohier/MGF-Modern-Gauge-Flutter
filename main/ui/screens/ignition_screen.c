@@ -50,6 +50,7 @@ struct ignition_screen_s {
     char coil_total_text[20];
 
     float advance_value;
+    bool has_snapshot;
     int32_t advance_bucket;
 };
 
@@ -268,7 +269,8 @@ void ignition_screen_update(ignition_screen_t *screen, const ecu_data_t *data) {
         ? (int32_t)lroundf(amber_progress(data->ignition_advance,
                                            ADVANCE_MIN, ADVANCE_MAX) * 3600.0f)
         : 0;
-    const bool advance_changed = advance_bucket != screen->advance_bucket;
+    const bool advance_changed = !screen->has_snapshot ||
+                                  advance_bucket != screen->advance_bucket;
     const bool advance_text_changed = update_pair(
         screen->advance, screen->advance_shadow, screen->advance_text,
         sizeof(screen->advance_text), "%.0f°", data->ignition_advance);
@@ -311,6 +313,7 @@ void ignition_screen_update(ignition_screen_t *screen, const ecu_data_t *data) {
         screen->advance_bucket = advance_bucket;
         lv_obj_invalidate(screen->canvas);
     }
+    screen->has_snapshot = true;
 }
 
 void ignition_screen_destroy(ignition_screen_t *screen) {
