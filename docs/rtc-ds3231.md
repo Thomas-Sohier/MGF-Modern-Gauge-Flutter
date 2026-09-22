@@ -7,17 +7,22 @@ utilisée.
 ## Contrat logiciel
 
 - `main/domain/rtc.h` expose `rtc_probe`, `rtc_read`, `rtc_set` et les dates
-  validées (`2000..2099`, calendrier grégorien).
+  validées (`2000..2099`, calendrier grégorien). Une `rtc_datetime_t` est
+  toujours en UTC ; le DS3231 ne stocke pas de fuseau.
 - `main/domain/rtc_time.c` contient le codec BCD et la validation sans
   dépendance ESP-IDF ; `test/test_rtc.c` l'exerce sur l'hôte.
 - `main/infrastructure/rtc_ds3231.c` traduit ce contrat vers les registres
   DS3231.
-- Le bit OSF (`STATUS 0x0F`, bit 7) et les champs BCD/date invalides refusent
-  une lecture. `rtc_set` écrit l'heure puis efface OSF.
+- Le bit OSF (`STATUS 0x0F`, bit 7), les bits réservés et les champs BCD/date
+  invalides refusent une lecture. `rtc_set` écrit l'heure puis efface OSF.
+  Une écriture valide est donc la seule opération qui acquitte explicitement
+  une perte d'oscillation.
 
 Une RTC absente, inaccessible, arrêtée ou non réglée ne fait pas échouer le
-firmware. L'écran horloge utilise l'heure système en repli et conserve une
-valeur cohérente si aucune source n'est valide.
+firmware. L'écran horloge utilise l'heure système UTC en repli et conserve une
+valeur cohérente si aucune source n'est valide. La conversion vers l'heure
+locale et l'heure été/hiver reste volontairement hors contrat tant qu'aucun
+fuseau n'est configuré.
 
 ## Bus I²C partagé
 
@@ -53,6 +58,11 @@ Commandes hôte :
 ./test/run_tests.sh
 ./build.sh
 ```
+
+La synchronisation BLE utilise la caractéristique `datetime` existante : les
+payloads `UTC` sont validés puis écrits dans le DS3231 ; les payloads `LOCAL`
+sont refusés par l'intégration, car aucun décalage ni règle d'heure d'été n'est
+encore configuré. Sans RTC, cette synchronisation échoue sans modifier l'écran.
 
 La compilation ESP-IDF et la validation sur LILYGO restent à faire avec la
 révision matérielle et le profil d'écran confirmés.

@@ -54,8 +54,10 @@ static bool decode_time(const uint8_t *registers, rtc_datetime_t *out) {
     uint8_t month;
     uint8_t year;
 
-    if (!rtc_bcd_decode(registers[0] & 0x7Fu, 59, &seconds) ||
-        !rtc_bcd_decode(registers[1] & 0x7Fu, 59, &minutes) ||
+    if ((registers[0] & 0x80u) != 0u ||
+        (registers[1] & 0x80u) != 0u ||
+        !rtc_bcd_decode(registers[0], 59, &seconds) ||
+        !rtc_bcd_decode(registers[1], 59, &minutes) ||
         !rtc_bcd_decode(registers[4] & 0x3Fu, 31, &day) ||
         !rtc_bcd_decode(registers[5] & 0x1Fu, 12, &month) ||
         !rtc_bcd_decode(registers[6], 99, &year) ||
@@ -71,7 +73,7 @@ static bool decode_time(const uint8_t *registers, rtc_datetime_t *out) {
         if (!rtc_bcd_decode(hour_bcd, 12, &hour_12) || hour_12 == 0) return false;
         const bool pm = (registers[2] & 0x20u) != 0u;
         hours = (uint8_t)(hour_12 % 12u + (pm ? 12u : 0u));
-    } else if (!rtc_bcd_decode(registers[2] & 0x3Fu, 23, &hours)) {
+    } else if (!rtc_bcd_decode(registers[2], 23, &hours)) {
         return false;
     }
 

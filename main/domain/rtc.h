@@ -5,6 +5,12 @@
 
 // Date/heure civile représentable directement par un DS3231. Les années sont
 // volontairement limitées à 2000..2099 (plage sans ambiguïté du composant).
+//
+// Contrat de l'application : cette valeur est en UTC. Le DS3231 ne contient
+// ni fuseau ni règle d'heure d'été ; une conversion locale doit donc être
+// effectuée avant l'affichage ou par le client qui fournit la synchronisation.
+// Tant qu'aucun fuseau n'est configuré, aucune date locale ne doit être écrite
+// comme si elle était UTC.
 typedef struct {
     uint16_t year;
     uint8_t month;

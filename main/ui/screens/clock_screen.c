@@ -206,7 +206,10 @@ static void hands_draw_cb(lv_event_t *event) {
     draw_hands(layer, &layout, screen);
 }
 
-static bool read_local_time(const clock_screen_t *screen, int *hour, int *minute) {
+// The RTC contract is UTC. Until a timezone/DST policy is configured, the
+// clock page deliberately displays UTC too; the no-RTC fallback uses the same
+// basis instead of mixing an RTC UTC value with a local libc value.
+static bool read_clock_time(const clock_screen_t *screen, int *hour, int *minute) {
 #ifdef MGF_SIMULATOR
     (void)screen;
     *hour = 10;
@@ -223,11 +226,13 @@ static bool read_local_time(const clock_screen_t *screen, int *hour, int *minute
     }
 
     const time_t now = time(NULL);
-    const struct tm *local = now != (time_t)-1 ? localtime(&now) : NULL;
-    if (local != NULL && local->tm_hour >= 0 && local->tm_hour < 24 &&
-        local->tm_min >= 0 && local->tm_min < 60) {
-        *hour = local->tm_hour;
-        *minute = local->tm_min;
+    const struct tm *utc = now != (time_t)-1 ? gmtime(&now) : NULL;
+    const int utc_year = utc != NULL ? utc->tm_year + 1900 : 0;
+    if (utc != NULL && utc_year >= 2000 && utc_year <= 2099 &&
+        utc->tm_hour >= 0 && utc->tm_hour < 24 && utc->tm_min >= 0 &&
+        utc->tm_min < 60) {
+        *hour = utc->tm_hour;
+        *minute = utc->tm_min;
         return true;
     }
 
@@ -268,7 +273,7 @@ clock_screen_t *clock_screen_create(lv_obj_t *parent) {
             CLOCK_CY + sinf(angle) * LABEL_RADIUS, 0.0f, 0.0f);
     }
 
-    read_local_time(screen, &screen->hour, &screen->minute);
+    read_clock_time(screen, &screen->hour, &screen->minute);
     return screen;
 
 fail:
@@ -283,7 +288,7 @@ void clock_screen_set_rtc(clock_screen_t *screen, rtc_t *rtc) {
 
     int hour;
     int minute;
-    if (!read_local_time(screen, &hour, &minute)) return;
+    if (!read_clock_time(screen, &hour, &minute)) return;
     if (hour == screen->hour && minute == screen->minute) return;
     screen->hour = hour;
     screen->minute = minute;
@@ -296,7 +301,7 @@ void clock_screen_update(clock_screen_t *screen, const ecu_data_t *data) {
 
     int hour;
     int minute;
-    read_local_time(screen, &hour, &minute);
+    read_clock_time(screen, &hour, &minute);
     if (hour == screen->hour && minute == screen->minute) return;
 
     screen->hour = hour;

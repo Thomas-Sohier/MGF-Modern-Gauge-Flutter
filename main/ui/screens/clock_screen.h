@@ -6,6 +6,8 @@
 
 // Horloge analogique ambre pour le panneau rond 480x480. Le cadran et les
 // aiguilles sont dessinés par des primitives LVGL, sans image ni buffer dédié.
+// Le DS3231 et le repli système sont affichés en UTC tant qu'aucun fuseau/DST
+// n'est configuré.
 typedef struct clock_screen_s clock_screen_t;
 
 // `parent` doit rester vivant jusqu'à clock_screen_destroy(). Les fonctions

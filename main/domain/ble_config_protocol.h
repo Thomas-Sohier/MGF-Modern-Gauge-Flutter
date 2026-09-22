@@ -19,6 +19,9 @@ typedef enum {
     BLE_CONFIG_PARSE_INVALID_VALUE,
 } ble_config_parse_result_t;
 
+// Wire-level time basis. The RTC integration accepts UTC only: LOCAL stays
+// representable for protocol compatibility, but is rejected before rtc_set()
+// until a timezone and DST policy exist.
 typedef enum {
     BLE_CONFIG_TIME_UTC = 0,
     BLE_CONFIG_TIME_LOCAL = 1,
