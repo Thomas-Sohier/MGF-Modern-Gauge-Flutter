@@ -5,6 +5,7 @@
 #include "ui/widgets/amber_ui.h"
 #include "ui/widgets/amber_value.h"
 #include "ui/ui_layout.h"
+#include "domain/value_smoothing.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -27,6 +28,8 @@
 // Plage régime
 #define RPM_MIN       0.0f
 #define RPM_MAX       8000.0f
+// Constante de temps du lissage d'affichage (trames MEMS toutes ~200 ms).
+#define RPM_SMOOTHING_TAU_MS 100.0f
 
 // Traits de séparation
 #define SEP_W         1.333f
@@ -77,6 +80,8 @@ struct amber_screen_s {
     amber_value_widget_t *ind_value[M_COUNT];
     lv_obj_t *icons[M_COUNT];
     float rpm;
+    float rpm_smoothed;     // valeur affichée, lissée entre deux trames ECU
+    uint32_t last_update_tick;
     bool has_snapshot;
     int32_t rpm_segment;
     int32_t rpm_display;
@@ -212,6 +217,7 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
     amber_screen_t *scr = lv_malloc(sizeof(*scr));
     if (scr == NULL) return NULL;
     lv_memzero(scr, sizeof(*scr));
+    scr->rpm_smoothed = NAN;
 
     scr->root = amber_ui_root_create(parent);
     if (scr->root == NULL) goto fail;
@@ -286,18 +292,27 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     scr->latest_data = *d;
     scr->has_latest_data = true;
 
+    // Le compte-tours suit la cible avec un léger retard plutôt que par
+    // paliers de 200 ms ; le premier échantillon (NAN initial) saute direct.
+    const uint32_t now = lv_tick_get();
+    scr->rpm_smoothed = value_smoothing_step(
+        scr->rpm_smoothed, d->rpm, now - scr->last_update_tick,
+        RPM_SMOOTHING_TAU_MS, 1.0f);
+    scr->last_update_tick = now;
+    const float rpm = scr->rpm_smoothed;
+
     const float coolant = temperature_display(d->coolant_temp, scr->units);
     const float oil = temperature_display(d->oil_temp, scr->units);
-    const int32_t rpm_display = isfinite(d->rpm) ? (int32_t)lroundf(d->rpm) : INT32_MIN;
+    const int32_t rpm_display = isfinite(rpm) ? (int32_t)lroundf(rpm) : INT32_MIN;
     const int32_t coolant_display = isfinite(coolant)
         ? (int32_t)lroundf(coolant) : INT32_MIN;
     const int32_t battery_display = isfinite(d->battery_voltage)
         ? (int32_t)lroundf(d->battery_voltage * 10.0f) : INT32_MIN;
     const int32_t oil_display = isfinite(oil)
         ? (int32_t)lroundf(oil) : INT32_MIN;
-    const float progress = LV_CLAMP(0.0f, (d->rpm - RPM_MIN) /
+    const float progress = LV_CLAMP(0.0f, (rpm - RPM_MIN) /
                                     (RPM_MAX - RPM_MIN), 1.0f);
-    const int32_t rpm_segment = isfinite(d->rpm)
+    const int32_t rpm_segment = isfinite(rpm)
         ? (int32_t)lroundf(progress * SEG_COUNT) : 0;
     const bool text_changed = !scr->has_snapshot ||
         rpm_display != scr->rpm_display ||
@@ -310,7 +325,7 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
 
     char buf[24];
     if (rpm_display != scr->rpm_display || !scr->has_snapshot) {
-        if (isfinite(d->rpm)) snprintf(buf, sizeof(buf), "%.0f", d->rpm);
+        if (isfinite(rpm)) snprintf(buf, sizeof(buf), "%.0f", rpm);
         else snprintf(buf, sizeof(buf), "--");
         amber_value_widget_set(scr->value, buf);
     }
@@ -335,7 +350,7 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     }
 
     if (dial_changed) {
-        scr->rpm = d->rpm;
+        scr->rpm = rpm;
         scr->rpm_segment = rpm_segment;
         lv_obj_invalidate(scr->canvas);
     }

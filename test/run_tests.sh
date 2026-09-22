@@ -49,6 +49,10 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
 "$BUILD_DIR/test_dashboard_timing"
 
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    "$ROOT/test/test_value_smoothing.c" -lm -o "$BUILD_DIR/test_value_smoothing"
+"$BUILD_DIR/test_value_smoothing"
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_runtime_diagnostics.c" -o "$BUILD_DIR/test_runtime_diagnostics"
 "$BUILD_DIR/test_runtime_diagnostics"
 
