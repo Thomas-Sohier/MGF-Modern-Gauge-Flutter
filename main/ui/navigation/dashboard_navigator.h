@@ -37,7 +37,8 @@ size_t dashboard_navigator_count(const dashboard_navigator_t *navigator);
 const char *dashboard_navigator_current_name(
     const dashboard_navigator_t *navigator);
 
-// Actualise toutes les pages afin qu'un changement d'écran soit instantané.
+// Mémorise le dernier instantané ECU et actualise uniquement la page visible.
+// Lors d'une navigation, la nouvelle page reçoit immédiatement cet instantané.
 void dashboard_navigator_update(dashboard_navigator_t *navigator,
                                 const ecu_data_t *data);
 void dashboard_navigator_destroy(dashboard_navigator_t *navigator);

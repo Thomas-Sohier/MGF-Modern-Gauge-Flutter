@@ -12,7 +12,19 @@ struct dashboard_navigator_s {
     page_entry_t pages[DASHBOARD_MAX_PAGES];
     size_t count;
     size_t current;
+    ecu_data_t latest_data;
+    bool has_latest_data;
 };
+
+static void update_current(dashboard_navigator_t *navigator) {
+    if (!navigator->has_latest_data || navigator->count == 0) return;
+
+    page_entry_t *page = &navigator->pages[navigator->current];
+    if (page->descriptor.update != NULL) {
+        page->descriptor.update(page->descriptor.context,
+                                &navigator->latest_data);
+    }
+}
 
 static void show_current(dashboard_navigator_t *navigator) {
     for (size_t i = 0; i < navigator->count; i++) {
@@ -25,12 +37,14 @@ void dashboard_navigator_next(dashboard_navigator_t *navigator) {
     if (navigator == NULL || navigator->count < 2) return;
     navigator->current = (navigator->current + 1) % navigator->count;
     show_current(navigator);
+    update_current(navigator);
 }
 
 void dashboard_navigator_previous(dashboard_navigator_t *navigator) {
     if (navigator == NULL || navigator->count < 2) return;
     navigator->current = (navigator->current + navigator->count - 1) % navigator->count;
     show_current(navigator);
+    update_current(navigator);
 }
 
 static void navigation_event_cb(lv_event_t *event) {
@@ -117,10 +131,10 @@ const char *dashboard_navigator_current_name(const dashboard_navigator_t *naviga
 void dashboard_navigator_update(dashboard_navigator_t *navigator,
                                 const ecu_data_t *data) {
     if (navigator == NULL || data == NULL) return;
-    for (size_t i = 0; i < navigator->count; i++) {
-        dashboard_page_update_cb_t update = navigator->pages[i].descriptor.update;
-        if (update != NULL) update(navigator->pages[i].descriptor.context, data);
-    }
+
+    navigator->latest_data = *data;
+    navigator->has_latest_data = true;
+    update_current(navigator);
 }
 
 void dashboard_navigator_destroy(dashboard_navigator_t *navigator) {
