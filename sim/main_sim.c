@@ -136,7 +136,9 @@ int main(int argc, char **argv) {
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
 
     const ecu_data_t mock = {
-        .connected = true, .rpm = 875, .throttle = 7, .coolant_temp = 89,
+        .connected = true, .faults_available = true,
+        .fault_flags = ECU_FAULT_INTAKE_AIR_SENSOR,
+        .rpm = 875, .throttle = 7, .coolant_temp = 89,
         .battery_voltage = 14.2f, .oil_temp = 96, .ambient_temp = 22,
         .intake_air_temp = 31, .fuel_rail_temp = 38, .map_sensor_kpa = 34,
         .throttle_pot_voltage = 0.72f, .ignition_advance = 14.5f,

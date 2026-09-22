@@ -2,6 +2,15 @@
 
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
+
+// Défauts remontés par l'ECU (bits de `ecu_data_t.fault_flags`).
+enum {
+    ECU_FAULT_COOLANT_SENSOR = 1u << 0,     // sonde température d'eau
+    ECU_FAULT_INTAKE_AIR_SENSOR = 1u << 1,  // sonde température d'air
+    ECU_FAULT_FUEL_PUMP = 1u << 2,          // circuit pompe à essence
+    ECU_FAULT_THROTTLE_POT = 1u << 3,       // potentiomètre papillon
+};
 
 // Instantané normalisé des données ECU consommées par les écrans. Un champ
 // indisponible (ECU déconnectée, mesure absente de la variante MEMS) vaut NAN :
@@ -9,6 +18,11 @@
 // est copiée en bloc entre la source, le contrôleur et les vues.
 typedef struct {
     bool connected;
+    // `fault_flags` n'a de sens que si `faults_available` : une ECU absente
+    // n'est pas une ECU « sans défaut ».
+    bool faults_available;
+    uint8_t fault_flags;
+
     float rpm;
     float throttle;
     float coolant_temp;
@@ -49,6 +63,8 @@ typedef struct {
 static inline ecu_data_t ecu_data_unavailable(void) {
     return (ecu_data_t){
         .connected = false,
+        .faults_available = false,
+        .fault_flags = 0,
         .rpm = NAN, .throttle = NAN, .coolant_temp = NAN,
         .battery_voltage = NAN, .oil_temp = NAN,
         .ambient_temp = NAN, .intake_air_temp = NAN, .fuel_rail_temp = NAN,

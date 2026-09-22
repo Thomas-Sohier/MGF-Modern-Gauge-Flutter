@@ -61,7 +61,8 @@ fake_ecu_t *fake_ecu_create(void) {
     fake_ecu_t *ecu = calloc(1, sizeof(*ecu));
     if (ecu == NULL) return NULL;
     ecu->data = (ecu_data_t){
-        .connected = true, .rpm = RPM_IDLE, .coolant_temp = 89.0f,
+        .connected = true, .faults_available = true,
+        .rpm = RPM_IDLE, .coolant_temp = 89.0f,
         .battery_voltage = 14.2f, .oil_temp = 96.0f,
         .ambient_temp = 22.0f, .intake_air_temp = 31.0f,
         .fuel_rail_temp = 38.0f, .map_sensor_kpa = 32.0f,

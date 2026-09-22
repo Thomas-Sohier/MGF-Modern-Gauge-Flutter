@@ -91,6 +91,6 @@ bool mems_parse_frame_7d(const uint8_t *frame, size_t len, mems_data_t *out);
 // depuis la tension du potentiomètre papillon (0.6 V fermé .. 4.6 V plein gaz,
 // approx.) ; `connected` fixé par l'appelant selon l'état de la liaison.
 //
-// ⚠️ MEMS 1.6 ne dispose PAS de capteur de température d'huile : `oil_temp` est
-// mis à 0 et devra être alimenté par une autre source si un jour disponible.
+// Les champs sans équivalent MEMS valent NAN — en particulier `oil_temp`
+// (pas de sonde d'huile). Les bits DTC sont projetés dans `fault_flags`.
 void mems_to_ecu_data(const mems_data_t *in, bool connected, ecu_data_t *out);

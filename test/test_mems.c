@@ -87,11 +87,21 @@ static void test_to_ecu_data(void) {
     check(isnan(e.injector_1_pw), "unmapped injector pw is unavailable");
     check(isnan(e.idle_setpoint), "unmapped idle setpoint is unavailable");
     check(isnan(e.lambda_sensor_duty_cycle), "unmapped heater duty is unavailable");
+    check(e.faults_available, "MEMS reports fault state");
+    check(e.fault_flags == 0, "reference frame has no fault");
+
+    d.coolant_sensor_fault = true;
+    d.throttle_pot_fault = true;
+    mems_to_ecu_data(&d, true, &e);
+    check(e.fault_flags ==
+              (ECU_FAULT_COOLANT_SENSOR | ECU_FAULT_THROTTLE_POT),
+          "MEMS DTC bits map to fault flags");
 }
 
 static void test_unavailable_snapshot(void) {
     const ecu_data_t e = ecu_data_unavailable();
     check(!e.connected, "unavailable snapshot is disconnected");
+    check(!e.faults_available, "unavailable snapshot has unknown faults");
     const float *field = &e.rpm;
     const size_t count =
         (sizeof(e) - ((const char *)field - (const char *)&e)) / sizeof(float);

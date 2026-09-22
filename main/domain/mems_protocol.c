@@ -111,6 +111,13 @@ void mems_to_ecu_data(const mems_data_t *in, bool connected, ecu_data_t *out) {
     out->o2_mv = (float)in->lambda_voltage_mv;
     out->idle_valve_position = (float)in->iac_position;
 
+    out->faults_available = true;
+    out->fault_flags =
+        (in->coolant_sensor_fault ? ECU_FAULT_COOLANT_SENSOR : 0u) |
+        (in->intake_air_sensor_fault ? ECU_FAULT_INTAKE_AIR_SENSOR : 0u) |
+        (in->fuel_pump_fault ? ECU_FAULT_FUEL_PUMP : 0u) |
+        (in->throttle_pot_fault ? ECU_FAULT_THROTTLE_POT : 0u);
+
     // Estimation du % de gaz depuis la tension du potentiomètre papillon
     // (le pourcentage n'est pas fourni tel quel par MEMS). Plage nominale
     // ~0.6 V (fermé) .. ~4.6 V (plein gaz).
