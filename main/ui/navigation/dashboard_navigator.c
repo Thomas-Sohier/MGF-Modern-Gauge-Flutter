@@ -5,6 +5,8 @@
 typedef struct {
     lv_obj_t *object;
     dashboard_page_t descriptor;
+    uint32_t last_update_ms;
+    bool has_presented_data;
 } page_entry_t;
 
 struct dashboard_navigator_s {
@@ -16,10 +18,19 @@ struct dashboard_navigator_s {
     bool has_latest_data;
 };
 
-static void update_current(dashboard_navigator_t *navigator) {
+static void update_current(dashboard_navigator_t *navigator, bool force) {
     if (!navigator->has_latest_data || navigator->count == 0) return;
 
     page_entry_t *page = &navigator->pages[navigator->current];
+    const uint32_t period = page->descriptor.update_period_ms;
+    if (!force && (period == 0 ||
+                   (page->has_presented_data &&
+                    lv_tick_elaps(page->last_update_ms) < period))) {
+        return;
+    }
+
+    page->last_update_ms = lv_tick_get();
+    page->has_presented_data = true;
     if (page->descriptor.update != NULL) {
         page->descriptor.update(page->descriptor.context,
                                 &navigator->latest_data);
@@ -37,14 +48,14 @@ void dashboard_navigator_next(dashboard_navigator_t *navigator) {
     if (navigator == NULL || navigator->count < 2) return;
     navigator->current = (navigator->current + 1) % navigator->count;
     show_current(navigator);
-    update_current(navigator);
+    update_current(navigator, true);
 }
 
 void dashboard_navigator_previous(dashboard_navigator_t *navigator) {
     if (navigator == NULL || navigator->count < 2) return;
     navigator->current = (navigator->current + navigator->count - 1) % navigator->count;
     show_current(navigator);
-    update_current(navigator);
+    update_current(navigator, true);
 }
 
 static void navigation_event_cb(lv_event_t *event) {
@@ -134,7 +145,7 @@ void dashboard_navigator_update(dashboard_navigator_t *navigator,
 
     navigator->latest_data = *data;
     navigator->has_latest_data = true;
-    update_current(navigator);
+    update_current(navigator, false);
 }
 
 void dashboard_navigator_destroy(dashboard_navigator_t *navigator) {

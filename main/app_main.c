@@ -71,12 +71,12 @@ DEFINE_PAGE_ADAPTER(ignition)
 DEFINE_PAGE_ADAPTER(idle)
 DEFINE_PAGE_ADAPTER(admission)
 
-#define REGISTER_PAGE(navigator, prefix, label) do {                          \
+#define REGISTER_PAGE(navigator, prefix, label, period) do {                  \
     lv_obj_t *page = dashboard_navigator_create_page(navigator);              \
     prefix##_screen_t *view = prefix##_screen_create(page);                   \
     const dashboard_page_t descriptor = {                                    \
         .name = label, .context = view, .update = prefix##_page_update,        \
-        .destroy = prefix##_page_destroy,                                     \
+        .destroy = prefix##_page_destroy, .update_period_ms = period,          \
     };                                                                         \
     if (page == NULL || view == NULL ||                                       \
         !dashboard_navigator_register_page(navigator, page, &descriptor)) {    \
@@ -139,17 +139,17 @@ void app_main(void) {
     }
 
     // Même ordre cyclique que l'application Flutter de référence.
-    REGISTER_PAGE(navigator, clock, "HEURE");
-    REGISTER_PAGE(navigator, music, "MUSIQUE");
-    REGISTER_PAGE(navigator, navigation, "NAVIGATION");
-    REGISTER_PAGE(navigator, amber, "RPM");
-    REGISTER_PAGE(navigator, faults, "DEFAUTS");
-    REGISTER_PAGE(navigator, temps, "TEMPERATURES");
-    REGISTER_PAGE(navigator, injection, "INJECTION");
-    REGISTER_PAGE(navigator, lambda, "LAMBDA");
-    REGISTER_PAGE(navigator, ignition, "ALLUMAGE");
-    REGISTER_PAGE(navigator, idle, "RALENTI");
-    REGISTER_PAGE(navigator, admission, "ADMISSION");
+    REGISTER_PAGE(navigator, clock, "HEURE", 1000);
+    REGISTER_PAGE(navigator, music, "MUSIQUE", 0);
+    REGISTER_PAGE(navigator, navigation, "NAVIGATION", 0);
+    REGISTER_PAGE(navigator, amber, "RPM", 40);
+    REGISTER_PAGE(navigator, faults, "DEFAUTS", 1000);
+    REGISTER_PAGE(navigator, temps, "TEMPERATURES", 150);
+    REGISTER_PAGE(navigator, injection, "INJECTION", 80);
+    REGISTER_PAGE(navigator, lambda, "LAMBDA", 80);
+    REGISTER_PAGE(navigator, ignition, "ALLUMAGE", 80);
+    REGISTER_PAGE(navigator, idle, "RALENTI", 150);
+    REGISTER_PAGE(navigator, admission, "ADMISSION", 150);
 
     // Composition de l'application : la source est branchée au contrôleur,
     // qui possède le snapshot et orchestre le rafraîchissement de l'écran.

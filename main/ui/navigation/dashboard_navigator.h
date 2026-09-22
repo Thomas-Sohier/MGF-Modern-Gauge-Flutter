@@ -15,6 +15,9 @@ typedef struct {
     void *context;
     dashboard_page_update_cb_t update;
     dashboard_page_destroy_cb_t destroy;
+    // 0 désactive les mises à jour ECU après l'activation : la page est
+    // événementielle (par exemple musique ou navigation statique).
+    uint32_t update_period_ms;
 } dashboard_page_t;
 
 typedef struct dashboard_navigator_s dashboard_navigator_t;
