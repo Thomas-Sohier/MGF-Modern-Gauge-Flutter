@@ -7,6 +7,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdint.h>
 
 // Repère logique 320 px, identique aux autres écrans ambre. La composition
 // reste volontairement dans la zone sûre du disque : l'eau occupe le premier
@@ -80,6 +81,11 @@ struct temps_screen_s {
     float values[METRIC_COUNT];
     bool available[METRIC_COUNT];
     bool danger[METRIC_COUNT];
+    bool connected;
+    bool has_snapshot;
+    int32_t displayed[METRIC_COUNT];
+    int32_t arc_bucket[METRIC_COUNT];
+    int32_t peak_display;
 };
 
 static void draw_arc(lv_layer_t *layer, int32_t cx, int32_t cy,
@@ -273,15 +279,47 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
         data->oil_temp,
         data->intake_air_temp,
     };
+    int32_t next_displayed[METRIC_COUNT];
+    int32_t next_arc_bucket[METRIC_COUNT];
+    bool next_available[METRIC_COUNT];
+    bool next_danger[METRIC_COUNT];
     float peak = 0.0f;
+    int32_t peak_display = 0;
     bool any_danger = false;
 
     for (int i = 0; i < METRIC_COUNT; i++) {
         const float raw = raw_values[i];
-        scr->available[i] = data->connected && isfinite(raw);
-        scr->values[i] = scr->available[i] ? raw : 0.0f;
-        scr->danger[i] = scr->available[i] && kMetrics[i].danger > 0.0f &&
+        next_available[i] = data->connected && isfinite(raw);
+        next_displayed[i] = next_available[i] ? (int32_t)lroundf(raw) : INT32_MIN;
+        next_arc_bucket[i] = next_available[i]
+            ? (int32_t)lroundf(clamp_progress(raw, kMetrics[i].maximum) * 1000.0f)
+            : 0;
+        next_danger[i] = next_available[i] && kMetrics[i].danger > 0.0f &&
                          raw >= kMetrics[i].danger;
+        any_danger = any_danger || next_danger[i];
+        if (next_available[i] && raw > peak) peak = raw;
+    }
+    peak_display = (int32_t)lroundf(peak);
+
+    if (scr->has_snapshot && scr->peak_display == peak_display &&
+        scr->connected == data->connected) {
+        bool same = true;
+        for (int i = 0; i < METRIC_COUNT; i++) {
+            same = same && scr->displayed[i] == next_displayed[i] &&
+                   scr->arc_bucket[i] == next_arc_bucket[i] &&
+                   scr->available[i] == next_available[i] &&
+                   scr->danger[i] == next_danger[i];
+        }
+        if (same) return;
+    }
+
+    for (int i = 0; i < METRIC_COUNT; i++) {
+        const float raw = raw_values[i];
+        scr->available[i] = next_available[i];
+        scr->values[i] = scr->available[i] ? raw : 0.0f;
+        scr->danger[i] = next_danger[i];
+        scr->displayed[i] = next_displayed[i];
+        scr->arc_bucket[i] = next_arc_bucket[i];
         any_danger = any_danger || scr->danger[i];
         if (scr->available[i] && raw > peak) peak = raw;
 
@@ -324,6 +362,9 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
     lv_label_set_text_static(scr->summary, scr->summary_text);
     lv_obj_set_style_text_color(scr->status, ui_theme_amber_bright(), 0);
     lv_obj_set_style_text_color(scr->summary, ui_theme_amber_dim(), 0);
+    scr->peak_display = peak_display;
+    scr->connected = data->connected;
+    scr->has_snapshot = true;
 
     // Les labels à largeur intrinsèque changent de largeur avec une valeur à
     // trois chiffres : les recentrer ne crée aucun objet supplémentaire.

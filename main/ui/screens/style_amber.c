@@ -7,6 +7,7 @@
 #include "ui/ui_layout.h"
 
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 
 // ── 1. CONSTANTES : géométrie (repère partagé 320 px) ───────────────────────
@@ -76,6 +77,13 @@ struct amber_screen_s {
     amber_value_widget_t *ind_value[M_COUNT];
     lv_obj_t *icons[M_COUNT];
     float rpm;
+    bool has_snapshot;
+    int32_t rpm_segment;
+    int32_t rpm_display;
+    int32_t coolant_display;
+    int32_t battery_display;
+    int32_t oil_display;
+    bool connected_display;
 };
 
 // Michroma n'existe qu'en une graisse : on simule le gras en superposant un
@@ -248,20 +256,58 @@ fail:
 void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     if (scr == NULL || d == NULL || scr->canvas == NULL || scr->value == NULL) return;
 
-    scr->rpm = d->rpm;
-    lv_obj_invalidate(scr->canvas);
+    const int32_t rpm_display = isfinite(d->rpm) ? (int32_t)lroundf(d->rpm) : INT32_MIN;
+    const int32_t coolant_display = isfinite(d->coolant_temp)
+        ? (int32_t)lroundf(d->coolant_temp) : INT32_MIN;
+    const int32_t battery_display = isfinite(d->battery_voltage)
+        ? (int32_t)lroundf(d->battery_voltage * 10.0f) : INT32_MIN;
+    const int32_t oil_display = isfinite(d->oil_temp)
+        ? (int32_t)lroundf(d->oil_temp) : INT32_MIN;
+    const float progress = LV_CLAMP(0.0f, (d->rpm - RPM_MIN) /
+                                    (RPM_MAX - RPM_MIN), 1.0f);
+    const int32_t rpm_segment = isfinite(d->rpm)
+        ? (int32_t)lroundf(progress * SEG_COUNT) : 0;
+    const bool text_changed = !scr->has_snapshot ||
+        rpm_display != scr->rpm_display ||
+        coolant_display != scr->coolant_display ||
+        battery_display != scr->battery_display ||
+        oil_display != scr->oil_display ||
+        d->connected != scr->connected_display;
+    const bool dial_changed = !scr->has_snapshot || rpm_segment != scr->rpm_segment;
+    if (!text_changed && !dial_changed) return;
 
     char buf[24];
-    snprintf(buf, sizeof(buf), "%.0f", d->rpm);
-    amber_value_widget_set(scr->value, buf);
+    if (rpm_display != scr->rpm_display || !scr->has_snapshot) {
+        snprintf(buf, sizeof(buf), "%.0f", d->rpm);
+        amber_value_widget_set(scr->value, buf);
+    }
+    if (coolant_display != scr->coolant_display || !scr->has_snapshot) {
+        snprintf(buf, sizeof(buf), "%.0f°C", d->coolant_temp);
+        amber_value_widget_set(scr->ind_value[M_COOLANT], buf);
+    }
+    if (battery_display != scr->battery_display || !scr->has_snapshot) {
+        snprintf(buf, sizeof(buf), "%.1fV", d->battery_voltage);
+        amber_value_widget_set(scr->ind_value[M_BATTERY], buf);
+    }
+    if (oil_display != scr->oil_display || !scr->has_snapshot) {
+        snprintf(buf, sizeof(buf), "%.0f°C", d->oil_temp);
+        amber_value_widget_set(scr->ind_value[M_OIL], buf);
+    }
+    if (d->connected != scr->connected_display || !scr->has_snapshot) {
+        amber_value_widget_set(scr->ind_value[M_OBD], d->connected ? "OBD" : "--");
+    }
 
-    snprintf(buf, sizeof(buf), "%.0f°C", d->coolant_temp);
-    amber_value_widget_set(scr->ind_value[M_COOLANT], buf);
-    snprintf(buf, sizeof(buf), "%.1fV", d->battery_voltage);
-    amber_value_widget_set(scr->ind_value[M_BATTERY], buf);
-    snprintf(buf, sizeof(buf), "%.0f°C", d->oil_temp);
-    amber_value_widget_set(scr->ind_value[M_OIL], buf);
-    amber_value_widget_set(scr->ind_value[M_OBD], d->connected ? "OBD" : "--");
+    if (dial_changed) {
+        scr->rpm = d->rpm;
+        scr->rpm_segment = rpm_segment;
+        lv_obj_invalidate(scr->canvas);
+    }
+    scr->rpm_display = rpm_display;
+    scr->coolant_display = coolant_display;
+    scr->battery_display = battery_display;
+    scr->oil_display = oil_display;
+    scr->connected_display = d->connected;
+    scr->has_snapshot = true;
 }
 
 void amber_screen_destroy(amber_screen_t *scr) {

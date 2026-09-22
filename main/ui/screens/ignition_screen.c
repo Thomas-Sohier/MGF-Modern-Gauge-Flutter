@@ -7,6 +7,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 // Toutes les coordonnées sont exprimées dans le repère ambre partagé 320 x
 // 320. Le contenu est ensuite inscrit dans le plus grand carré disponible.
@@ -49,6 +50,7 @@ struct ignition_screen_s {
     char coil_total_text[20];
 
     float advance_value;
+    int32_t advance_bucket;
 };
 
 
@@ -124,16 +126,20 @@ static void canvas_draw_cb(lv_event_t *event) {
     draw_spark_symbol(layer, &layout);
 }
 
-static void update_label(lv_obj_t *label, char *buffer, size_t buffer_size,
-                         const char *format, float value) {
-    if (label == NULL || buffer == NULL || buffer_size == 0) return;
-    snprintf(buffer, buffer_size, format, value);
+static bool update_pair(lv_obj_t *front, lv_obj_t *shadow, char *buffer,
+                        size_t buffer_size, const char *format, float value) {
+    char next[24];
+    snprintf(next, sizeof(next), format, value);
     // Les libellés sont français : la virgule décimale reste déterministe,
     // sans dépendre de la locale globale de l'ESP-IDF.
-    for (char *cursor = buffer; *cursor != '\0'; cursor++) {
+    for (char *cursor = next; *cursor != '\0'; cursor++) {
         if (*cursor == '.') *cursor = ',';
     }
-    lv_label_set_text_static(label, buffer);
+    if (strcmp(buffer, next) == 0) return false;
+    snprintf(buffer, buffer_size, "%s", next);
+    lv_label_set_text_static(front, buffer);
+    lv_label_set_text_static(shadow, buffer);
+    return true;
 }
 
 static void scale_metric_value(lv_obj_t *label) {
@@ -258,45 +264,39 @@ fail:
 void ignition_screen_update(ignition_screen_t *screen, const ecu_data_t *data) {
     if (screen == NULL || data == NULL || screen->canvas == NULL) return;
 
-    screen->advance_value = data->ignition_advance;
-    update_label(screen->advance, screen->advance_text,
-                 sizeof(screen->advance_text), "%.0f°", data->ignition_advance);
-    update_label(screen->advance_shadow, screen->advance_text,
-                 sizeof(screen->advance_text), "%.0f°", data->ignition_advance);
-    update_label(screen->metric_shadow[0], screen->offset_text,
-                 sizeof(screen->offset_text), "%.1f°",
-                 data->ignition_advance_offset);
-    update_label(screen->metric_value[0], screen->offset_text,
-                 sizeof(screen->offset_text), "%.1f°",
-                 data->ignition_advance_offset);
-    update_label(screen->metric_shadow[1], screen->coil_1_text,
-                 sizeof(screen->coil_1_text), "%.2f ms",
-                 data->coil_1_charge_time);
-    update_label(screen->metric_value[1], screen->coil_1_text,
-                 sizeof(screen->coil_1_text), "%.2f ms",
-                 data->coil_1_charge_time);
-    update_label(screen->metric_shadow[2], screen->coil_2_text,
-                 sizeof(screen->coil_2_text), "%.2f ms",
-                 data->coil_2_charge_time);
-    update_label(screen->metric_value[2], screen->coil_2_text,
-                 sizeof(screen->coil_2_text), "%.2f ms",
-                 data->coil_2_charge_time);
-    update_label(screen->metric_shadow[3], screen->coil_total_text,
-                 sizeof(screen->coil_total_text), "%.2f ms",
-                 data->coil_time_microseconds / 1000.0f);
-    update_label(screen->metric_value[3], screen->coil_total_text,
-                 sizeof(screen->coil_total_text), "%.2f ms",
-                 data->coil_time_microseconds / 1000.0f);
+    const int32_t advance_bucket = isfinite(data->ignition_advance)
+        ? (int32_t)lroundf(amber_progress(data->ignition_advance,
+                                           ADVANCE_MIN, ADVANCE_MAX) * 3600.0f)
+        : 0;
+    const bool advance_changed = advance_bucket != screen->advance_bucket;
+    const bool advance_text_changed = update_pair(
+        screen->advance, screen->advance_shadow, screen->advance_text,
+        sizeof(screen->advance_text), "%.0f°", data->ignition_advance);
+    const bool metric_changed[4] = {
+        update_pair(screen->metric_value[0], screen->metric_shadow[0],
+                    screen->offset_text, sizeof(screen->offset_text), "%.1f°",
+                    data->ignition_advance_offset),
+        update_pair(screen->metric_value[1], screen->metric_shadow[1],
+                    screen->coil_1_text, sizeof(screen->coil_1_text), "%.2f ms",
+                    data->coil_1_charge_time),
+        update_pair(screen->metric_value[2], screen->metric_shadow[2],
+                    screen->coil_2_text, sizeof(screen->coil_2_text), "%.2f ms",
+                    data->coil_2_charge_time),
+        update_pair(screen->metric_value[3], screen->metric_shadow[3],
+                    screen->coil_total_text, sizeof(screen->coil_total_text),
+                    "%.2f ms", data->coil_time_microseconds / 1000.0f),
+    };
 
-    // Les largeurs changent avec les chiffres : le repositionnement est purement
-    // géométrique et n'alloue rien, tandis que le canvas redessine l'arc.
-    amber_ui_place_centered(
-        screen->advance_shadow, screen->root, SCREEN_CX, 143.0f, 0.0f,
-        amber_ui_bold_spread(BOLD_SPREAD_PX));
-    amber_ui_place_centered(
-        screen->advance, screen->root, SCREEN_CX, 143.0f, 0.0f,
-        -amber_ui_bold_spread(BOLD_SPREAD_PX));
+    if (advance_text_changed) {
+        amber_ui_place_centered(
+            screen->advance_shadow, screen->root, SCREEN_CX, 143.0f, 0.0f,
+            amber_ui_bold_spread(BOLD_SPREAD_PX));
+        amber_ui_place_centered(
+            screen->advance, screen->root, SCREEN_CX, 143.0f, 0.0f,
+            -amber_ui_bold_spread(BOLD_SPREAD_PX));
+    }
     for (int i = 0; i < 4; i++) {
+        if (!metric_changed[i]) continue;
         amber_ui_place_centered(
             screen->metric_shadow[i], screen->root, k_metric_x[i],
             k_metric_value_y[i], 0.0f, amber_ui_bold_spread(BOLD_SPREAD_PX));
@@ -306,7 +306,11 @@ void ignition_screen_update(ignition_screen_t *screen, const ecu_data_t *data) {
         scale_metric_value(screen->metric_shadow[i]);
         scale_metric_value(screen->metric_value[i]);
     }
-    lv_obj_invalidate(screen->canvas);
+    if (advance_changed) {
+        screen->advance_value = data->ignition_advance;
+        screen->advance_bucket = advance_bucket;
+        lv_obj_invalidate(screen->canvas);
+    }
 }
 
 void ignition_screen_destroy(ignition_screen_t *screen) {

@@ -5,6 +5,7 @@
 #include "ui/widgets/amber_ui.h"
 
 #include <stdio.h>
+#include <string.h>
 
 // Repère de conception commun aux écrans ambre : 320 unités sur le diamètre.
 #define SCREEN_CX 160.0f
@@ -46,32 +47,22 @@ struct injection_screen_s {
 // colonnes de mesures. La géométrie des labels fournit la symétrie à toutes
 // les tailles de canvas via amber_ui_place_centered().
 
-static void set_pair_text(injection_screen_t *scr, int index, const char *text) {
-    lv_label_set_text_static(scr->metric_front[index], text);
-    lv_label_set_text_static(scr->metric_shadow[index], text);
+static bool set_pair_text_if_changed(char *buffer, size_t buffer_size,
+                                     lv_obj_t *front, lv_obj_t *shadow,
+                                     const char *text) {
+    if (strcmp(buffer, text) == 0) return false;
+    snprintf(buffer, buffer_size, "%s", text);
+    lv_label_set_text_static(front, buffer);
+    lv_label_set_text_static(shadow, buffer);
+    return true;
 }
 
-static void set_available_text(injection_screen_t *scr, const ecu_data_t *data) {
-    snprintf(scr->hero_text, sizeof(scr->hero_text), "%.0f%%", data->fuelling_feedback_percent);
-    snprintf(scr->metric_text[METRIC_SHORT_TRIM],
-             sizeof(scr->metric_text[METRIC_SHORT_TRIM]), "%+.1f%%",
-             data->short_term_trim_percent);
-    snprintf(scr->metric_text[METRIC_LONG_TRIM],
-             sizeof(scr->metric_text[METRIC_LONG_TRIM]), "%+.1f%%",
-             data->long_term_trim);
-    snprintf(scr->metric_text[METRIC_INJECTOR_1],
-             sizeof(scr->metric_text[METRIC_INJECTOR_1]), "%.2f ms",
-             data->injector_1_pw);
-    snprintf(scr->metric_text[METRIC_INJECTOR_2],
-             sizeof(scr->metric_text[METRIC_INJECTOR_2]), "%.2f ms",
-             data->injector_2_pw);
-}
-
-static void set_unavailable_text(injection_screen_t *scr) {
-    snprintf(scr->hero_text, sizeof(scr->hero_text), "--");
-    for (int i = 0; i < METRIC_COUNT; i++) {
-        snprintf(scr->metric_text[i], sizeof(scr->metric_text[i]), "--");
-    }
+static bool set_pair_value_if_changed(char *buffer, size_t buffer_size,
+                                      lv_obj_t *front, lv_obj_t *shadow,
+                                      const char *format, float value) {
+    char next[24];
+    snprintf(next, sizeof(next), format, value);
+    return set_pair_text_if_changed(buffer, buffer_size, front, shadow, next);
 }
 
 injection_screen_t *injection_screen_create(lv_obj_t *parent) {
@@ -105,7 +96,10 @@ injection_screen_t *injection_screen_create(lv_obj_t *parent) {
     lv_obj_t *inj_two_label = amber_ui_label_create(
         scr->root, font_m, dim, "INJECT. 2", 130.0f);
 
-    set_unavailable_text(scr);
+    strcpy(scr->hero_text, "--");
+    for (int i = 0; i < METRIC_COUNT; i++) {
+        strcpy(scr->metric_text[i], "--");
+    }
     scr->hero_front = amber_ui_label_create(scr->root, font_xl, bright,
                                              scr->hero_text, 190.0f);
     scr->hero_shadow = amber_ui_label_create(scr->root, font_xl,
@@ -188,17 +182,48 @@ fail:
 void injection_screen_update(injection_screen_t *scr, const ecu_data_t *data) {
     if (scr == NULL || data == NULL) return;
 
-    scr->connected = data->connected;
-    if (scr->connected) set_available_text(scr, data);
-    else set_unavailable_text(scr);
-
-    lv_label_set_text_static(scr->hero_front, scr->hero_text);
-    lv_label_set_text_static(scr->hero_shadow, scr->hero_text);
-    for (int i = 0; i < METRIC_COUNT; i++) {
-        set_pair_text(scr, i, scr->metric_text[i]);
+    if (data->connected) {
+        set_pair_value_if_changed(
+            scr->hero_text, sizeof(scr->hero_text), scr->hero_front,
+            scr->hero_shadow, "%.0f%%", data->fuelling_feedback_percent);
+        set_pair_value_if_changed(
+            scr->metric_text[METRIC_SHORT_TRIM],
+            sizeof(scr->metric_text[METRIC_SHORT_TRIM]),
+            scr->metric_front[METRIC_SHORT_TRIM],
+            scr->metric_shadow[METRIC_SHORT_TRIM], "%+.1f%%",
+            data->short_term_trim_percent);
+        set_pair_value_if_changed(
+            scr->metric_text[METRIC_LONG_TRIM],
+            sizeof(scr->metric_text[METRIC_LONG_TRIM]),
+            scr->metric_front[METRIC_LONG_TRIM],
+            scr->metric_shadow[METRIC_LONG_TRIM], "%+.1f%%",
+            data->long_term_trim);
+        set_pair_value_if_changed(
+            scr->metric_text[METRIC_INJECTOR_1],
+            sizeof(scr->metric_text[METRIC_INJECTOR_1]),
+            scr->metric_front[METRIC_INJECTOR_1],
+            scr->metric_shadow[METRIC_INJECTOR_1], "%.2f ms",
+            data->injector_1_pw);
+        set_pair_value_if_changed(
+            scr->metric_text[METRIC_INJECTOR_2],
+            sizeof(scr->metric_text[METRIC_INJECTOR_2]),
+            scr->metric_front[METRIC_INJECTOR_2],
+            scr->metric_shadow[METRIC_INJECTOR_2], "%.2f ms",
+            data->injector_2_pw);
+    } else {
+        set_pair_text_if_changed(
+            scr->hero_text, sizeof(scr->hero_text), scr->hero_front,
+            scr->hero_shadow, "--");
+        for (int i = 0; i < METRIC_COUNT; i++) {
+            set_pair_text_if_changed(
+                scr->metric_text[i], sizeof(scr->metric_text[i]),
+                scr->metric_front[i], scr->metric_shadow[i], "--");
+        }
     }
-    // Les buffers sont persistants dans scr : aucun label ne duplique de
-    // chaîne pendant update, et aucune allocation n'est réalisée ici.
+
+    scr->connected = data->connected;
+    // Les buffers persistants et set_text_static évitent les allocations ; les
+    // setters ne sont appelés que si la chaîne affichée a changé.
 }
 
 void injection_screen_destroy(injection_screen_t *scr) {

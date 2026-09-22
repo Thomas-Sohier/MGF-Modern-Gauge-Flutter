@@ -7,6 +7,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdint.h>
 
 // Repère de conception commun au cadran ambre : 320 unités inscrites dans le
 // plus grand carré disponible. Le panneau physique est un disque de 480 px.
@@ -97,6 +98,10 @@ struct admission_screen_s {
     float throttle;
     float throttle_pot_voltage;
     float intake_air_temp;
+    bool has_snapshot;
+    int32_t displayed[5];
+    int32_t map_bucket;
+    int32_t throttle_bucket;
 };
 
 static void draw_map_ring(lv_layer_t *layer, const ui_layout_t *layout,
@@ -370,7 +375,33 @@ fail:
 void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
     if (scr == NULL || data == NULL || scr->canvas == NULL) return;
 
-    scr->connected = data->connected;
+    const bool connected = data->connected;
+    const float map_kpa = connected && isfinite(data->map_sensor_kpa)
+        ? amber_clampf(data->map_sensor_kpa, 0.0f, MAP_MAX) : 0.0f;
+    const float throttle = connected && isfinite(data->throttle)
+        ? amber_clampf(data->throttle, 0.0f, 100.0f) : 0.0f;
+    const float tps = connected && isfinite(data->throttle_pot_voltage)
+        ? amber_clampf(data->throttle_pot_voltage, 0.0f, 5.0f) : 0.0f;
+    const float intake = connected && isfinite(data->intake_air_temp)
+        ? data->intake_air_temp : 0.0f;
+    const int32_t displayed[5] = {
+        connected ? (int32_t)lroundf(map_kpa) : INT32_MIN,
+        connected ? (int32_t)lroundf(throttle) : INT32_MIN,
+        connected ? (int32_t)lroundf(tps * 100.0f) : INT32_MIN,
+        connected ? (int32_t)lroundf(intake) : INT32_MIN,
+        connected ? (int32_t)lroundf(map_kpa) : INT32_MIN,
+    };
+    const int32_t map_bucket = (int32_t)lroundf(map_kpa * 1000.0f);
+    const int32_t throttle_bucket = (int32_t)lroundf(throttle * 1000.0f);
+    if (scr->has_snapshot && scr->connected == connected &&
+        scr->map_bucket == map_bucket &&
+        scr->throttle_bucket == throttle_bucket) {
+        bool same = true;
+        for (int i = 0; i < 5; i++) same = same && scr->displayed[i] == displayed[i];
+        if (same) return;
+    }
+
+    scr->connected = connected;
     scr->map_kpa = scr->connected && isfinite(data->map_sensor_kpa)
                        ? amber_clampf(data->map_sensor_kpa, 0.0f, MAP_MAX) : 0.0f;
     scr->throttle = scr->connected && isfinite(data->throttle)
@@ -403,6 +434,11 @@ void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
     lv_label_set_text_static(scr->status, scr->status_text);
     amber_ui_place_centered(scr->status, scr->root, CX, STATUS_Y, 220.0f,
                              0.0f);
+
+    for (int i = 0; i < 5; i++) scr->displayed[i] = displayed[i];
+    scr->map_bucket = map_bucket;
+    scr->throttle_bucket = throttle_bucket;
+    scr->has_snapshot = true;
 
     // Les textes viennent de buffers persistants et set_text_static ne copie
     // rien : cette voie ne fait aucune allocation pendant une mise à jour.

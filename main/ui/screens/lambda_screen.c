@@ -7,6 +7,8 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 
 // Repère unique du cadran ambre : 320 unités, quelle que soit la taille du
 // parent. La composition reste à l'intérieur d'une marge circulaire sûre.
@@ -65,6 +67,11 @@ struct lambda_screen_s {
     float lambda_mv;
     float o2_mv;
     float duty;
+    bool has_snapshot;
+    int32_t afr_lit;
+    int32_t lambda_lit;
+    int32_t o2_lit;
+    bool heater_active;
 };
 
 static void draw_segment_bar(lv_layer_t *layer, const ui_layout_t *layout,
@@ -123,6 +130,15 @@ static void text_style(amber_text_t *text, lv_color_t front,
                        lv_color_t shadow) {
     lv_obj_set_style_text_color(text->front, front, 0);
     lv_obj_set_style_text_color(text->shadow, shadow, 0);
+}
+
+static bool set_text_if_changed(amber_text_t *text, char *buffer,
+                                size_t buffer_size, const char *value) {
+    if (strcmp(buffer, value) == 0) return false;
+    snprintf(buffer, buffer_size, "%s", value);
+    lv_label_set_text_static(text->shadow, buffer);
+    lv_label_set_text_static(text->front, buffer);
+    return true;
 }
 
 lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
@@ -289,86 +305,104 @@ fail:
 void lambda_screen_update(lambda_screen_t *screen, const ecu_data_t *data) {
     if (screen == NULL || data == NULL || screen->canvas == NULL) return;
 
-    screen->connected = data->connected;
-    screen->afr_value = isfinite(data->estimated_air_fuel)
-                            ? amber_clampf(data->estimated_air_fuel, AFR_MIN,
-                                           AFR_MAX)
-                            : AFR_MIN;
-    screen->lambda_mv = isfinite(data->lambda_mv)
-                            ? amber_clampf(data->lambda_mv, 0.0f, 1000.0f)
-                            : 0.0f;
-    screen->o2_mv = isfinite(data->o2_mv)
-                        ? amber_clampf(data->o2_mv, 0.0f, 1000.0f)
-                        : 0.0f;
-    screen->duty = isfinite(data->lambda_sensor_duty_cycle)
-                       ? amber_clampf(data->lambda_sensor_duty_cycle, 0.0f,
-                                      100.0f)
-                       : 0.0f;
+    const bool connected = data->connected;
+    const float afr = isfinite(data->estimated_air_fuel)
+        ? amber_clampf(data->estimated_air_fuel, AFR_MIN, AFR_MAX) : AFR_MIN;
+    const float lambda_mv = isfinite(data->lambda_mv)
+        ? amber_clampf(data->lambda_mv, 0.0f, 1000.0f) : 0.0f;
+    const float o2_mv = isfinite(data->o2_mv)
+        ? amber_clampf(data->o2_mv, 0.0f, 1000.0f) : 0.0f;
+    const float duty = isfinite(data->lambda_sensor_duty_cycle)
+        ? amber_clampf(data->lambda_sensor_duty_cycle, 0.0f, 100.0f) : 0.0f;
+    const int32_t afr_lit = (int32_t)lroundf(
+        amber_progress(afr, AFR_MIN, AFR_MAX) * AFR_SEGMENTS);
+    const int32_t lambda_lit = (int32_t)lroundf(
+        amber_progress(lambda_mv, 0.0f, 1000.0f) * O2_SEGMENTS);
+    const int32_t o2_lit = (int32_t)lroundf(
+        amber_progress(o2_mv, 0.0f, 1000.0f) * O2_SEGMENTS);
+    const bool bars_changed = !screen->has_snapshot ||
+        connected != screen->connected || afr_lit != screen->afr_lit ||
+        lambda_lit != screen->lambda_lit || o2_lit != screen->o2_lit;
+    const bool heater_active = connected && duty > 0.0f;
+    const bool style_changed = !screen->has_snapshot ||
+                               heater_active != screen->heater_active;
 
-    if (screen->connected) {
-        snprintf(screen->afr_buf, sizeof(screen->afr_buf), "%.2f",
-                 screen->afr_value);
-        snprintf(screen->lambda_buf, sizeof(screen->lambda_buf), "%.0f",
-                 screen->lambda_mv);
-        snprintf(screen->o2_buf, sizeof(screen->o2_buf), "%.0f", screen->o2_mv);
-        snprintf(screen->duty_buf, sizeof(screen->duty_buf), "%.0f%%",
-                 screen->duty);
+    char next_afr[12], next_lambda[12], next_o2[12], next_duty[12];
+    if (connected) {
+        snprintf(next_afr, sizeof(next_afr), "%.2f", afr);
+        snprintf(next_lambda, sizeof(next_lambda), "%.0f", lambda_mv);
+        snprintf(next_o2, sizeof(next_o2), "%.0f", o2_mv);
+        snprintf(next_duty, sizeof(next_duty), "%.0f%%", duty);
     } else {
-        snprintf(screen->afr_buf, sizeof(screen->afr_buf), "--.--");
-        snprintf(screen->lambda_buf, sizeof(screen->lambda_buf), "--");
-        snprintf(screen->o2_buf, sizeof(screen->o2_buf), "--");
-        snprintf(screen->duty_buf, sizeof(screen->duty_buf), "--%%");
+        snprintf(next_afr, sizeof(next_afr), "--.--");
+        snprintf(next_lambda, sizeof(next_lambda), "--");
+        snprintf(next_o2, sizeof(next_o2), "--");
+        snprintf(next_duty, sizeof(next_duty), "--%%");
     }
+    const char *heater_state = !connected ? "CHAUFFAGE INDISPONIBLE"
+        : duty > 0.0f ? "CHAUFFAGE ACTIF" : "CHAUFFAGE INACTIF";
 
-    const char *heater_state = !screen->connected
-                                   ? "CHAUFFAGE INDISPONIBLE"
-                               : screen->duty > 0.0f
-                                   ? "CHAUFFAGE ACTIF"
-                                   : "CHAUFFAGE INACTIF";
-    snprintf(screen->duty_state_buf, sizeof(screen->duty_state_buf), "%s",
-             heater_state);
+    const bool afr_changed = set_text_if_changed(&screen->afr, screen->afr_buf,
+                                                  sizeof(screen->afr_buf), next_afr);
+    const bool lambda_changed = set_text_if_changed(&screen->lambda_value,
+        screen->lambda_buf, sizeof(screen->lambda_buf), next_lambda);
+    const bool o2_changed = set_text_if_changed(&screen->o2_value,
+        screen->o2_buf, sizeof(screen->o2_buf), next_o2);
+    const bool duty_changed = set_text_if_changed(&screen->duty_value,
+        screen->duty_buf, sizeof(screen->duty_buf), next_duty);
+    const bool state_changed = set_text_if_changed(&screen->duty_label,
+        screen->duty_state_buf, sizeof(screen->duty_state_buf), heater_state);
 
-    lv_label_set_text_static(screen->afr.shadow, screen->afr_buf);
-    lv_label_set_text_static(screen->afr.front, screen->afr_buf);
-    amber_ui_place_centered(screen->afr.shadow, screen->root, CX, 130.0f,
-                            150.0f, amber_ui_bold_spread(2));
-    amber_ui_place_centered(screen->afr.front, screen->root, CX, 130.0f,
-                            150.0f, -amber_ui_bold_spread(2));
+    screen->connected = connected;
+    screen->afr_value = afr;
+    screen->lambda_mv = lambda_mv;
+    screen->o2_mv = o2_mv;
+    screen->duty = duty;
+    screen->afr_lit = afr_lit;
+    screen->lambda_lit = lambda_lit;
+    screen->o2_lit = o2_lit;
+    screen->heater_active = heater_active;
+    screen->has_snapshot = true;
 
-    lv_label_set_text_static(screen->lambda_value.shadow, screen->lambda_buf);
-    lv_label_set_text_static(screen->lambda_value.front, screen->lambda_buf);
-    amber_ui_place_centered(screen->lambda_value.shadow, screen->root, 80.0f,
-                            222.0f, 100.0f, amber_ui_bold_spread(1));
-    amber_ui_place_centered(screen->lambda_value.front, screen->root, 80.0f,
-                            222.0f, 100.0f, -amber_ui_bold_spread(1));
-
-    lv_label_set_text_static(screen->o2_value.shadow, screen->o2_buf);
-    lv_label_set_text_static(screen->o2_value.front, screen->o2_buf);
-    amber_ui_place_centered(screen->o2_value.shadow, screen->root, 240.0f,
-                            222.0f, 100.0f, amber_ui_bold_spread(1));
-    amber_ui_place_centered(screen->o2_value.front, screen->root, 240.0f,
-                            222.0f, 100.0f, -amber_ui_bold_spread(1));
-
-    lv_label_set_text_static(screen->duty_value.shadow, screen->duty_buf);
-    lv_label_set_text_static(screen->duty_value.front, screen->duty_buf);
-    amber_ui_place_centered(screen->duty_value.shadow, screen->root, CX, 269.0f,
-                            100.0f, amber_ui_bold_spread(1));
-    amber_ui_place_centered(screen->duty_value.front, screen->root, CX, 269.0f,
-                            100.0f, -amber_ui_bold_spread(1));
-
-    lv_label_set_text_static(screen->duty_label.shadow, screen->duty_state_buf);
-    lv_label_set_text_static(screen->duty_label.front, screen->duty_state_buf);
-    amber_ui_place_centered(screen->duty_label.shadow, screen->root, CX, 291.0f,
-                            200.0f, 0.0f);
-    amber_ui_place_centered(screen->duty_label.front, screen->root, CX, 291.0f,
-                            200.0f, 0.0f);
-    text_style(&screen->duty_label,
-               screen->connected && screen->duty > 0.0f
-                   ? ui_theme_amber_bright()
-                   : ui_theme_amber_dim(),
-               ui_theme_amber_separator());
-
-    lv_obj_invalidate(screen->canvas);
+    if (afr_changed) {
+        amber_ui_place_centered(screen->afr.shadow, screen->root, CX, 130.0f,
+                                150.0f, amber_ui_bold_spread(2));
+        amber_ui_place_centered(screen->afr.front, screen->root, CX, 130.0f,
+                                150.0f, -amber_ui_bold_spread(2));
+    }
+    if (lambda_changed) {
+        amber_ui_place_centered(screen->lambda_value.shadow, screen->root, 80.0f,
+                                222.0f, 100.0f, amber_ui_bold_spread(1));
+        amber_ui_place_centered(screen->lambda_value.front, screen->root, 80.0f,
+                                222.0f, 100.0f, -amber_ui_bold_spread(1));
+    }
+    if (o2_changed) {
+        amber_ui_place_centered(screen->o2_value.shadow, screen->root, 240.0f,
+                                222.0f, 100.0f, amber_ui_bold_spread(1));
+        amber_ui_place_centered(screen->o2_value.front, screen->root, 240.0f,
+                                222.0f, 100.0f, -amber_ui_bold_spread(1));
+    }
+    if (duty_changed) {
+        amber_ui_place_centered(screen->duty_value.shadow, screen->root, CX, 269.0f,
+                                100.0f, amber_ui_bold_spread(1));
+        amber_ui_place_centered(screen->duty_value.front, screen->root, CX, 269.0f,
+                                100.0f, -amber_ui_bold_spread(1));
+    }
+    if (state_changed || style_changed) {
+        if (state_changed) {
+            amber_ui_place_centered(screen->duty_label.shadow, screen->root, CX,
+                                    291.0f, 200.0f, 0.0f);
+            amber_ui_place_centered(screen->duty_label.front, screen->root, CX,
+                                    291.0f, 200.0f, 0.0f);
+        }
+        if (style_changed) {
+            text_style(&screen->duty_label,
+                       heater_active ? ui_theme_amber_bright()
+                                     : ui_theme_amber_dim(),
+                       ui_theme_amber_separator());
+        }
+    }
+    if (bars_changed) lv_obj_invalidate(screen->canvas);
 }
 
 void lambda_screen_destroy(lambda_screen_t *screen) {

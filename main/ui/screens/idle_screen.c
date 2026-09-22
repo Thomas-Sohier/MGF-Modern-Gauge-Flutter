@@ -7,6 +7,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 // Toutes les coordonnées sont dans le cadran de conception 320 x 320. La
 // translation et l'échelle sont calculées à partir de la zone réellement
@@ -89,6 +90,7 @@ struct idle_screen_s {
     float error_value;
     float adjuster;
     bool connected;
+    int32_t rpm_lit;
 };
 
 static void draw_rpm_ring(lv_layer_t *layer, const ui_layout_t *layout,
@@ -138,27 +140,29 @@ static void canvas_draw_cb(lv_event_t *event) {
     draw_panel_lines(layer, &layout);
 }
 
-static void set_text(lv_obj_t *label, char *buffer, size_t size,
+static bool set_text(lv_obj_t *label, char *buffer, size_t size,
                      const char *format, float value) {
-    if (label == NULL || buffer == NULL || size == 0) return;
-    if (!isfinite(value)) {
-        snprintf(buffer, size, "--");
-    } else {
-        snprintf(buffer, size, format, value);
-    }
+    if (label == NULL || buffer == NULL || size == 0) return false;
+    char next[32];
+    if (!isfinite(value)) snprintf(next, sizeof(next), "--");
+    else snprintf(next, sizeof(next), format, value);
+    if (strcmp(buffer, next) == 0) return false;
+    snprintf(buffer, size, "%s", next);
     lv_label_set_text_static(label, buffer);
+    return true;
 }
 
-static void set_pair_text(lv_obj_t *front, lv_obj_t *shadow, char *buffer,
+static bool set_pair_text(lv_obj_t *front, lv_obj_t *shadow, char *buffer,
                           size_t size, const char *format, float value) {
-    if (buffer == NULL || size == 0) return;
-    if (!isfinite(value)) {
-        snprintf(buffer, size, "--");
-    } else {
-        snprintf(buffer, size, format, value);
-    }
+    if (buffer == NULL || size == 0) return false;
+    char next[32];
+    if (!isfinite(value)) snprintf(next, sizeof(next), "--");
+    else snprintf(next, sizeof(next), format, value);
+    if (strcmp(buffer, next) == 0) return false;
+    snprintf(buffer, size, "%s", next);
     lv_label_set_text_static(front, buffer);
     lv_label_set_text_static(shadow, buffer);
+    return true;
 }
 
 idle_screen_t *idle_screen_create(lv_obj_t *parent) {
@@ -293,6 +297,41 @@ fail:
 void idle_screen_update(idle_screen_t *screen, const ecu_data_t *data) {
     if (screen == NULL || data == NULL || screen->canvas == NULL) return;
 
+    const int32_t rpm_lit = (int32_t)lroundf(
+        amber_progress(data->rpm, 0.0f, RPM_MAX) * RPM_SEGMENTS);
+    const bool ring_changed = rpm_lit != screen->rpm_lit ||
+                              data->connected != screen->connected;
+    bool text_changed = false;
+    text_changed |= set_pair_text(screen->hero, screen->hero_shadow,
+                                  screen->hero_text, sizeof(screen->hero_text),
+                                  "%.0f", data->rpm);
+    text_changed |= set_text(screen->error, screen->error_text,
+                             sizeof(screen->error_text), "ERREUR %+.0f RPM",
+                             data->idle_error);
+    const char *status = data->connected ? "BOUCLE ACTIVE" : "PAS DE LIEN";
+    if (strcmp(screen->status_text, status) != 0) {
+        snprintf(screen->status_text, sizeof(screen->status_text), "%s", status);
+        lv_label_set_text_static(screen->status, screen->status_text);
+        text_changed = true;
+    }
+
+    text_changed |= set_text(screen->metric_value[METRIC_SETPOINT],
+                             screen->metric_text[METRIC_SETPOINT],
+                             sizeof(screen->metric_text[METRIC_SETPOINT]),
+                             "%.0f", data->idle_setpoint);
+    text_changed |= set_text(screen->metric_value[METRIC_VALVE],
+                             screen->metric_text[METRIC_VALVE],
+                             sizeof(screen->metric_text[METRIC_VALVE]),
+                             "%.0f%%", data->idle_valve_position);
+    text_changed |= set_text(screen->metric_value[METRIC_BASE],
+                             screen->metric_text[METRIC_BASE],
+                             sizeof(screen->metric_text[METRIC_BASE]),
+                             "%.0f%%", data->idle_base_position);
+    text_changed |= set_text(screen->metric_value[METRIC_ADJUSTER],
+                             screen->metric_text[METRIC_ADJUSTER],
+                             sizeof(screen->metric_text[METRIC_ADJUSTER]),
+                             "%+.0f", data->idle_adjuster_rpm);
+
     screen->rpm = data->rpm;
     screen->setpoint = data->idle_setpoint;
     screen->valve = data->idle_valve_position;
@@ -300,50 +339,29 @@ void idle_screen_update(idle_screen_t *screen, const ecu_data_t *data) {
     screen->error_value = data->idle_error;
     screen->adjuster = data->idle_adjuster_rpm;
     screen->connected = data->connected;
-
-    set_pair_text(screen->hero, screen->hero_shadow, screen->hero_text,
-                  sizeof(screen->hero_text), "%.0f", screen->rpm);
-    set_text(screen->error, screen->error_text, sizeof(screen->error_text),
-             "ERREUR %+.0f RPM", screen->error_value);
-    snprintf(screen->status_text, sizeof(screen->status_text),
-             data->connected ? "BOUCLE ACTIVE" : "PAS DE LIEN");
-    lv_label_set_text_static(screen->status, screen->status_text);
-
-    set_text(screen->metric_value[METRIC_SETPOINT],
-             screen->metric_text[METRIC_SETPOINT],
-             sizeof(screen->metric_text[METRIC_SETPOINT]), "%.0f",
-             screen->setpoint);
-    set_text(screen->metric_value[METRIC_VALVE],
-             screen->metric_text[METRIC_VALVE],
-             sizeof(screen->metric_text[METRIC_VALVE]), "%.0f%%",
-             screen->valve);
-    set_text(screen->metric_value[METRIC_BASE],
-             screen->metric_text[METRIC_BASE],
-             sizeof(screen->metric_text[METRIC_BASE]), "%.0f%%",
-             screen->base);
-    set_text(screen->metric_value[METRIC_ADJUSTER],
-             screen->metric_text[METRIC_ADJUSTER],
-             sizeof(screen->metric_text[METRIC_ADJUSTER]), "%+.0f",
-             screen->adjuster);
+    screen->rpm_lit = rpm_lit;
+    if (!text_changed && !ring_changed) return;
 
     // Le texte à largeur intrinsèque est recentré sans recréer de widget.
-    amber_ui_place_centered(screen->hero_shadow, screen->root, SCREEN_CX,
-                             HERO_Y, 0.0f,
-                             BOLD_SPREAD_PX * UI_REFERENCE_SIZE /
-                             UI_DISPLAY_SIZE_PX);
-    amber_ui_place_centered(screen->hero, screen->root, SCREEN_CX, HERO_Y,
-                             0.0f,
-                             -BOLD_SPREAD_PX * UI_REFERENCE_SIZE /
-                             UI_DISPLAY_SIZE_PX);
-    amber_ui_place_centered(screen->error, screen->root, SCREEN_CX, ERROR_Y,
-                             0.0f, 0.0f);
-    amber_ui_place_centered(screen->status, screen->root, SCREEN_CX, STATUS_Y,
-                             0.0f, 0.0f);
-    for (int i = 0; i < METRIC_COUNT; i++) {
-        amber_ui_place_centered(screen->metric_value[i], screen->root,
-                                kMetricX[i], kMetricValueY[i], 0.0f, 0.0f);
+    if (text_changed) {
+        amber_ui_place_centered(screen->hero_shadow, screen->root, SCREEN_CX,
+                                 HERO_Y, 0.0f,
+                                 BOLD_SPREAD_PX * UI_REFERENCE_SIZE /
+                                 UI_DISPLAY_SIZE_PX);
+        amber_ui_place_centered(screen->hero, screen->root, SCREEN_CX, HERO_Y,
+                                 0.0f,
+                                 -BOLD_SPREAD_PX * UI_REFERENCE_SIZE /
+                                 UI_DISPLAY_SIZE_PX);
+        amber_ui_place_centered(screen->error, screen->root, SCREEN_CX, ERROR_Y,
+                                 0.0f, 0.0f);
+        amber_ui_place_centered(screen->status, screen->root, SCREEN_CX,
+                                 STATUS_Y, 0.0f, 0.0f);
+        for (int i = 0; i < METRIC_COUNT; i++) {
+            amber_ui_place_centered(screen->metric_value[i], screen->root,
+                                    kMetricX[i], kMetricValueY[i], 0.0f, 0.0f);
+        }
     }
-    lv_obj_invalidate(screen->canvas);
+    if (ring_changed) lv_obj_invalidate(screen->canvas);
 }
 
 void idle_screen_destroy(idle_screen_t *screen) {
