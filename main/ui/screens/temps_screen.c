@@ -86,6 +86,7 @@ struct temps_screen_s {
     int32_t displayed[METRIC_COUNT];
     int32_t arc_bucket[METRIC_COUNT];
     int32_t peak_display;
+    bool any_danger_display;
 };
 
 static void draw_arc(lv_layer_t *layer, int32_t cx, int32_t cy,
@@ -313,8 +314,18 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
         if (same) return;
     }
 
+    const bool arc_changed = !scr->has_snapshot ||
+        scr->arc_bucket[METRIC_COOLANT] != next_arc_bucket[METRIC_COOLANT] ||
+        scr->arc_bucket[METRIC_OIL] != next_arc_bucket[METRIC_OIL] ||
+        scr->arc_bucket[METRIC_INTAKE] != next_arc_bucket[METRIC_INTAKE];
+    const bool hero_changed = !scr->has_snapshot ||
+        scr->displayed[METRIC_COOLANT] != next_displayed[METRIC_COOLANT];
+    bool text_changed = false;
     for (int i = 0; i < METRIC_COUNT; i++) {
         const float raw = raw_values[i];
+        const bool metric_changed = !scr->has_snapshot ||
+            scr->available[i] != next_available[i] ||
+            scr->displayed[i] != next_displayed[i];
         scr->available[i] = next_available[i];
         scr->values[i] = scr->available[i] ? raw : 0.0f;
         scr->danger[i] = next_danger[i];
@@ -323,30 +334,40 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
         any_danger = any_danger || scr->danger[i];
         if (scr->available[i] && raw > peak) peak = raw;
 
-        if (scr->available[i]) {
-            snprintf(scr->metric_text[i], sizeof(scr->metric_text[i]),
-                     "%.0f", raw);
-        } else {
-            snprintf(scr->metric_text[i], sizeof(scr->metric_text[i]), "--");
-        }
-        if (i != METRIC_COOLANT) {
-            lv_label_set_text_static(scr->metric_value[i], scr->metric_text[i]);
-            lv_obj_set_style_text_color(
-                scr->metric_value[i], scr->available[i]
-                    ? ui_theme_amber_bright() : ui_theme_amber_dim(), 0);
-            lv_obj_set_style_text_color(
-                scr->metric_unit[i], scr->available[i]
-                    ? ui_theme_amber_bright() : ui_theme_amber_dim(), 0);
+        if (metric_changed) {
+            if (scr->available[i]) {
+                snprintf(scr->metric_text[i], sizeof(scr->metric_text[i]),
+                         "%.0f", raw);
+            } else {
+                snprintf(scr->metric_text[i], sizeof(scr->metric_text[i]), "--");
+            }
+            text_changed = true;
+            if (i != METRIC_COOLANT) {
+                lv_label_set_text_static(scr->metric_value[i], scr->metric_text[i]);
+                lv_obj_set_style_text_color(
+                    scr->metric_value[i], scr->available[i]
+                        ? ui_theme_amber_bright() : ui_theme_amber_dim(), 0);
+                lv_obj_set_style_text_color(
+                    scr->metric_unit[i], scr->available[i]
+                        ? ui_theme_amber_bright() : ui_theme_amber_dim(), 0);
+            }
         }
     }
 
+    if (hero_changed) text_changed = true;
     if (scr->available[METRIC_COOLANT]) {
         snprintf(scr->hero_text, sizeof(scr->hero_text), "%.0f",
                  scr->values[METRIC_COOLANT]);
     } else {
         snprintf(scr->hero_text, sizeof(scr->hero_text), "--");
     }
-    lv_label_set_text_static(scr->hero_value, scr->hero_text);
+    if (hero_changed) lv_label_set_text_static(scr->hero_value, scr->hero_text);
+
+    const bool status_changed = !scr->has_snapshot ||
+        scr->connected != data->connected ||
+        scr->peak_display != peak_display ||
+        scr->any_danger_display != any_danger;
+    if (!status_changed) goto skip_status_text;
 
     if (!data->connected) {
         snprintf(scr->status_text, sizeof(scr->status_text), "PAS DE LIAISON");
@@ -362,14 +383,18 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
     lv_label_set_text_static(scr->summary, scr->summary_text);
     lv_obj_set_style_text_color(scr->status, ui_theme_amber_bright(), 0);
     lv_obj_set_style_text_color(scr->summary, ui_theme_amber_dim(), 0);
+    text_changed = true;
+
+skip_status_text:
     scr->peak_display = peak_display;
     scr->connected = data->connected;
+    scr->any_danger_display = any_danger;
     scr->has_snapshot = true;
 
     // Les labels à largeur intrinsèque changent de largeur avec une valeur à
     // trois chiffres : les recentrer ne crée aucun objet supplémentaire.
-    place_labels(scr);
-    lv_obj_invalidate(scr->canvas);
+    if (text_changed) place_labels(scr);
+    if (arc_changed) lv_obj_invalidate(scr->canvas);
 }
 
 void temps_screen_destroy(temps_screen_t *scr) {
