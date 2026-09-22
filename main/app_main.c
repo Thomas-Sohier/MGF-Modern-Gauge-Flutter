@@ -30,6 +30,14 @@
 #include "app/dashboard_controller.h"
 #include "app/settings_coordinator.h"
 
+#ifndef MGF_ENABLE_BLE_CONFIG
+#define MGF_ENABLE_BLE_CONFIG 0
+#endif
+
+#if MGF_ENABLE_BLE_CONFIG
+#include "infrastructure/ble_config_service.h"
+#endif
+
 #if MGF_USE_MEMS_KLINE
 #include "infrastructure/mems_ecu.h"
 // Variante ECU : MEMS_VARIANT_1_6 (direct) ou MEMS_VARIANT_1_9 (réveil 5 bauds).
@@ -39,6 +47,31 @@
 #endif
 
 static const char *TAG = "mgf_gauge";
+
+#if MGF_ENABLE_BLE_CONFIG
+static app_settings_t s_ble_settings;
+
+static bool ble_settings_read(void *context, app_settings_t *out) {
+    if (context == NULL || out == NULL) return false;
+    *out = *(const app_settings_t *)context;
+    return app_settings_is_valid(out);
+}
+
+static bool ble_settings_update(void *context, const app_settings_t *settings) {
+    if (context == NULL || !app_settings_is_valid(settings)) return false;
+    if (settings_store_save(settings) != ESP_OK) return false;
+    *(app_settings_t *)context = *settings;
+    return true;
+}
+
+static rtc_result_t ble_datetime_set(void *context,
+                                     const rtc_datetime_t *date_time,
+                                     ble_config_time_basis_t basis) {
+    (void)basis;
+    if (context == NULL) return RTC_ERR_IO;
+    return rtc_set(context, date_time);
+}
+#endif
 
 static bool disconnected_ecu_read(void *context, ecu_data_t *out) {
     (void)context;
@@ -311,6 +344,27 @@ void app_main(void) {
     boot = NULL;
     board_display_unlock();
     lvgl_locked = false;
+
+#if MGF_ENABLE_BLE_CONFIG
+    if (settings_err == ESP_OK) {
+        s_ble_settings = *settings_coordinator_current(settings_coordinator);
+        const ble_config_service_config_t ble_config = {
+            .device_name = "MGF Gauge",
+            .settings_context = &s_ble_settings,
+            .settings_read = ble_settings_read,
+            .settings_update = ble_settings_update,
+            .rtc_context = rtc,
+            .datetime_set = ble_datetime_set,
+        };
+        const esp_err_t ble_error = ble_config_service_start(&ble_config);
+        if (ble_error != ESP_OK) {
+            ESP_LOGW(TAG, "BLE configuration unavailable: %s",
+                     esp_err_to_name(ble_error));
+        }
+    } else {
+        ESP_LOGW(TAG, "BLE configuration disabled: NVS unavailable");
+    }
+#endif
     return;
 
 cleanup:

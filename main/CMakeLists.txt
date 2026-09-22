@@ -11,6 +11,13 @@ set(MGF_KLINE_TX_GPIO 40 CACHE STRING "LILYGO T-RGB K-line TX GPIO")
 set(MGF_KLINE_RX_GPIO 38 CACHE STRING "LILYGO T-RGB K-line RX GPIO")
 set(MGF_KLINE_LOCAL_ECHO 0 CACHE STRING "Discard local K-line loopback echo (0/1)")
 set(MGF_MEMS_VARIANT MEMS_VARIANT_1_6 CACHE STRING "MEMS variant (MEMS_VARIANT_1_6 or MEMS_VARIANT_1_9)")
+set(MGF_ENABLE_BLE_CONFIG 0 CACHE STRING "Enable optional NimBLE configuration service (0/1)")
+set(MGF_BLE_CONFIG_SRCS)
+set(MGF_BLE_CONFIG_REQUIRES)
+if(MGF_ENABLE_BLE_CONFIG)
+    list(APPEND MGF_BLE_CONFIG_SRCS "infrastructure/ble_config_service.c")
+    list(APPEND MGF_BLE_CONFIG_REQUIRES bt)
+endif()
 # GPIO38/GPIO40 replace microSD DAT0/CMD. Do not add an SDMMC owner here.
 set(MGF_LILYGO_SDMMC_ENABLED 0 CACHE INTERNAL "SDMMC is unavailable in the K-line profile" FORCE)
 
@@ -21,6 +28,7 @@ idf_component_register(
         "app/settings_coordinator.c"
         "domain/app_settings.c"
         "domain/display_brightness.c"
+        "domain/ble_config_protocol.c"
         "domain/mems_protocol.c"
         "domain/mems_reader.c"
         "domain/mems19_reader.c"
@@ -33,6 +41,7 @@ idf_component_register(
         "infrastructure/kline_uart_esp32.c"
         "infrastructure/mems_ecu.c"
         "infrastructure/settings_store.c"
+        ${MGF_BLE_CONFIG_SRCS}
         "ui/icons/dash_icons.c"
         "ui/navigation/dashboard_navigator.c"
         "ui/navigation/ui_instrumentation.c"
@@ -58,6 +67,7 @@ idf_component_register(
     REQUIRES
         driver                        # GPIO + ESP-IDF compatibility types
         nvs_flash                     # persistent app settings and BT stack data
+        ${MGF_BLE_CONFIG_REQUIRES}
         esp_lcd
         esp_lcd_st7701                 # ST7701S vendor init + RGB panel
         esp_lcd_panel_io_additions    # série 9 bits ST7701S via XL9535
@@ -81,4 +91,5 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     MGF_KLINE_LOCAL_ECHO=${MGF_KLINE_LOCAL_ECHO}
     MGF_MEMS_VARIANT=${MGF_MEMS_VARIANT}
     MGF_LILYGO_SDMMC_ENABLED=${MGF_LILYGO_SDMMC_ENABLED}
+    MGF_ENABLE_BLE_CONFIG=${MGF_ENABLE_BLE_CONFIG}
 )

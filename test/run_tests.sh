@@ -26,6 +26,13 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
 "$BUILD_DIR/test_settings_coordinator"
 
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    "$ROOT/test/test_ble_config_protocol.c" \
+    "$ROOT/main/domain/ble_config_protocol.c" \
+    "$ROOT/main/domain/app_settings.c" \
+    "$ROOT/main/domain/rtc_time.c" -o "$BUILD_DIR/test_ble_config_protocol"
+"$BUILD_DIR/test_ble_config_protocol"
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_ui_layout.c" -lm -o "$BUILD_DIR/test_ui_layout"
 "$BUILD_DIR/test_ui_layout"
 
