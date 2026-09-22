@@ -15,6 +15,7 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_rgb.h"
 #include "esp_lcd_st7701.h"
+#include "esp_lcd_touch.h"
 #include "esp_lcd_touch_cst816s.h" // CST820-compatible driver
 #include "esp_lvgl_port.h"
 
@@ -111,6 +112,14 @@ static const lilygo_display_profile_t s_profile = {
 
 static i2c_master_bus_handle_t s_i2c_bus;
 static esp_io_expander_handle_t s_expander;
+static esp_lcd_panel_io_handle_t s_panel_io;
+static esp_lcd_panel_handle_t s_panel;
+static esp_lcd_panel_io_handle_t s_touch_io;
+static esp_lcd_touch_handle_t s_touch;
+static lv_indev_t *s_touch_indev;
+static lv_display_t *s_display;
+static bool s_lvgl_ready;
+static bool s_backlight_ready;
 static uint8_t s_backlight_level;
 static portMUX_TYPE s_backlight_lock = portMUX_INITIALIZER_UNLOCKED;
 static shared_i2c_bus_t s_shared_i2c_bus;
@@ -246,6 +255,7 @@ static lv_display_t *lvgl_bringup(esp_lcd_panel_io_handle_t io,
         ESP_LOGE(TAG, "LVGL port init failed: %s", esp_err_to_name(err));
         return NULL;
     }
+    s_lvgl_ready = true;
 
     const lvgl_port_display_cfg_t display_config = {
         .io_handle = io,
@@ -283,7 +293,8 @@ static void touch_bringup(lv_display_t *display) {
     esp_err_t err = esp_lcd_new_panel_io_i2c(s_i2c_bus, &touch_io_config,
                                              &touch_io);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "CST820 I2C IO unavailable: %s", esp_err_to_name(err));
+        ESP_LOGW(TAG, "optional CST820 I2C IO unavailable: %s",
+                 esp_err_to_name(err));
         return;
     }
 
@@ -305,19 +316,91 @@ static void touch_bringup(lv_display_t *display) {
     esp_lcd_touch_handle_t touch = NULL;
     err = esp_lcd_touch_new_i2c_cst816s(touch_io, &touch_config, &touch);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "CST820 unavailable through CST816S driver: %s",
+        ESP_LOGW(TAG, "optional CST820 unavailable through CST816S driver: %s",
                  esp_err_to_name(err));
+        (void)esp_lcd_panel_io_del(touch_io);
         return;
     }
-    if (lvgl_port_add_touch(&(lvgl_port_touch_cfg_t){
-            .disp = display,
-            .handle = touch,
-        }) == NULL) {
-        ESP_LOGW(TAG, "failed to attach CST820 to LVGL");
+
+    lv_indev_t *touch_indev = lvgl_port_add_touch(&(lvgl_port_touch_cfg_t){
+        .disp = display,
+        .handle = touch,
+    });
+    if (touch_indev == NULL) {
+        ESP_LOGW(TAG, "optional CST820 could not attach to LVGL");
+        (void)esp_lcd_touch_del(touch);
+        (void)esp_lcd_panel_io_del(touch_io);
+        return;
     }
+    s_touch_io = touch_io;
+    s_touch = touch;
+    s_touch_indev = touch_indev;
+    ESP_LOGI(TAG, "optional CST820 touch attached (0x%02x)",
+             ESP_LCD_TOUCH_IO_I2C_CST816S_ADDRESS);
+}
+
+static void board_display_cleanup(void) {
+    // Remove LVGL wrappers before deleting the panel and touch objects they use.
+    if (s_touch_indev != NULL) {
+        (void)lvgl_port_remove_touch(s_touch_indev);
+        s_touch_indev = NULL;
+    }
+    if (s_display != NULL) {
+        (void)lvgl_port_remove_disp(s_display);
+        s_display = NULL;
+    }
+    if (s_lvgl_ready) {
+        lvgl_port_deinit();
+        s_lvgl_ready = false;
+    }
+
+    if (s_touch != NULL) {
+        (void)esp_lcd_touch_del(s_touch);
+        s_touch = NULL;
+    }
+    if (s_touch_io != NULL) {
+        (void)esp_lcd_panel_io_del(s_touch_io);
+        s_touch_io = NULL;
+    }
+    if (s_panel != NULL) {
+        (void)esp_lcd_panel_disp_on_off(s_panel, false);
+        (void)esp_lcd_panel_del(s_panel);
+        s_panel = NULL;
+    }
+    if (s_panel_io != NULL) {
+        (void)esp_lcd_panel_io_del(s_panel_io);
+        s_panel_io = NULL;
+    }
+    if (s_expander != NULL) {
+        (void)esp_io_expander_del(s_expander);
+        s_expander = NULL;
+    }
+
+    // The RTC only borrows this adapter. Its owner is responsible for
+    // destroying the RTC before calling board_display_stop().
+    if (s_i2c_ready) {
+        shared_i2c_master_bus_deinit(&s_shared_i2c_bus,
+                                     &s_shared_i2c_context);
+        s_i2c_ready = false;
+    }
+    if (s_i2c_bus != NULL) {
+        (void)i2c_del_master_bus(s_i2c_bus);
+        s_i2c_bus = NULL;
+    }
+
+    if (s_backlight_ready) {
+        (void)gpio_set_level(PIN_LCD_BL, 0);
+        s_backlight_ready = false;
+    }
+    s_backlight_level = 0;
 }
 
 lv_display_t *board_display_start(void) {
+    if (s_display != NULL) {
+        ESP_LOGW(TAG, "display already started; reusing existing LVGL display");
+        return s_display;
+    }
+
     const gpio_config_t backlight_config = {
         .pin_bit_mask = 1ULL << PIN_LCD_BL,
         .mode = GPIO_MODE_OUTPUT,
@@ -330,45 +413,60 @@ lv_display_t *board_display_start(void) {
         ESP_LOGE(TAG, "configure AW9364 backlight: %s", esp_err_to_name(err));
         return NULL;
     }
-    gpio_set_level(PIN_LCD_BL, 0);
+    s_backlight_ready = true;
+    (void)gpio_set_level(PIN_LCD_BL, 0);
     s_backlight_level = 0;
 
     err = i2c_bus_init();
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "create I2C bus: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "create I2C bus on GPIO%d/GPIO%d: %s", PIN_I2C_SDA,
+                 PIN_I2C_SCL, esp_err_to_name(err));
+        board_display_cleanup();
         return NULL;
     }
     err = expander_init();
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "initialize XL9535-compatible expander: %s",
+        ESP_LOGE(TAG, "initialize mandatory XL9535-compatible expander: %s",
                  esp_err_to_name(err));
+        board_display_cleanup();
         return NULL;
     }
 
-    esp_lcd_panel_io_handle_t panel_io = NULL;
-    esp_lcd_panel_handle_t panel = NULL;
-    err = panel_init(&panel_io, &panel);
+    err = panel_init(&s_panel_io, &s_panel);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "initialize LILYGO T-RGB panel: %s",
-                 esp_err_to_name(err));
+        ESP_LOGE(TAG, "initialize LILYGO T-RGB panel profile=%s: %s",
+                 s_profile.name, esp_err_to_name(err));
+        board_display_cleanup();
         return NULL;
     }
 
-    lv_display_t *display = lvgl_bringup(panel_io, panel);
-    if (display == NULL) {
-        ESP_LOGE(TAG, "failed to create LVGL RGB display");
+    s_display = lvgl_bringup(s_panel_io, s_panel);
+    if (s_display == NULL) {
+        ESP_LOGE(TAG, "failed to create LVGL RGB display; unwinding panel");
+        board_display_cleanup();
         return NULL;
     }
-    touch_bringup(display);
-    ESP_LOGI(TAG, "LILYGO T-RGB H597 profile=%s %ux%u @ %lu Hz",
+    touch_bringup(s_display);
+    ESP_LOGI(TAG, "LILYGO T-RGB H597 ready: profile=%s %ux%u @ %lu Hz%s",
              s_profile.name, LCD_H_RES, LCD_V_RES,
-             (unsigned long)s_profile.pclk_hz);
-    return display;
+             (unsigned long)s_profile.pclk_hz,
+             s_touch != NULL ? ", touch=present" : ", touch=absent");
+    return s_display;
+}
+
+void board_display_stop(void) {
+    board_display_cleanup();
 }
 
 void board_display_backlight_set_brightness(uint8_t level) {
     if (level > 16) {
         level = 16;
+    }
+
+    if (!s_backlight_ready) {
+        ESP_LOGW(TAG, "ignore backlight level %u before display GPIO setup",
+                 level);
+        return;
     }
 
     portENTER_CRITICAL(&s_backlight_lock);
@@ -417,7 +515,9 @@ void board_display_unlock(void) {
 }
 
 bool board_display_i2c_bus(shared_i2c_bus_t *out) {
-    if (!s_i2c_ready || out == NULL) return false;
+    if (!s_i2c_ready || !s_shared_i2c_context.active || out == NULL) {
+        return false;
+    }
     *out = s_shared_i2c_bus;
     return true;
 }

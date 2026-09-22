@@ -29,6 +29,7 @@ struct mems_ecu_s {
     uint32_t reconnect_delay_ms;
 
     SemaphoreHandle_t lock;   // protège `snapshot`
+    SemaphoreHandle_t stopped; // signal de fin de la tâche avant libération
     ecu_data_t snapshot;      // dernier instantané publié
 
     TaskHandle_t task;
@@ -71,6 +72,9 @@ static void mems_ecu_task(void *arg) {
         vTaskDelay(pdMS_TO_TICKS(ecu->poll_period_ms));
     }
 
+    // This is the final operation that touches `ecu`; the owner waits for
+    // this signal before releasing the UART, mutex, and allocation.
+    xSemaphoreGive(ecu->stopped);
     vTaskDelete(NULL);
 }
 
@@ -87,13 +91,17 @@ mems_ecu_t *mems_ecu_create(const mems_ecu_config_t *config) {
                                   : DEFAULT_RECONNECT_MS;
 
     ecu->lock = xSemaphoreCreateMutex();
-    if (ecu->lock == NULL) {
+    ecu->stopped = xSemaphoreCreateBinary();
+    if (ecu->lock == NULL || ecu->stopped == NULL) {
+        if (ecu->stopped != NULL) vSemaphoreDelete(ecu->stopped);
+        if (ecu->lock != NULL) vSemaphoreDelete(ecu->lock);
         free(ecu);
         return NULL;
     }
 
     ecu->kline = kline_uart_create(&config->kline);
     if (ecu->kline == NULL) {
+        vSemaphoreDelete(ecu->stopped);
         vSemaphoreDelete(ecu->lock);
         free(ecu);
         return NULL;
@@ -132,12 +140,14 @@ bool mems_ecu_start(mems_ecu_t *ecu) {
 void mems_ecu_destroy(mems_ecu_t *ecu) {
     if (ecu == NULL) return;
 
-    // Demander l'arrêt et laisser la tâche se terminer (elle s'auto-supprime).
+    // Demander l'arrêt et attendre la fin réelle de la tâche. Un délai fixe
+    // pourrait libérer l'UART ou le mutex pendant un échange encore actif.
     ecu->running = false;
-    if (ecu->task != NULL) {
-        vTaskDelay(pdMS_TO_TICKS(ecu->poll_period_ms + ecu->reconnect_delay_ms + 50));
+    if (ecu->task != NULL && ecu->stopped != NULL) {
+        (void)xSemaphoreTake(ecu->stopped, portMAX_DELAY);
     }
     if (ecu->kline != NULL) kline_uart_destroy(ecu->kline);
+    if (ecu->stopped != NULL) vSemaphoreDelete(ecu->stopped);
     if (ecu->lock != NULL) vSemaphoreDelete(ecu->lock);
     free(ecu);
 }

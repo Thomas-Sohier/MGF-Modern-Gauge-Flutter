@@ -9,7 +9,8 @@ static int timeout_value(uint32_t timeout_ms) {
 
 static esp_err_t ensure_device(shared_i2c_master_context_t *context,
                                uint8_t address) {
-    if (context == NULL || context->bus == NULL) return ESP_ERR_INVALID_ARG;
+    if (context == NULL) return ESP_ERR_INVALID_ARG;
+    if (!context->active || context->bus == NULL) return ESP_ERR_INVALID_STATE;
     if (context->device != NULL) {
         return context->address == address ? ESP_OK : ESP_ERR_INVALID_STATE;
     }
@@ -58,6 +59,7 @@ void shared_i2c_master_bus_init(shared_i2c_bus_t *bus,
     *context = (shared_i2c_master_context_t){
         .bus = master_bus,
         .clock_hz = clock_hz,
+        .active = master_bus != NULL,
     };
     *bus = (shared_i2c_bus_t){
         .context = context,
@@ -66,4 +68,18 @@ void shared_i2c_master_bus_init(shared_i2c_bus_t *bus,
         .sda_gpio = sda_gpio,
         .scl_gpio = scl_gpio,
     };
+}
+
+void shared_i2c_master_bus_deinit(shared_i2c_bus_t *bus,
+                                  shared_i2c_master_context_t *context) {
+    if (context == NULL) return;
+
+    context->active = false;
+    if (context->device != NULL && context->bus != NULL) {
+        (void)i2c_master_bus_rm_device(context->device);
+    }
+    context->device = NULL;
+    context->bus = NULL;
+    context->address = 0;
+    if (bus != NULL) *bus = (shared_i2c_bus_t){0};
 }

@@ -11,6 +11,10 @@
 // to select the vendor V2 profile (timings, RGB GPIO order and init table).
 lv_display_t *board_display_start(void);
 
+// Stops the display and releases all board-owned handles. Call only after
+// destroying borrowed RTC/UI objects; safe to call after a partial start.
+void board_display_stop(void);
+
 // AW9364 brightness is discrete: 0 is off, 1..16 are the hardware levels.
 // The existing on/off API remains available for application callers.
 void board_display_backlight_set_brightness(uint8_t level);

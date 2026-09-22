@@ -19,6 +19,7 @@ idf_component_register(
         "app_main.c"
         "app/dashboard_controller.c"
         "domain/app_settings.c"
+        "domain/display_brightness.c"
         "domain/mems_protocol.c"
         "domain/mems_reader.c"
         "domain/mems19_reader.c"

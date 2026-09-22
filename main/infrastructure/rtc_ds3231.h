@@ -11,7 +11,8 @@
 
 typedef struct {
     // Le bus est fourni par le propriétaire (display/LILYGO), jamais installé
-    // ni désinstallé par le RTC.
+    // ni désinstallé par le RTC. Le propriétaire doit détruire la RTC avant
+    // de détruire le bus et ses vues empruntées.
     shared_i2c_bus_t bus;
     uint8_t address; // 0 -> DS3231_I2C_ADDRESS
     uint32_t timeout_ms;

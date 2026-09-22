@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -30,9 +31,15 @@ typedef struct {
     i2c_master_dev_handle_t device;
     uint8_t address;
     uint32_t clock_hz;
+    bool active;
 } shared_i2c_master_context_t;
 
 void shared_i2c_master_bus_init(shared_i2c_bus_t *bus,
                                 shared_i2c_master_context_t *context,
                                 i2c_master_bus_handle_t master_bus,
                                 uint32_t clock_hz, int sda_gpio, int scl_gpio);
+
+// Removes the adapter-owned device and invalidates all borrowed bus views. The
+// underlying master bus is owned and deleted by the board bring-up.
+void shared_i2c_master_bus_deinit(shared_i2c_bus_t *bus,
+                                  shared_i2c_master_context_t *context);

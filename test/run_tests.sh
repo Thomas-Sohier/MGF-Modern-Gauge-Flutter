@@ -15,6 +15,11 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
 "$BUILD_DIR/test_app_settings"
 
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    "$ROOT/test/test_display_brightness.c" \
+    "$ROOT/main/domain/display_brightness.c" -o "$BUILD_DIR/test_display_brightness"
+"$BUILD_DIR/test_display_brightness"
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_ui_layout.c" -lm -o "$BUILD_DIR/test_ui_layout"
 "$BUILD_DIR/test_ui_layout"
 

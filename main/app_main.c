@@ -2,6 +2,7 @@
 #include "esp_err.h"
 #include "lvgl.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -25,6 +26,7 @@
 #include "infrastructure/settings_store.h"
 #include "infrastructure/rtc_ds3231.h"
 #include "domain/app_settings.h"
+#include "domain/display_brightness.h"
 #include "app/dashboard_controller.h"
 
 #if MGF_USE_MEMS_KLINE
@@ -37,6 +39,20 @@
 
 static const char *TAG = "mgf_gauge";
 
+static bool disconnected_ecu_read(void *context, ecu_data_t *out) {
+    (void)context;
+    if (out == NULL) return false;
+    *out = (ecu_data_t){.connected = false};
+    return true;
+}
+
+static ecu_source_t disconnected_ecu_source(void) {
+    return (ecu_source_t){
+        .read = disconnected_ecu_read,
+        .context = NULL,
+    };
+}
+
 static rtc_t *optional_rtc_start(void) {
     shared_i2c_bus_t bus;
     if (!board_display_i2c_bus(&bus)) {
@@ -45,7 +61,9 @@ static rtc_t *optional_rtc_start(void) {
     }
     if (bus.sda_gpio != DS3231_I2C_SDA_GPIO ||
         bus.scl_gpio != DS3231_I2C_SCL_GPIO) {
-        ESP_LOGI(TAG, "RTC DS3231 en attente du bus LILYGO GPIO8/48");
+        ESP_LOGW(TAG, "RTC DS3231 disabled: bus GPIO%d/GPIO%d, expected GPIO%d/GPIO%d",
+                 bus.sda_gpio, bus.scl_gpio, DS3231_I2C_SDA_GPIO,
+                 DS3231_I2C_SCL_GPIO);
         return NULL;
     }
 
@@ -103,98 +121,85 @@ DEFINE_PAGE_ADAPTER(admission)
 #define REGISTER_PAGE(navigator, prefix, label, period) do {                  \
     lv_obj_t *page = dashboard_navigator_create_page(navigator);              \
     prefix##_screen_t *view = prefix##_screen_create(page);                   \
-    const dashboard_page_t descriptor = {                                    \
-        .name = label, .context = view, .update = prefix##_page_update,        \
-        .destroy = prefix##_page_destroy, .update_period_ms = period,          \
-    };                                                                         \
+    const dashboard_page_t descriptor = {                                     \
+        .name = label, .context = view, .update = prefix##_page_update,       \
+        .destroy = prefix##_page_destroy, .update_period_ms = period,         \
+    };                                                                        \
     if (page == NULL || view == NULL ||                                       \
         !dashboard_navigator_register_page(navigator, page, &descriptor)) {    \
         ESP_LOGE(TAG, "impossible de créer la page %s", label);              \
-        dashboard_navigator_destroy(navigator);                               \
-        boot_screen_destroy(boot);                                            \
-        rtc_destroy(rtc);                                                      \
-        board_display_unlock();                                               \
-        board_display_backlight_off();                                        \
-        return;                                                               \
+        if (view != NULL) prefix##_screen_destroy(view);                      \
+        goto cleanup;                                                          \
     }                                                                          \
 } while (0)
 
 void app_main(void) {
     ESP_LOGI(TAG, "MGF Gauge LVGL — ecran RPM ambre (LILYGO T-RGB H597)");
 
-    // Les préférences sont chargées avant l'écran, sans bloquer le démarrage si
-    // la partition NVS est indisponible ou si ses données sont corrompues.
     app_settings_t settings;
     app_settings_defaults(&settings);
     esp_err_t settings_err = settings_store_init();
-    if (settings_err == ESP_OK) {
-        settings_err = settings_store_load(&settings);
-    }
+    if (settings_err == ESP_OK) settings_err = settings_store_load(&settings);
     if (settings_err != ESP_OK) {
-        ESP_LOGW(TAG, "preferences indisponibles, valeurs par défaut (%s)",
+        ESP_LOGW(TAG, "preferences indisponibles; defaults retained (%s)",
                  esp_err_to_name(settings_err));
     } else {
-        ESP_LOGI(TAG, "preferences application chargées");
+        ESP_LOGI(TAG, "application preferences loaded");
     }
 
-    // Écran ST7701S RGB 480x480 rond + tactile CST820 + port LVGL (thread dédié).
-    if (board_display_start() == NULL) {
-        ESP_LOGE(TAG, "impossible d'initialiser l'écran");
-        board_display_backlight_off();
-        return;
+    lv_display_t *display = NULL;
+    bool lvgl_locked = false;
+    rtc_t *rtc = NULL;
+    boot_screen_t *boot = NULL;
+    dashboard_navigator_t *navigator = NULL;
+    dashboard_controller_t *controller = NULL;
+#if MGF_USE_MEMS_KLINE
+    mems_ecu_t *mems_ecu = NULL;
+#else
+    fake_ecu_t *fake_ecu = NULL;
+#endif
+
+    display = board_display_start();
+    if (display == NULL) {
+        ESP_LOGE(TAG, "display startup failed; no optional device was required");
+        goto cleanup;
     }
-    const uint8_t brightness_level = settings.brightness_percent == 0U
-        ? 0U
-        : (uint8_t)(((settings.brightness_percent - 1U) * 15U) / 99U + 1U);
-    board_display_backlight_set_brightness(brightness_level);
 
-    // Le bus I2C appartient à l'affichage. Le DS3231 ne l'installe pas et
-    // reste optionnel : la branche LILYGO exportera le bus GPIO8/GPIO48.
-    rtc_t *rtc = optional_rtc_start();
+    board_display_backlight_set_brightness(
+        display_brightness_level(settings.brightness_percent));
 
-    // Toute manipulation d'objets LVGL doit se faire sous verrou (thread LVGL).
+    // The display owns the I2C master. The DS3231 only borrows its validated
+    // bus view and must be destroyed before board_display_stop().
+    rtc = optional_rtc_start();
+
     if (!board_display_lock(0)) {
-        ESP_LOGE(TAG, "impossible de prendre le verrou LVGL");
-        rtc_destroy(rtc);
-        board_display_backlight_off();
-        return;
+        ESP_LOGE(TAG, "could not acquire LVGL lock");
+        goto cleanup;
     }
+    lvgl_locked = true;
 
-    // Police Michroma (carrée, esprit Microgramma ; utilisée par le style ambre).
     ui_fonts_init(michroma_start, (size_t)(michroma_end - michroma_start));
-
     lv_obj_t *screen = lv_screen_active();
     if (screen == NULL) {
-        ESP_LOGE(TAG, "écran LVGL actif introuvable");
-        rtc_destroy(rtc);
-        board_display_unlock();
-        board_display_backlight_off();
-        return;
+        ESP_LOGE(TAG, "active LVGL screen is unavailable");
+        goto cleanup;
     }
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Affichage immédiat pendant la préparation de la source et du contrôleur.
-    boot_screen_t *boot = boot_screen_create(screen);
+    boot = boot_screen_create(screen);
     if (boot == NULL) {
-        ESP_LOGE(TAG, "impossible de créer l'écran de démarrage");
-        rtc_destroy(rtc);
-        board_display_unlock();
-        board_display_backlight_off();
-        return;
+        ESP_LOGE(TAG, "could not create boot screen");
+        goto cleanup;
     }
     lv_refr_now(NULL);
 
-    dashboard_navigator_t *navigator = dashboard_navigator_create(screen);
+    navigator = dashboard_navigator_create(screen);
     if (navigator == NULL) {
-        ESP_LOGE(TAG, "impossible de créer la navigation du dashboard");
-        boot_screen_destroy(boot);
-        rtc_destroy(rtc);
-        board_display_unlock();
-        board_display_backlight_off();
-        return;
+        ESP_LOGE(TAG, "could not create dashboard navigator");
+        goto cleanup;
     }
 
-    // Même ordre cyclique que l'application Flutter de référence.
+    // Same cyclic order as the Flutter reference application.
     {
         lv_obj_t *page = dashboard_navigator_create_page(navigator);
         clock_screen_t *view = clock_screen_create(page);
@@ -205,13 +210,9 @@ void app_main(void) {
         };
         if (page == NULL || view == NULL ||
             !dashboard_navigator_register_page(navigator, page, &descriptor)) {
-            ESP_LOGE(TAG, "impossible de créer la page HEURE");
-            dashboard_navigator_destroy(navigator);
-            boot_screen_destroy(boot);
-            rtc_destroy(rtc);
-            board_display_unlock();
-            board_display_backlight_off();
-            return;
+            ESP_LOGE(TAG, "could not create page HEURE");
+            if (view != NULL) clock_screen_destroy(view);
+            goto cleanup;
         }
     }
     REGISTER_PAGE(navigator, music, "MUSIQUE", 0);
@@ -225,11 +226,8 @@ void app_main(void) {
     REGISTER_PAGE(navigator, idle, "RALENTI", 150);
     REGISTER_PAGE(navigator, admission, "ADMISSION", 150);
 
-    // Composition de l'application : la source est branchée au contrôleur,
-    // qui possède le snapshot et orchestre le rafraîchissement de l'écran.
-    // Les deux sources exposent le même contrat `ecu_source_t` ; le contrôleur
-    // ne lit qu'une copie non bloquante du dernier instantané.
-    ecu_source_t ecu_source;
+    // A missing K-line is a disconnected ECU, not a display startup failure.
+    ecu_source_t ecu_source = disconnected_ecu_source();
 #if MGF_USE_MEMS_KLINE
     const mems_ecu_config_t mems_cfg = {
         .kline = {
@@ -242,55 +240,56 @@ void app_main(void) {
         .variant = MGF_MEMS_VARIANT,
         .poll_period_ms = 200,
     };
-    mems_ecu_t *mems_ecu = mems_ecu_create(&mems_cfg);
+    mems_ecu = mems_ecu_create(&mems_cfg);
     if (mems_ecu == NULL || !mems_ecu_start(mems_ecu)) {
-        ESP_LOGE(TAG, "impossible de démarrer la source MEMS K-line");
+        ESP_LOGW(TAG, "K-line unavailable; booting with ECU disconnected");
         mems_ecu_destroy(mems_ecu);
-        dashboard_navigator_destroy(navigator);
-        boot_screen_destroy(boot);
-        rtc_destroy(rtc);
-        board_display_unlock();
-        board_display_backlight_off();
-        return;
+        mems_ecu = NULL;
+    } else {
+        ecu_source = mems_ecu_source(mems_ecu);
     }
-    ecu_source = mems_ecu_source(mems_ecu);
 #else
-    fake_ecu_t *fake_ecu = fake_ecu_create();
+    fake_ecu = fake_ecu_create();
     if (fake_ecu == NULL || !fake_ecu_start(fake_ecu)) {
-        ESP_LOGE(TAG, "impossible de démarrer la source ECU factice");
+        ESP_LOGW(TAG, "simulated ECU unavailable; booting disconnected");
         fake_ecu_destroy(fake_ecu);
-        dashboard_navigator_destroy(navigator);
-        boot_screen_destroy(boot);
-        rtc_destroy(rtc);
-        board_display_unlock();
-        board_display_backlight_off();
-        return;
+        fake_ecu = NULL;
+    } else {
+        ecu_source = fake_ecu_source(fake_ecu);
     }
-    ecu_source = fake_ecu_source(fake_ecu);
 #endif
+
     const dashboard_controller_config_t controller_config = {
         .navigator = navigator,
         .ecu_source = ecu_source,
         .period_ms = 40,
     };
-    dashboard_controller_t *controller =
-        dashboard_controller_create(&controller_config);
+    controller = dashboard_controller_create(&controller_config);
     if (controller == NULL || !dashboard_controller_start(controller)) {
-        ESP_LOGE(TAG, "impossible de démarrer le contrôleur dashboard");
-        dashboard_controller_destroy(controller);
-#if MGF_USE_MEMS_KLINE
-        mems_ecu_destroy(mems_ecu);
-#else
-        fake_ecu_destroy(fake_ecu);
-#endif
-        dashboard_navigator_destroy(navigator);
-        boot_screen_destroy(boot);
-        rtc_destroy(rtc);
-        board_display_unlock();
-        board_display_backlight_off();
-        return;
+        ESP_LOGE(TAG, "could not start dashboard controller");
+        goto cleanup;
     }
 
     boot_screen_destroy(boot);
+    boot = NULL;
     board_display_unlock();
+    lvgl_locked = false;
+    return;
+
+cleanup:
+    // All LVGL objects and LVGL timers are stopped before the port is torn down.
+    if (controller != NULL) dashboard_controller_destroy(controller);
+#if MGF_USE_MEMS_KLINE
+    if (mems_ecu != NULL) mems_ecu_destroy(mems_ecu);
+#else
+    if (fake_ecu != NULL) fake_ecu_destroy(fake_ecu);
+#endif
+    if (navigator != NULL) dashboard_navigator_destroy(navigator);
+    if (boot != NULL) boot_screen_destroy(boot);
+    rtc_destroy(rtc);
+    if (lvgl_locked) board_display_unlock();
+    if (display != NULL) {
+        board_display_backlight_off();
+        board_display_stop();
+    }
 }
