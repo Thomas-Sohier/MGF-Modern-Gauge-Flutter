@@ -386,6 +386,9 @@ extern const uint8_t michroma_start[] asm("_binary_Michroma_Regular_ttf_start");
 extern const uint8_t michroma_end[]   asm("_binary_Michroma_Regular_ttf_end");
 
 #define DEFINE_PAGE_ADAPTER(prefix)                                           \
+    static void *prefix##_page_create(lv_obj_t *parent) {                     \
+        return prefix##_screen_create(parent);                                \
+    }                                                                         \
     static void prefix##_page_update(void *context, const ecu_data_t *data) { \
         prefix##_screen_update(context, data);                                \
     }                                                                         \
@@ -412,20 +415,23 @@ DEFINE_PAGE_ADAPTER(ignition)
 DEFINE_PAGE_ADAPTER(idle)
 DEFINE_PAGE_ADAPTER(admission)
 
-#define REGISTER_PAGE(navigator, prefix, label, period) do {                  \
-    lv_obj_t *page = dashboard_navigator_create_page(navigator);              \
-    prefix##_screen_t *view = prefix##_screen_create(page);                   \
-    const dashboard_page_t descriptor = {                                     \
-        .name = label, .context = view, .update = prefix##_page_update,       \
-        .destroy = prefix##_page_destroy, .update_period_ms = period,         \
-    };                                                                        \
-    if (page == NULL || view == NULL ||                                       \
-        !dashboard_navigator_register_page(navigator, page, &descriptor)) {    \
-        ESP_LOGE(TAG, "impossible de créer la page %s", label);              \
-        if (view != NULL) prefix##_screen_destroy(view);                      \
-        goto cleanup;                                                          \
-    }                                                                          \
-} while (0)
+// Pages de télémétrie décrites par une table (ordre du swipe) : chaque ligne
+// porte les adaptateurs générés ci-dessus, une seule boucle enregistre le tout.
+typedef struct {
+    const char *label;
+    void *(*create)(lv_obj_t *parent);
+    dashboard_page_update_cb_t update;
+    dashboard_page_destroy_cb_t destroy;
+    dashboard_page_settings_cb_t settings_changed;
+    uint32_t update_period_ms;
+} page_row_t;
+
+#define PAGE_ROW(prefix, label, period)                                    \
+    { label, prefix##_page_create, prefix##_page_update,                   \
+      prefix##_page_destroy, NULL, period }
+#define PAGE_ROW_UNITS(prefix, label, period, units_cb)                    \
+    { label, prefix##_page_create, prefix##_page_update,                   \
+      prefix##_page_destroy, units_cb, period }
 
 static void amber_page_settings(void *context, app_settings_units_t units) {
     amber_screen_set_units(context, units);
@@ -438,23 +444,6 @@ static void temps_page_settings(void *context, app_settings_units_t units) {
 static void admission_page_settings(void *context, app_settings_units_t units) {
     admission_screen_set_units(context, units);
 }
-
-#define REGISTER_PAGE_WITH_UNITS(navigator, prefix, label, period, units_cb)   \
-    do {                                                                       \
-        lv_obj_t *page = dashboard_navigator_create_page(navigator);           \
-        prefix##_screen_t *view = prefix##_screen_create(page);                \
-        const dashboard_page_t descriptor = {                                  \
-            .name = label, .context = view, .update = prefix##_page_update,    \
-            .destroy = prefix##_page_destroy, .settings_changed = units_cb,    \
-            .update_period_ms = period,                                        \
-        };                                                                     \
-        if (page == NULL || view == NULL ||                                    \
-            !dashboard_navigator_register_page(navigator, page, &descriptor)) { \
-            ESP_LOGE(TAG, "impossible de créer la page %s", label);            \
-            if (view != NULL) prefix##_screen_destroy(view);                   \
-            goto cleanup;                                                       \
-        }                                                                      \
-    } while (0)
 
 void app_main(void) {
     ESP_LOGI(TAG, "MGF Gauge LVGL — ecran RPM ambre (LILYGO T-RGB H597)");
@@ -576,17 +565,33 @@ void app_main(void) {
             goto cleanup;
         }
     }
-    REGISTER_PAGE_WITH_UNITS(navigator, amber, "RPM", 40,
-                             amber_page_settings);
-    REGISTER_PAGE(navigator, faults, "DEFAUTS", 1000);
-    REGISTER_PAGE_WITH_UNITS(navigator, temps, "TEMPERATURES", 150,
-                             temps_page_settings);
-    REGISTER_PAGE(navigator, injection, "INJECTION", 80);
-    REGISTER_PAGE(navigator, lambda, "LAMBDA", 80);
-    REGISTER_PAGE(navigator, ignition, "ALLUMAGE", 80);
-    REGISTER_PAGE(navigator, idle, "RALENTI", 150);
-    REGISTER_PAGE_WITH_UNITS(navigator, admission, "ADMISSION", 150,
-                             admission_page_settings);
+    const page_row_t page_rows[] = {
+        PAGE_ROW_UNITS(amber, "RPM", 40, amber_page_settings),
+        PAGE_ROW(faults, "DEFAUTS", 1000),
+        PAGE_ROW_UNITS(temps, "TEMPERATURES", 150, temps_page_settings),
+        PAGE_ROW(injection, "INJECTION", 80),
+        PAGE_ROW(lambda, "LAMBDA", 80),
+        PAGE_ROW(ignition, "ALLUMAGE", 80),
+        PAGE_ROW(idle, "RALENTI", 150),
+        PAGE_ROW_UNITS(admission, "ADMISSION", 150, admission_page_settings),
+    };
+    for (size_t i = 0; i < sizeof(page_rows) / sizeof(page_rows[0]); i++) {
+        const page_row_t *row = &page_rows[i];
+        lv_obj_t *page = dashboard_navigator_create_page(navigator);
+        void *view = page != NULL ? row->create(page) : NULL;
+        const dashboard_page_t descriptor = {
+            .name = row->label, .context = view, .update = row->update,
+            .destroy = row->destroy,
+            .settings_changed = row->settings_changed,
+            .update_period_ms = row->update_period_ms,
+        };
+        if (page == NULL || view == NULL ||
+            !dashboard_navigator_register_page(navigator, page, &descriptor)) {
+            ESP_LOGE(TAG, "impossible de créer la page %s", row->label);
+            if (view != NULL) row->destroy(view);
+            goto cleanup;
+        }
+    }
 
     // Bilan unique après création des 11 pages (toutes gardées en mémoire) :
     // permet de suivre leur coût sans activer les diagnostics périodiques.
