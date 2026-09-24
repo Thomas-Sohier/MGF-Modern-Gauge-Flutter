@@ -297,6 +297,16 @@ static void button_event_cb(lv_event_t *event) {
     }
 }
 
+// Appui hors des contrôles : ferme la surimpression, comme OK. Le press
+// d'ouverture (maintien) vise la page sous la surimpression, LVGL n'émet donc
+// pas de CLICKED ici au relâcher.
+static void overlay_event_cb(lv_event_t *event) {
+    settings_screen_t *scr = lv_event_get_user_data(event);
+    if (scr == NULL) return;
+    settings_screen_hide(scr);
+    if (scr->actions.closed != NULL) scr->actions.closed(scr->actions.context);
+}
+
 static lv_obj_t *create_target(settings_screen_t *scr, float x, float y,
                                float w, float h) {
     const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(scr->root),
@@ -350,6 +360,7 @@ settings_screen_t *settings_screen_create(
     lv_obj_clear_flag(scr->overlay, LV_OBJ_FLAG_SCROLLABLE |
                                         LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_flag(scr->overlay, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(scr->overlay, overlay_event_cb, LV_EVENT_CLICKED, scr);
     lv_obj_update_layout(scr->overlay);
 
     scr->root = amber_ui_root_create(scr->overlay);
