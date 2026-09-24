@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  host:
+    name: host tests + goldens
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache LVGL sources and objects
+        uses: actions/cache@v4
+        with:
+          path: |
+            sim/.lvgl
+            sim/build/lvgl_obj
+          key: lvgl-${{ runner.os }}-${{ hashFiles('build.sh') }}
+
+      - name: Host unit tests
+        run: bash test/run_tests.sh
+
+      - name: Render the goldens
+        run: ./build.sh
+
+      - name: Goldens must match the source
+        run: |
+          git add -N test/golden
+          git diff --exit-code -- test/golden
