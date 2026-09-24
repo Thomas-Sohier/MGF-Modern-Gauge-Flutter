@@ -32,7 +32,11 @@ UI_SRCS=(
     "$MAIN/ui/screens/faults_screen.c" "$MAIN/ui/screens/temps_screen.c" "$MAIN/ui/screens/injection_screen.c"
     "$MAIN/ui/screens/lambda_screen.c" "$MAIN/ui/screens/ignition_screen.c"
     "$MAIN/ui/screens/idle_screen.c" "$MAIN/ui/screens/admission_screen.c"
-    "$MAIN/ui/widgets/amber_value.c" "$MAIN/ui/widgets/amber_draw.c" "$MAIN/ui/widgets/amber_ui.c" "$MAIN/ui/widgets/amber_text.c" "$MAIN/ui/fonts/ui_fonts.c"
+    "$MAIN/ui/screens/settings_screen.c"
+    "$MAIN/domain/app_settings.c" "$MAIN/domain/display_brightness.c"
+    "$MAIN/domain/companion_protocol.c" "$MAIN/domain/flat_json.c"
+    "$MAIN/domain/rtc_time.c"
+    "$MAIN/ui/widgets/amber_value.c" "$MAIN/ui/widgets/amber_draw.c" "$MAIN/ui/widgets/amber_ui.c" "$MAIN/ui/widgets/amber_kit.c" "$MAIN/ui/fonts/ui_fonts.c"
 )
 
 if [ "${1:-}" = "clean" ]; then
@@ -86,7 +90,7 @@ gcc "${CFLAGS[@]}" \
 echo ">> génération des goldens..."
 "$BUILD/gen_golden" boot  "$GDIR/boot_amber.png"
 "$BUILD/gen_golden" amber "$GDIR/rpm_amber.png"
-for style in clock music navigation faults temps injection lambda ignition idle admission; do
+for style in clock music navigation faults temps injection lambda ignition idle admission settings; do
     "$BUILD/gen_golden" "$style" "$GDIR/${style}_amber.png"
 done
 echo ">> OK — goldens régénérés dans test/golden/"

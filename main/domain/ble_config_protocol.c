@@ -50,6 +50,8 @@ ble_config_parse_result_t ble_config_settings_decode(
         .selected_page = (app_settings_page_t)payload[2],
         .theme = (app_settings_theme_t)payload[3],
         .units = (app_settings_units_t)payload[4],
+        // Absent du protocole v1 : l'application conserve sa valeur locale.
+        .startup_page = APP_SETTINGS_STARTUP_LAST_PAGE,
     };
     if (!app_settings_is_valid(&decoded)) {
         return BLE_CONFIG_PARSE_INVALID_VALUE;

@@ -79,10 +79,16 @@ void amber_draw_arc_wrapped(lv_layer_t *layer, const ui_layout_t *layout,
         amber_draw_arc(layer, layout, cx, cy, radius, width, normalized, end,
                        color, rounded);
     } else {
-        amber_draw_arc(layer, layout, cx, cy, radius, width, normalized, 360.0f,
-                       color, rounded);
-        amber_draw_arc(layer, layout, cx, cy, radius, width, 0.0f, end - 360.0f,
-                       color, rounded);
+        // Un morceau de longueur (quasi) nulle serait interprété par LVGL
+        // comme un cercle complet (angles entiers égaux) : on l'omet.
+        if (360.0f - normalized >= 1.0f) {
+            amber_draw_arc(layer, layout, cx, cy, radius, width, normalized,
+                           360.0f, color, rounded);
+        }
+        if (end - 360.0f >= 1.0f) {
+            amber_draw_arc(layer, layout, cx, cy, radius, width, 0.0f,
+                           end - 360.0f, color, rounded);
+        }
     }
 }
 

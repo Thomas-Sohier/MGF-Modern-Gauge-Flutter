@@ -12,10 +12,8 @@
 # script enforces. IRAM is printed for information only.
 #
 # IDF must be exported before invoking this script (or set IDF_PY to an
-# absolute path). For the BLE image, target its dedicated build directory:
-#   BUILD_DIR=build-ble IDF_PY_ARGS='-B build-ble -D SDKCONFIG=build-ble/sdkconfig
-#     -D SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.ble
-#     -D MGF_ENABLE_BLE_CONFIG=1' tools/check_iram.sh
+# absolute path). The firmware always includes NimBLE; for another build
+# directory, set BUILD_DIR and IDF_PY_ARGS (e.g. '-B other-build').
 set -euo pipefail
 
 PROJECT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)

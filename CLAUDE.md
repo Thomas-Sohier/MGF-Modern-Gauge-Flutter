@@ -27,8 +27,14 @@ piloté par l'ECU MEMS de la MGF (K-line) ou une ECU simulée. Le style de réf�
 
 ### Périphériques ajoutés
 
+- **Téléphone Android** via BLE (NimBLE, toujours actif) : application
+  compagnon `../rover-mems-ecu-companion` (musique, navigation Google Maps,
+  télécommande, heure + fuseau). Reconnexion automatique au démarrage de la
+  voiture, appairage limité à une fenêtre ouverte depuis les Réglages. Cf.
+  `docs/ble-config.md`.
 - **RTC DS3231 externe** (`0x68`, bus I²C partagé) : la carte n'a pas de RTC.
-  Optionnelle, stocke de l'**UTC** (cf. `docs/rtc-ds3231.md`).
+  Optionnelle, stocke de l'**UTC** (cf. `docs/rtc-ds3231.md`) ; l'horloge
+  affiche l'heure légale avec le décalage reçu du téléphone.
 - **K-line MEMS** : GPIO40 = TX, GPIO38 = RX, UART1 (reprend microSD CMD/DAT0 ;
   **SDMMC n'est ni initialisé ni possédé**). Garde-fous dans
   `main/infrastructure/kline_board_config.h`. Désactivée par défaut
@@ -38,8 +44,9 @@ piloté par l'ECU MEMS de la MGF (K-line) ou une ECU simulée. Le style de réf�
   sur un GPIO.
 
 > ⚠️ Build ESP-IDF 5.4.2 validé par l'utilisateur, **pas encore testé sur la
-> carte** (cf. `docs/lilygo-roadmap.md`). ESP-IDF est absent de cet
-> environnement : seuls les tests hôte et le simulateur sont exécutables ici.
+> carte** (cf. `docs/lilygo-roadmap.md`). ESP-IDF 5.4.2 est installé hors
+> du PATH : `. ~/.cache/mgf-gauge-esp-idf/esp-idf-v5.4.2/export.sh` avant
+> `idf.py` / `tools/check_iram.sh`.
 
 ## Build & tests
 
@@ -60,10 +67,7 @@ LVGL est cloné (v9.2.2) et compilé **une seule fois** en cache
 **Cible ESP-IDF** :
 
 ```bash
-idf.py set-target esp32s3 && idf.py build          # firmware normal (sans BT)
-idf.py -B build-ble -D SDKCONFIG=build-ble/sdkconfig \
-    -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ble" \
-    -D MGF_ENABLE_BLE_CONFIG=1 build               # image de configuration BLE
+idf.py set-target esp32s3 && idf.py build          # firmware (BLE NimBLE inclus)
 tools/check_iram.sh                                # marge DIRAM (la région IRAM 16 KiB est toujours ~pleine, c'est normal)
 ```
 
@@ -80,9 +84,11 @@ main/
   app/                # dashboard_controller, settings_coordinator/runtime
   infrastructure/     # ESP-IDF : board_display, K-line UART, mems_ecu, fake_ecu,
                       # NVS, DS3231, BLE NimBLE, diagnostics
-  ui/navigation/      # dashboard_navigator (11 pages, swipe cyclique)
+  ui/navigation/      # dashboard_navigator (11 pages, swipe cyclique, tap
+                      # tiers gauche/droit, maintien 1 s -> réglages)
   ui/screens/         # style_amber (★ RPM), boot, clock, music, navigation,
-                      # faults, temps, injection, lambda, ignition, idle, admission
+                      # faults, temps, injection, lambda, ignition, idle,
+                      # admission, settings (surimpression)
   ui/widgets/ icons/ themes/ fonts/   # briques ambre partagées, Michroma tiny_ttf
 sim/                  # harnais de rendu hôte + lv_conf.h
 test/                 # tests hôte (run_tests.sh, mocks ESP-IDF) + golden/
@@ -122,14 +128,65 @@ docs/                 # K-line MEMS, NVS, BLE, RTC, roadmap LILYGO
 - **API** : `amber_screen_create(parent)` / `amber_screen_update(scr, ecu_data_t*)` /
   `amber_screen_set_units(scr, units)` / `amber_screen_destroy(scr)`.
 
+### Autres écrans — kit commun (`main/ui/widgets/amber_kit.c`)
+
+Tous les écrans hors RPM partagent une même grammaire, fournie par le kit :
+- **Couronne segmentée 220°** ouverte en bas (36 segments, même écart
+  angulaire que le RPM) **uniquement sur injection et allumage** ; remplissage
+  depuis un **repère** (correction 100 %, PMH). Les autres écrans
+  (températures, richesse, ralenti, admission, diagnostic) n'ont pas de
+  jauge, seulement le **filet fin** gradué ; la navigation n'a aucun cadre.
+  Exceptions hors kit :
+  l'**horloge** garde son style propre, la **musique** un anneau continu de
+  progression (pas de segments).
+- **Titre** en capitales espacées encadré de filets pointés, **valeur héros**
+  (56 px) + **unité réduite** posée sur la ligne de base, **légende**.
+- **Grille 2×2** ouverte (séparateurs non jointifs, esprit RPM), valeurs
+  30 px + unités, **ligne d'état** dans l'ouverture basse.
+- Couleurs : valeur = ambre vif, légendes/unités/filets = séparateur
+  (lisible), éteint/indisponible = ambre sombre.
+- `amber_page_*` construit l'écran type ; `amber_readout_*` = valeur + unité,
+  avec un **`°` vectoriel** (unité commençant par « ° ») ; `amber_kit_place`
+  centre un texte sur la **hauteur de capitale** (alignement optique).
+- `sim/build/gen_golden <écran> out.png offline` rend l'état ECU déconnectée.
+
+### Réglages (`main/ui/screens/settings_screen.c`)
+
+- Surimpression opaque ouverte par un **maintien ~1 s** (doigt immobile) sur
+  n'importe quelle page ; fermée par **OK**. Luminosité (16 crans AW9364,
+  jamais 0), **page de démarrage** (fixe ou « dernière vue », défaut) et
+  fenêtre d'**appairage** Bluetooth de 5 min (`domain/ble_window`, refermée
+  dès qu'un téléphone est lié ; « INDISPONIBLE » si le BLE est absent).
+- L'écran ne fait que remonter des actions : `app_main.c` les applique via
+  `settings_runtime_*` et resynchronise l'affichage dans le timer réglages.
+- `startup_page` et `utc_offset_minutes` (schéma NVS **v2**, migration depuis
+  v1) ne sont **pas** dans le protocole BLE de réglages v1 : les valeurs
+  locales sont conservées lors d'une écriture BLE (`app_settings_merge_ble_v1`).
+
+### Application compagnon (`infrastructure/companion_gatt.c`)
+
+- Service GATT `7f3a0001-…` repris de l'ancien boîtier Go ; JSON décodé dans
+  la tâche NimBLE par `domain/companion_protocol.c` (C pur, testé), déposé
+  dans une boîte aux lettres, appliqué par `companion_timer_tick` (LVGL).
+- Musique/Navigation ne dépendent plus de l'ECU : `music_screen_set_media`,
+  `navigation_screen_set_route`, `*_set_link`. Flèche de manœuvre déduite du
+  texte ; pochette, icône PNG et alertes ignorées. Lien à sens unique.
+- `sim/build/gen_golden music|navigation out.png offline` rend l'état
+  « téléphone déconnecté ».
+
 ### Gotchas
 
+- **Objets décoratifs non cliquables** : `lv_obj_create` rend un objet
+  cliquable, il capte alors les appuis destinés au navigateur (tap latéral,
+  maintien). Retirer `LV_OBJ_FLAG_CLICKABLE` des conteneurs/canvas (fait dans
+  `amber_ui_root_create`/`amber_ui_canvas_create`) ; seuls les vrais contrôles
+  (boutons des réglages) restent cliquables.
 - **Polices en px fixes** (`ui_fonts.c`) : tiny_ttf crée les fontes à taille fixe,
   elles doivent correspondre à la **résolution de rendu** (480). Si tu changes la
   résolution du sim, re-cale `UI_FONT_*_PX` en proportion.
-- **Symbole `°`** : Michroma le rend comme un petit anneau (« 89oC ») — c'est le
-  vrai glyphe U+00B0 de la police. Le dessiner en vectoriel si un vrai exposant
-  est voulu.
+- **Symbole `°`** : Michroma le rend comme un petit « o » bas (« 89oC ») — c'est
+  le vrai glyphe U+00B0 de la police. Passer par `amber_readout` (unité « °C »)
+  qui dessine un anneau en exposant.
 - **Changer de police** : déposer un `.ttf` dans `main/fonts/` et mettre à jour
   `TTF_PATH` (build.sh, fallback `main_sim.c`), `EMBED_FILES`
   (main/CMakeLists.txt) et les symboles `_binary_*` dans `app_main.c`.

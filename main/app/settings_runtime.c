@@ -123,6 +123,24 @@ bool settings_runtime_set_page(settings_runtime_t *runtime,
     return apply_update(runtime, &next);
 }
 
+bool settings_runtime_set_startup_page(settings_runtime_t *runtime,
+                                       app_settings_page_t page) {
+    if (runtime == NULL) return false;
+    app_settings_t next = *settings_coordinator_current(runtime->coordinator);
+    next.startup_page = page;
+    if (!app_settings_is_valid(&next)) return false;
+    return apply_update(runtime, &next);
+}
+
+bool settings_runtime_set_utc_offset(settings_runtime_t *runtime,
+                                     int16_t utc_offset_minutes) {
+    if (runtime == NULL) return false;
+    app_settings_t next = *settings_coordinator_current(runtime->coordinator);
+    next.utc_offset_minutes = utc_offset_minutes;
+    if (!app_settings_is_valid(&next)) return false;
+    return apply_update(runtime, &next);
+}
+
 bool settings_runtime_set_theme(settings_runtime_t *runtime,
                                 app_settings_theme_t theme) {
     if (runtime == NULL || theme >= APP_SETTINGS_THEME_COUNT) return false;

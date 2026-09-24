@@ -102,10 +102,10 @@ Cette étape réduit surtout flash et RAM générale, mais peut aussi supprimer 
 
 ### 6. Utiliser une configuration distincte avec et sans BLE
 
-**Appliqué** : `sdkconfig.defaults` désactive Bluetooth pour le firmware
-normal, et l'image de configuration ajoute `sdkconfig.ble` dans un dossier de
-build séparé (cf. `docs/ble-config.md`). La marge IRAM reste à surveiller sur
-l'image BLE avec `tools/check_iram.sh`.
+**Abandonné** : le BLE est désormais permanent (lien avec l'application
+compagnon), il n'y a plus d'image séparée. DIRAM ~33 % avec NimBLE (2026-09-23),
+à surveiller avec `tools/check_iram.sh`. Les pistes ci-dessous restent
+valables si la mémoire venait à manquer.
 
 Si le BLE augmente trop les contraintes mémoire :
 
@@ -161,24 +161,28 @@ C’est la solution la plus complexe et la plus fragile face aux mises à jour E
 ### Paramètres et NVS
 
 - [x] ajouter une interface applicative de modification des réglages via le
-  runtime settings (les setters publics sont prêts ; pas encore de page tactile
-  dédiée) ;
+  runtime settings ;
+- [x] écran tactile de réglages (maintien ~1 s) : luminosité, page de
+  démarrage, ouverture BLE temporisée ;
+- [x] migration du schéma NVS 1 -> 2 (ajout de la page de démarrage) ;
 - [x] appliquer à l’exécution les changements BLE de luminosité, unités et page ;
 - [x] éviter les accès concurrents entre la tâche NimBLE et la tâche LVGL : BLE
   ne fait qu'alimenter un snapshot protégé, consommé par le timer LVGL ;
-- implémenter la migration lors d’un futur changement de schéma NVS ;
 - tester coupure d’alimentation pendant une sauvegarde ;
 - tester la conservation du bonding Bluetooth et des paramètres après mise à jour.
 
 ### Bluetooth
 
-- tester avec un téléphone réel ;
-- créer ou documenter une application cliente ;
-- choisir la politique de pairing définitive ;
-- décider si Just Works est suffisant ou si une authentification MITM est requise ;
+- tester avec un téléphone réel (appairage, reconnexion auto au démarrage,
+  écritures JSON longues) ;
+- [x] application cliente : `rover-mems-ecu-companion`, branche
+  `feature/esp32` (heure, reconnexion `autoConnect`, appairage) ;
+- [x] politique de pairing : annonce permanente, bonds seuls acceptés,
+  fenêtre d'appairage de 5 min depuis les Réglages, Just Works ;
+- [x] persistance des bonds en NVS (`CONFIG_BT_NIMBLE_NVS_PERSIST`) ;
 - valider suppression et renouvellement des appareils bondés ;
-- définir un mode permettant d’ouvrir volontairement la configuration ;
-- vérifier la consommation électrique quand BLE est actif.
+- vérifier la consommation électrique quand BLE est actif ;
+- éventuel canal retour (notify) pour commander la lecture depuis la jauge.
 
 ### RTC DS3231
 
@@ -187,7 +191,8 @@ C’est la solution la plus complexe et la plus fragile face aux mises à jour E
 - [x] détecter le drapeau oscillator-stop et ne l'acquitter qu'après une écriture valide ;
 - [x] définir le DS3231 comme stockage UTC ; les valeurs `LOCAL` BLE sont
   refusées tant qu'aucun fuseau/DST n'est configuré ;
-- gérer ultérieurement la conversion d'affichage, le fuseau et l'heure été/hiver ;
+- [x] conversion d'affichage : décalage fuseau + été fourni par le téléphone
+  (`…000b`), persisté, appliqué à l'horloge ;
 - [x] synchroniser l'heure UTC depuis BLE ; vérifier sa conservation après
   coupure sur carte.
 

@@ -41,6 +41,18 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
 "$BUILD_DIR/test_ble_config_protocol"
 
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    "$ROOT/test/test_companion.c" \
+    "$ROOT/main/domain/companion_protocol.c" \
+    "$ROOT/main/domain/flat_json.c" \
+    "$ROOT/main/domain/rtc_time.c" -lm -o "$BUILD_DIR/test_companion"
+"$BUILD_DIR/test_companion"
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    "$ROOT/test/test_ble_window.c" \
+    "$ROOT/main/domain/ble_window.c" -o "$BUILD_DIR/test_ble_window"
+"$BUILD_DIR/test_ble_window"
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_ui_layout.c" -lm -o "$BUILD_DIR/test_ui_layout"
 "$BUILD_DIR/test_ui_layout"
 

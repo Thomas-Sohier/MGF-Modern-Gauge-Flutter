@@ -10,18 +10,20 @@ set(MGF_KLINE_TX_GPIO 40 CACHE STRING "LILYGO T-RGB K-line TX GPIO")
 set(MGF_KLINE_RX_GPIO 38 CACHE STRING "LILYGO T-RGB K-line RX GPIO")
 set(MGF_KLINE_LOCAL_ECHO 0 CACHE STRING "Discard local K-line loopback echo (0/1)")
 set(MGF_MEMS_VARIANT MEMS_VARIANT_1_9 CACHE STRING "MEMS variant (MEMS_VARIANT_1_9 for MGF 1995-1999, or MEMS_VARIANT_1_6)")
-set(MGF_ENABLE_BLE_CONFIG 0 CACHE STRING "Enable optional NimBLE configuration service (0/1)")
+set(MGF_ENABLE_BLE_CONFIG 1 CACHE STRING "Enable the NimBLE link: settings + companion app services (0/1)")
 set(MGF_BLE_CONFIG_OPEN_ON_BOOT 0 CACHE STRING "Open BLE configuration advertising at boot (0/1; service images only)")
 set(MGF_RUNTIME_DIAGNOSTICS 0 CACHE STRING "Enable periodic runtime diagnostics (0/1)")
 set(MGF_BLE_CONFIG_SRCS)
 if(MGF_ENABLE_BLE_CONFIG)
-    if(NOT CONFIG_BT_NIMBLE_ENABLED)
+    # Les CONFIG_* ne sont pas chargés pendant l'expansion des dépendances.
+    if(NOT CMAKE_BUILD_EARLY_EXPANSION AND NOT CONFIG_BT_NIMBLE_ENABLED)
         message(FATAL_ERROR
-            "MGF_ENABLE_BLE_CONFIG=1 requires NimBLE: build with "
-            "-D SDKCONFIG_DEFAULTS=\"sdkconfig.defaults;sdkconfig.ble\" "
-            "and a dedicated build dir/sdkconfig (see docs/ble-config.md)")
+            "MGF_ENABLE_BLE_CONFIG=1 requires NimBLE (CONFIG_BT_NIMBLE_ENABLED, "
+            "set by sdkconfig.defaults). A stale sdkconfig generated before BLE "
+            "was enabled must be deleted (see docs/ble-config.md)")
     endif()
-    list(APPEND MGF_BLE_CONFIG_SRCS "infrastructure/ble_config_service.c")
+    list(APPEND MGF_BLE_CONFIG_SRCS "infrastructure/ble_config_service.c"
+                                    "infrastructure/companion_gatt.c")
 endif()
 
 # GPIO38/GPIO40 replace microSD DAT0/CMD. Do not add an SDMMC owner here.
@@ -36,6 +38,9 @@ idf_component_register(
         "domain/app_settings.c"
         "domain/display_brightness.c"
         "domain/ble_config_protocol.c"
+        "domain/ble_window.c"
+        "domain/companion_protocol.c"
+        "domain/flat_json.c"
         "domain/mems_protocol.c"
         "domain/mems_reader.c"
         "domain/mems19_reader.c"
@@ -56,6 +61,7 @@ idf_component_register(
         "ui/screens/style_amber.c"
         "ui/screens/boot_screen.c"
         "ui/screens/clock_screen.c"
+        "ui/screens/settings_screen.c"
         "ui/screens/music_screen.c"
         "ui/screens/navigation_screen.c"
         "ui/screens/faults_screen.c"
@@ -69,7 +75,7 @@ idf_component_register(
         "ui/widgets/amber_value.c"
         "ui/widgets/amber_draw.c"
         "ui/widgets/amber_ui.c"
-        "ui/widgets/amber_text.c"
+        "ui/widgets/amber_kit.c"
         "ui/fonts/ui_fonts.c"
     INCLUDE_DIRS "." "app" "domain" "infrastructure" "ui" "ui/screens" "ui/widgets" "ui/icons" "ui/fonts" "ui/themes"
     REQUIRES

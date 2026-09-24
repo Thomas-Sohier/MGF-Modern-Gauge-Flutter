@@ -328,7 +328,8 @@ lv_obj_t * dash_icon_create(lv_obj_t * parent,
 
     lv_obj_remove_style_all(obj);
     lv_obj_set_size(obj, size, size);
-    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    // Décoratif : les appuis doivent atteindre le navigateur du dashboard.
+    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
 
     dash_icon_data_t * data = lv_malloc(sizeof(dash_icon_data_t));
     if(!data) {

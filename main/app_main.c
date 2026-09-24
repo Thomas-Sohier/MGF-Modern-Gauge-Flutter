@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/time.h>
 
 #include "infrastructure/board_display.h"
 #include "ui/screens/style_amber.h"
@@ -23,6 +24,7 @@
 #include "ui/screens/ignition_screen.h"
 #include "ui/screens/idle_screen.h"
 #include "ui/screens/admission_screen.h"
+#include "ui/screens/settings_screen.h"
 #include "ui/navigation/dashboard_navigator.h"
 #include "ui/fonts/ui_fonts.h"
 #include "infrastructure/fake_ecu.h"
@@ -30,6 +32,9 @@
 #include "infrastructure/settings_store.h"
 #include "infrastructure/rtc_ds3231.h"
 #include "domain/app_settings.h"
+#include "domain/ble_window.h"
+#include "domain/companion_protocol.h"
+#include "domain/rtc_time.h"
 #include "domain/display_brightness.h"
 #include "app/dashboard_controller.h"
 #include "app/settings_runtime.h"
@@ -50,6 +55,7 @@
 
 #if MGF_ENABLE_BLE_CONFIG
 #include "infrastructure/ble_config_service.h"
+#include "infrastructure/companion_gatt.h"
 #endif
 
 #if MGF_USE_MEMS_KLINE
@@ -108,6 +114,7 @@ static bool save_settings(void *context, const app_settings_t *settings) {
 
 typedef struct {
     dashboard_navigator_t *navigator;
+    clock_screen_t *clock;
 } settings_apply_context_t;
 
 static settings_apply_context_t s_settings_apply_context;
@@ -123,20 +130,110 @@ static bool apply_settings(void *context, const app_settings_t *settings) {
         return false;
     }
     dashboard_navigator_set_units(apply_context->navigator, settings->units);
+    clock_screen_set_utc_offset(apply_context->clock,
+                                settings->utc_offset_minutes);
     board_display_backlight_set_brightness(
         display_brightness_level(settings->brightness_percent));
     return true;
 }
 
+// État partagé par l'écran de réglages, ses actions et le timer de réglages.
+// Tout s'exécute dans la tâche LVGL.
+typedef struct {
+    settings_runtime_t *runtime;
+    settings_screen_t *screen;
+    ble_window_t ble_window;
+} settings_ui_t;
+
+static settings_ui_t s_settings_ui;
+
+static settings_ble_state_t current_ble_state(void) {
+#if MGF_ENABLE_BLE_CONFIG
+    if (!ble_config_service_is_started()) return SETTINGS_BLE_UNAVAILABLE;
+    if (ble_config_service_is_pairing_open()) return SETTINGS_BLE_OPEN;
+    return ble_config_service_phone_linked() ? SETTINGS_BLE_CONNECTED
+                                             : SETTINGS_BLE_CLOSED;
+#else
+    return SETTINGS_BLE_UNAVAILABLE;
+#endif
+}
+
+static void refresh_settings_screen(settings_ui_t *ui) {
+    if (!settings_screen_is_visible(ui->screen)) return;
+    app_settings_t current;
+    if (settings_runtime_read(ui->runtime, &current)) {
+        settings_screen_set_settings(ui->screen, &current);
+    }
+    settings_screen_set_bluetooth(
+        ui->screen, current_ble_state(),
+        ble_window_remaining_s(&ui->ble_window, lv_tick_get()));
+}
+
+static void settings_open_on_hold(void *context) {
+    settings_ui_t *ui = context;
+    app_settings_t current;
+    if (ui == NULL || !settings_runtime_read(ui->runtime, &current)) return;
+    settings_screen_show(ui->screen, &current);
+    refresh_settings_screen(ui);
+}
+
+static void settings_brightness_changed(void *context, uint8_t percent) {
+    settings_ui_t *ui = context;
+    settings_runtime_set_brightness(ui->runtime, percent);
+}
+
+static void settings_startup_page_changed(void *context,
+                                          app_settings_page_t page) {
+    settings_ui_t *ui = context;
+    settings_runtime_set_startup_page(ui->runtime, page);
+}
+
+static void settings_bluetooth_toggled(void *context, bool open) {
+    settings_ui_t *ui = context;
+#if MGF_ENABLE_BLE_CONFIG
+    if (open) {
+        const esp_err_t error = ble_config_service_open_pairing();
+        if (error == ESP_OK) {
+            ble_window_open(&ui->ble_window, lv_tick_get());
+        } else {
+            ESP_LOGW(TAG, "cannot open BLE pairing: %s",
+                     esp_err_to_name(error));
+        }
+    } else {
+        ble_window_close(&ui->ble_window);
+        (void)ble_config_service_close_pairing();
+    }
+#else
+    (void)open;
+#endif
+    refresh_settings_screen(ui);
+}
+
 static void settings_timer_tick(lv_timer_t *timer) {
-    settings_runtime_t *runtime = lv_timer_get_user_data(timer);
+    settings_ui_t *ui = lv_timer_get_user_data(timer);
+    settings_runtime_t *runtime = ui->runtime;
 #if MGF_ENABLE_BLE_CONFIG
     app_settings_t pending;
     if (ble_config_service_take_settings_update(&pending)) {
+        // Le protocole BLE v1 ne porte ni la page de démarrage ni le fuseau :
+        // on garde les valeurs locales.
+        app_settings_t current;
+        if (settings_runtime_read(runtime, &current)) {
+            app_settings_merge_ble_v1(&current, &pending);
+        }
         settings_runtime_update(runtime, &pending);
+    }
+    // Le service referme lui-même la fenêtre dès qu'un téléphone est appairé.
+    if (ui->ble_window.open && !ble_config_service_is_pairing_open()) {
+        ble_window_close(&ui->ble_window);
+    }
+    if (ble_window_tick(&ui->ble_window, lv_tick_get(), false)) {
+        ESP_LOGI(TAG, "BLE pairing window expired");
+        (void)ble_config_service_close_pairing();
     }
 #endif
     settings_runtime_process(runtime, lv_tick_get());
+    refresh_settings_screen(ui);
 #if MGF_ENABLE_BLE_CONFIG
     if (ble_config_service_is_started()) {
         app_settings_t current;
@@ -145,6 +242,102 @@ static void settings_timer_tick(lv_timer_t *timer) {
         }
     }
 #endif
+}
+
+// Pont application compagnon -> écrans, dans la tâche LVGL. Les messages
+// sont décodés par la tâche NimBLE (companion_gatt.c) ; ce timer ne fait que
+// les consommer et les appliquer.
+typedef struct {
+    dashboard_navigator_t *navigator;
+    music_screen_t *music;
+    navigation_screen_t *navigation;
+    settings_ui_t *settings;
+    rtc_t *rtc;
+    bool linked;
+} companion_ui_t;
+
+static companion_ui_t s_companion_ui;
+
+#if MGF_ENABLE_BLE_CONFIG
+static void apply_phone_time(companion_ui_t *ui, const companion_time_t *time) {
+    const int64_t seconds = time->epoch_ms / 1000;
+    rtc_datetime_t utc;
+    if (!rtc_datetime_from_unix(seconds, &utc)) {
+        ESP_LOGW(TAG, "phone time out of range, ignored");
+        return;
+    }
+    // Horloge système (repli sans DS3231) et RTC, toutes deux en UTC.
+    const struct timeval now = {
+        .tv_sec = (time_t)seconds,
+        .tv_usec = (suseconds_t)((time->epoch_ms % 1000) * 1000),
+    };
+    settimeofday(&now, NULL);
+    if (ui->rtc != NULL) {
+        const rtc_result_t result = rtc_set(ui->rtc, &utc);
+        if (result != RTC_OK) {
+            ESP_LOGW(TAG, "RTC not updated from phone: %s",
+                     rtc_result_name(result));
+        }
+    }
+    // Persisté (anti-rebond) et appliqué à l'horloge via apply_settings.
+    settings_runtime_set_utc_offset(ui->settings->runtime,
+                                    time->utc_offset_min);
+    ESP_LOGI(TAG, "time synced from phone (UTC%+d min)",
+             time->utc_offset_min);
+}
+
+static void apply_remote_key(companion_ui_t *ui, companion_key_t key) {
+    settings_screen_t *settings = ui->settings->screen;
+    if (settings_screen_is_visible(settings)) {
+        // La télécommande ne pilote pas les réglages : OK/retour les ferment.
+        if (key == COMPANION_KEY_BACK || key == COMPANION_KEY_OK) {
+            settings_screen_hide(settings);
+        }
+        return;
+    }
+    switch (key) {
+    case COMPANION_KEY_NEXT:
+    case COMPANION_KEY_RIGHT:
+        dashboard_navigator_next(ui->navigator);
+        break;
+    case COMPANION_KEY_PREVIOUS:
+    case COMPANION_KEY_LEFT:
+        dashboard_navigator_previous(ui->navigator);
+        break;
+    default:
+        break;
+    }
+}
+#endif
+
+static void companion_timer_tick(lv_timer_t *timer) {
+    companion_ui_t *ui = lv_timer_get_user_data(timer);
+    const uint32_t now = lv_tick_get();
+#if MGF_ENABLE_BLE_CONFIG
+    const bool linked = ble_config_service_phone_linked();
+    if (linked != ui->linked) {
+        ui->linked = linked;
+        ESP_LOGI(TAG, "companion phone %s", linked ? "linked" : "lost");
+        if (!linked) music_screen_set_media(ui->music, NULL, now);
+        music_screen_set_link(ui->music, linked, now);
+        navigation_screen_set_link(ui->navigation, linked);
+    }
+    companion_media_t media;
+    if (companion_gatt_take_media(&media)) {
+        music_screen_set_media(ui->music, &media, now);
+    }
+    companion_nav_t nav;
+    if (companion_gatt_take_nav(&nav)) {
+        navigation_screen_set_route(ui->navigation, &nav);
+    }
+    companion_time_t phone_time;
+    if (companion_gatt_take_time(&phone_time)) {
+        apply_phone_time(ui, &phone_time);
+    }
+    companion_key_t key;
+    while (companion_gatt_take_key(&key)) apply_remote_key(ui, key);
+#endif
+    music_screen_tick(ui->music, now);
 }
 
 static rtc_t *optional_rtc_start(void) {
@@ -201,8 +394,15 @@ extern const uint8_t michroma_end[]   asm("_binary_Michroma_Regular_ttf_end");
     }
 
 DEFINE_PAGE_ADAPTER(clock)
-DEFINE_PAGE_ADAPTER(music)
-DEFINE_PAGE_ADAPTER(navigation)
+
+// Pages alimentées par l'application compagnon (timer dédié), pas par l'ECU.
+static void music_page_destroy(void *context) {
+    music_screen_destroy(context);
+}
+
+static void navigation_page_destroy(void *context) {
+    navigation_screen_destroy(context);
+}
 DEFINE_PAGE_ADAPTER(amber)
 DEFINE_PAGE_ADAPTER(faults)
 DEFINE_PAGE_ADAPTER(temps)
@@ -277,8 +477,13 @@ void app_main(void) {
     dashboard_navigator_t *navigator = NULL;
     dashboard_controller_t *controller = NULL;
     settings_runtime_t *settings_runtime = NULL;
+    settings_screen_t *settings_screen = NULL;
     runtime_diagnostics_t *diagnostics = NULL;
     lv_timer_t *settings_timer = NULL;
+    lv_timer_t *companion_timer = NULL;
+    clock_screen_t *clock_view = NULL;
+    music_screen_t *music_view = NULL;
+    navigation_screen_t *navigation_view = NULL;
     bool ecu_ready = false;
 #if MGF_USE_MEMS_KLINE
     mems_ecu_t *mems_ecu = NULL;
@@ -331,6 +536,7 @@ void app_main(void) {
         lv_obj_t *page = dashboard_navigator_create_page(navigator);
         clock_screen_t *view = clock_screen_create(page);
         clock_screen_set_rtc(view, rtc);
+        clock_view = view;
         const dashboard_page_t descriptor = {
             .name = "HEURE", .context = view, .update = clock_page_update,
             .destroy = clock_page_destroy, .update_period_ms = 1000,
@@ -342,8 +548,34 @@ void app_main(void) {
             goto cleanup;
         }
     }
-    REGISTER_PAGE(navigator, music, "MUSIQUE", 0);
-    REGISTER_PAGE(navigator, navigation, "NAVIGATION", 0);
+    {
+        lv_obj_t *page = dashboard_navigator_create_page(navigator);
+        music_view = music_screen_create(page);
+        const dashboard_page_t descriptor = {
+            .name = "MUSIQUE", .context = music_view,
+            .destroy = music_page_destroy,
+        };
+        if (page == NULL || music_view == NULL ||
+            !dashboard_navigator_register_page(navigator, page, &descriptor)) {
+            ESP_LOGE(TAG, "could not create page MUSIQUE");
+            if (music_view != NULL) music_screen_destroy(music_view);
+            goto cleanup;
+        }
+    }
+    {
+        lv_obj_t *page = dashboard_navigator_create_page(navigator);
+        navigation_view = navigation_screen_create(page);
+        const dashboard_page_t descriptor = {
+            .name = "NAVIGATION", .context = navigation_view,
+            .destroy = navigation_page_destroy,
+        };
+        if (page == NULL || navigation_view == NULL ||
+            !dashboard_navigator_register_page(navigator, page, &descriptor)) {
+            ESP_LOGE(TAG, "could not create page NAVIGATION");
+            if (navigation_view != NULL) navigation_screen_destroy(navigation_view);
+            goto cleanup;
+        }
+    }
     REGISTER_PAGE_WITH_UNITS(navigator, amber, "RPM", 40,
                              amber_page_settings);
     REGISTER_PAGE(navigator, faults, "DEFAUTS", 1000);
@@ -365,7 +597,10 @@ void app_main(void) {
 
     s_settings_apply_context = (settings_apply_context_t){
         .navigator = navigator,
+        .clock = clock_view,
     };
+    // Page fixe choisie dans les réglages, sinon la dernière page vue.
+    settings.selected_page = app_settings_boot_page(&settings);
     settings_runtime = settings_runtime_create(
         &settings, save_settings, NULL, apply_settings,
         &s_settings_apply_context);
@@ -376,10 +611,43 @@ void app_main(void) {
     }
     dashboard_navigator_set_page_changed_callback(
         navigator, settings_runtime_page_changed, settings_runtime);
+
+    // Réglages en surimpression, créés après le navigateur pour le couvrir ;
+    // ouverts par un maintien prolongé sur n'importe quelle page.
+    s_settings_ui = (settings_ui_t){.runtime = settings_runtime};
+    const settings_screen_actions_t settings_actions = {
+        .context = &s_settings_ui,
+        .brightness_changed = settings_brightness_changed,
+        .startup_page_changed = settings_startup_page_changed,
+        .bluetooth_toggled = settings_bluetooth_toggled,
+    };
+    settings_screen = settings_screen_create(screen, &settings_actions);
+    if (settings_screen == NULL) {
+        ESP_LOGE(TAG, "could not create settings screen");
+        goto cleanup;
+    }
+    s_settings_ui.screen = settings_screen;
+    dashboard_navigator_set_hold_callback(navigator, settings_open_on_hold,
+                                          &s_settings_ui);
+
     settings_timer = lv_timer_create(
-        settings_timer_tick, 250, settings_runtime);
+        settings_timer_tick, 250, &s_settings_ui);
     if (settings_timer == NULL) {
         ESP_LOGE(TAG, "could not create settings persistence timer");
+        goto cleanup;
+    }
+
+    s_companion_ui = (companion_ui_t){
+        .navigator = navigator,
+        .music = music_view,
+        .navigation = navigation_view,
+        .settings = &s_settings_ui,
+        .rtc = rtc,
+    };
+    companion_timer = lv_timer_create(companion_timer_tick, 200,
+                                      &s_companion_ui);
+    if (companion_timer == NULL) {
+        ESP_LOGE(TAG, "could not create companion timer");
         goto cleanup;
     }
 
@@ -460,7 +728,7 @@ void app_main(void) {
             .settings_update = ble_settings_accept,
             .rtc_context = rtc,
             .datetime_set = ble_datetime_set,
-            .open_on_start = MGF_BLE_CONFIG_OPEN_ON_BOOT != 0,
+            .pairing_open_on_start = MGF_BLE_CONFIG_OPEN_ON_BOOT != 0,
         };
         const esp_err_t ble_error = ble_config_service_start(&ble_config);
         if (ble_error != ESP_OK) {
@@ -487,6 +755,7 @@ cleanup:
     // All LVGL objects and LVGL timers are stopped before the port is torn down.
     if (diagnostics != NULL) runtime_diagnostics_stop(diagnostics);
     if (controller != NULL) dashboard_controller_destroy(controller);
+    if (companion_timer != NULL) lv_timer_delete(companion_timer);
     if (settings_timer != NULL) lv_timer_delete(settings_timer);
     if (settings_runtime != NULL) {
         settings_runtime_destroy(settings_runtime);
@@ -496,6 +765,7 @@ cleanup:
 #else
     if (fake_ecu != NULL) fake_ecu_destroy(fake_ecu);
 #endif
+    if (settings_screen != NULL) settings_screen_destroy(settings_screen);
     if (navigator != NULL) dashboard_navigator_destroy(navigator);
     if (boot != NULL) boot_screen_destroy(boot);
     rtc_destroy(rtc);

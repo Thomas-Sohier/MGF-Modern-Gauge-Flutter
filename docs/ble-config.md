@@ -1,48 +1,99 @@
-# Configuration BLE optionnelle
+# Lien Bluetooth (NimBLE) : réglages et application compagnon
 
-Le service de configuration BLE est désactivé par défaut. Il utilise uniquement
-le contrôleur BLE et l'hôte **NimBLE** d'ESP-IDF (aucun profil Bluetooth
-Classic). Pour l'activer sur le firmware ESP-IDF :
+La jauge embarque un lien BLE permanent, activé par défaut
+(`MGF_ENABLE_BLE_CONFIG=1`, `CONFIG_BT_NIMBLE_ENABLED=y` dans
+`sdkconfig.defaults`). Seuls le contrôleur BLE et l'hôte **NimBLE** d'ESP-IDF
+sont utilisés : l'ESP32-S3 n'a pas de Bluetooth classique. Deux services GATT
+cohabitent sur la même connexion :
+
+| Service | UUID | Rôle |
+|---|---|---|
+| Réglages (protocole binaire v1) | `0111b043-1870-448e-2c4d-6a913172549a` | luminosité, page, thème, unités ; date UTC |
+| Compagnon (JSON) | `7f3a0001-9c44-4e6b-8d2a-5b1f00000001` | application Android `rover-mems-ecu-companion` : musique, navigation, télécommande, heure |
+
+Coût mémoire mesuré (ESP-IDF 5.4.2) : ~36 Ko de DIRAM statique, plus le tas
+alloué par NimBLE au démarrage ; DIRAM ~33 % au total. `tools/check_iram.sh`
+contrôle la marge.
 
 ```bash
-idf.py -B build-ble -D SDKCONFIG=build-ble/sdkconfig \
-    -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ble" \
-    -D MGF_ENABLE_BLE_CONFIG=1 set-target esp32s3 build
+idf.py build                                   # BLE inclus
+idf.py -D MGF_ENABLE_BLE_CONFIG=0 build        # BLE retiré du code (garder
+                                               # un sdkconfig sans BT pour
+                                               # récupérer la mémoire)
 ```
 
-Le firmware normal garde `CONFIG_BT_ENABLED=n` (`sdkconfig.defaults`) : aucune
-pile Bluetooth n'y est liée : ~36 Ko de DIRAM statique économisés (mesuré
-sous ESP-IDF 5.4.2), plus le tas alloué par NimBLE au démarrage. L'image BLE utilise son propre dossier de build et son propre
-`sdkconfig` pour que les deux configurations ne se contaminent pas ;
-`main/CMakeLists.txt` refuse `MGF_ENABLE_BLE_CONFIG=1` sans NimBLE activé.
-Un `sdkconfig` existant n'est pas réécrit par les defaults : après ce
-changement, supprimer l'ancien `sdkconfig` (ou `idf.py fullclean`) pour
-régénérer le firmware normal sans Bluetooth.
+> Un `sdkconfig` ou un `build/` générés avant l'activation du BLE ne sont pas
+> réécrits par les defaults : supprimer `sdkconfig` (ou `idf.py fullclean`),
+> et passer une fois `-D MGF_ENABLE_BLE_CONFIG=1` si `build/CMakeCache.txt`
+> contient encore `MGF_ENABLE_BLE_CONFIG=0`.
 
-Le simulateur hôte et les builds firmware par défaut ne compilent pas le fichier
-NimBLE et ne dépendent donc pas de `bt`. Avec NimBLE, l'ouverture de la
-publicité au boot est contrôlée séparément par
-`MGF_BLE_CONFIG_OPEN_ON_BOOT=1` (désactivée par défaut) ; les écritures restent
-limitées aux clients chiffrés et bondés.
+Le simulateur hôte et les tests ne compilent pas NimBLE ; le décodage du
+protocole compagnon (`domain/companion_protocol.c`, `domain/flat_json.c`) est
+en C pur et testé sur hôte (`test/test_companion.c`).
 
-Dans `sdkconfig.ble`, la politique fixe également
-`CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1` et `CONFIG_BT_NIMBLE_MAX_BONDS=3`.
+## Politique de connexion et d'appairage
 
-## Politique d'ouverture
+- La jauge **annonce en permanence** (UUID 128 bits du service compagnon dans
+  l'annonce, nom « MGF Gauge » dans la réponse de scan) dès qu'aucune
+  connexion n'est active : le téléphone appairé se reconnecte ainsi seul au
+  démarrage de la voiture. Une seule connexion à la fois
+  (`CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1`), rôle périphérique uniquement.
+- À la connexion, la jauge demande la sécurité. Un téléphone **appairé**
+  chiffre le lien avec sa clé ; tout lien non chiffré avec une clé stockée
+  (inconnu, clé perdue, simple scanner) est **coupé après 10 s**, ou dès
+  l'échec du chiffrement.
+- **Fenêtre d'appairage** : c'est le seul moment où un nouveau bond peut être
+  créé. On l'ouvre depuis l'écran Réglages (maintien ~1 s sur une page) →
+  Bluetooth → **APPAIRER**, pour 5 minutes (`domain/ble_window.c`). Hors
+  fenêtre, `ble_hs_cfg.sm_bonding = 0` : un appairage ne produit aucune clé
+  stockée, le lien est refusé et aucun bond existant n'est évincé. La fenêtre
+  se referme dès qu'un téléphone appairé est lié, à l'échéance, ou par un
+  second appui. La fermeture ne coupe pas le téléphone déjà lié.
+- Un téléphone qui a « oublié » la jauge alors qu'elle garde sa clé
+  (`REPEAT_PAIRING`) ne peut se ré-appairer que pendant la fenêtre.
+- Bonds conservés en NVS (`CONFIG_BT_NIMBLE_NVS_PERSIST=y`,
+  `CONFIG_BT_NIMBLE_MAX_BONDS=3`) : sans persistance, le téléphone devrait se
+  ré-appairer à chaque démarrage. (Avant ce changement, l'option était absente
+  et les bonds ne survivaient pas à un redémarrage.)
+- Toutes les écritures des deux services exigent un lien **chiffré et
+  appairé** ; la lecture des réglages reste libre (aucun secret).
+- `MGF_BLE_CONFIG_OPEN_ON_BOOT=1` ouvre la fenêtre au démarrage, sans
+  échéance : réservé à une image de banc.
+- Pairage **Just Works** (ni écran de code ni clavier) : un attaquant présent
+  pendant la fenêtre pourrait s'appairer à la place du téléphone. La fenêtre
+  courte et déclenchée localement limite ce risque.
+- `ble_config_service_forget_bonds()` supprime tous les bonds (fenêtre fermée,
+  aucune connexion) ; chaque téléphone devra se ré-appairer.
 
-Le service peut être initialisé mais reste **fermé et non annonçant par défaut**.
-`ble_config_service_open()` doit être appelé après une action locale explicite
-(mode maintenance) ; `ble_config_service_close()` arrête les annonces et la
-connexion en cours. L'option `MGF_BLE_CONFIG_OPEN_ON_BOOT=1` est réservée à une
-image de banc/service contrôlée.
+## Service compagnon (`infrastructure/companion_gatt.c`)
 
-> TODO produit : le déclencheur local de ce mode (séquence tactile, bouton ou
-> autre procédure) n'est pas décidé. Aucune ouverture automatique supplémentaire
-> n'est inventée ici.
+Contrat repris de l'ancien boîtier Linux/Go (cf. README et ADR 0007 de
+l'application). Le téléphone écrit du JSON UTF-8 (≤ 512 octets) ; la tâche
+NimBLE le décode et dépose le dernier état dans une boîte aux lettres que le
+timer LVGL (`companion_timer_tick`, 200 ms) consomme. Aucun appel LVGL dans
+la tâche NimBLE.
 
-## GATT et protocole v1
+| Car. | Contenu | Usage sur la jauge |
+|---|---|---|
+| `…0002` | `{title, artist, album, state, position_ms, duration_ms, art_id}` | écran Musique ; position extrapolée localement pendant la lecture |
+| `…0003`/`…0004` | pochette (contrôle JSON / morceaux binaires) | acceptée, ignorée |
+| `…0005` | `{active, instruction, distance, eta, maneuver_icon_id}` | écran Navigation ; flèche déduite du texte (FR/EN), consigne découpée en manœuvre + voie, distance en valeur + unité |
+| `…0006`/`…0007` | icône de manœuvre PNG | acceptée, ignorée |
+| `…0008` | alerte `{app, title, text, posted_at}` | acceptée, ignorée |
+| `…0009` | `{type:"nav_key", key}` | `next`/`right` et `previous`/`left` changent de page ; `ok`/`back` ferment les réglages |
+| `…000b` | `{epoch_ms, tz_offset_min}` | RTC DS3231 + horloge système en UTC ; décalage (fuseau + été) persisté et appliqué à l'horloge |
 
-Service custom : `0111b043-1870-448e-2c4d-6a913172549a`.
+Les textes sont normalisés pour Michroma : capitales ASCII, accents repliés
+(« Arrivée » → « ARRIVEE »), ponctuation typographique simplifiée, emoji
+retirés. Un JSON invalide est refusé avec une erreur ATT (l'application
+réessaie au plus trois fois). Le lien est à sens unique : la jauge n'envoie
+rien au téléphone, la pastille de l'écran Musique indique l'état de lecture
+sans le commander.
+
+Perte du lien : l'écran Musique affiche « TELEPHONE / NON CONNECTE » et le
+guidage est effacé.
+
+## Service de réglages (protocole binaire v1)
 
 | Caractéristique | UUID | Accès |
 |---|---|---|
@@ -51,52 +102,18 @@ Service custom : `0111b043-1870-448e-2c4d-6a913172549a`.
 
 Les octets sont little-endian et chaque payload commence par la version `1`.
 
-- `settings` : 5 octets `[version, brightness, page, theme, units]`.
+- `settings` : 5 octets `[version, brightness, page, theme, units]`. La page
+  de démarrage et le décalage horaire ne sont **pas** dans ce format : une
+  écriture BLE conserve les valeurs locales (`app_settings_merge_ble_v1`).
 - `datetime` : 10 octets `[version, basis, year_lo, year_hi, month, day,
   weekday, hour, minute, second]`. `basis` vaut `0` pour UTC et `1` pour
-  local. L'année est limitée à 2000..2099 et la date complète est validée
-  avant l'appel du callback.
+  local ; `LOCAL` est refusé à la frontière RTC (le DS3231 stocke de l'UTC).
 
 Le parseur est indépendant d'ESP-IDF et testé sur l'hôte. Les valeurs
 inconnues, versions inattendues, longueurs incorrectes et dates invalides sont
-refusées avant tout callback ou écriture.
+refusées avant tout callback ou écriture. Une écriture acceptée est appliquée
+et persistée par le timer LVGL (NVS avec anti-rebond de 3 s).
 
-## Sécurité et stockage
-
-- Les propriétés GATT demandent le chiffrement pour les écritures et le
-  callback vérifie en plus `encrypted && bonded` avant de parser ou d'appliquer
-  une valeur.
-- NimBLE est configuré avec bonding, Secure Connections et échange des clés
-  d'identité/chiffrement. Une demande de sécurité est lancée à la connexion ;
-  le client doit donc accepter le pairage et conserver le bond.
-- Le matériel n'a pas d'écran/clavier utilisable pour confirmer un code : le
-  pairage est **Just Works**, sans MITM. Un attaquant présent pendant le
-  pairage initial peut donc usurper le premier client. Il faut supprimer les
-  bonds non reconnus côté téléphone et re-flasher/effacer les données BLE selon
-  la procédure de maintenance si nécessaire.
-- La lecture de `settings` reste lisible sans chiffrement ; elle ne contient
-  pas de secret. Les écritures sont la surface protégée.
-- Les clés de bond sont conservées par les callbacks de stockage NimBLE/ESP-IDF
-  dans sa zone NVS. Le service ne l'ouvre ni ne l'efface. Le callback de
-  paramètres valide seulement la valeur ; le service la place dans son
-  hand-off protégé et le timer LVGL la consomme via
-  `ble_config_service_take_settings_update`, puis le runtime l'applique et la
-  persiste. Le callback RTC passe par `rtc_set`; le service ne possède donc ni
-  NVS applicative ni bus I²C. Une écriture de réglages peut ainsi être acceptée
-  avant le commit NVS ; une panne avant le prochain tick laisse l'ancienne
-  valeur persistée.
-- `ble_config_service_forget_bonds()` supprime explicitement tous les bonds,
-  uniquement service fermé et sans connexion active. La fermeture peut donc
-  devoir être suivie d'un tick de déconnexion avant cet appel. Une demande de
-  nouveau pairage d'un appareil déjà connu déclenche aussi le renouvellement de
-  son bond ; aucune éviction automatique d'un autre appareil n'est faite.
-  L'ouverture suivante impose alors un nouveau pairage.
-- Le DS3231 stocke exclusivement UTC. Le champ `basis` reste explicite sur le
-  protocole pour éviter toute ambiguïté ; `UTC` est validé puis synchronisé,
-  tandis que `LOCAL` est refusé à la frontière application/RTC tant qu'aucun
-  décalage de fuseau ni règle d'heure d'été n'est configuré. Une heure locale
-  ne doit jamais être écrite telle quelle dans le DS3231.
-
-Le support n'a pas encore été validé sur carte réelle ; il faut tester le
-pairage, la reconnexion d'un bond et les révisions NimBLE/ESP-IDF utilisées par
-la carte.
+Le lien n'a pas encore été validé sur carte réelle : pairage, reconnexion d'un
+bond après coupure, écritures longues (JSON > MTU) et comportement avec
+l'application restent à tester.

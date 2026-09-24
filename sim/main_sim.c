@@ -17,6 +17,7 @@
 #include "ui/screens/ignition_screen.h"
 #include "ui/screens/idle_screen.h"
 #include "ui/screens/admission_screen.h"
+#include "ui/screens/settings_screen.h"
 #include "ui/fonts/ui_fonts.h"
 #include "domain/ecu_data.h"
 #include "ui/ui_layout.h"
@@ -102,7 +103,8 @@ static void *load_file(const char *path, size_t *out_size) {
 
 int main(int argc, char **argv) {
     // Usage : gen_golden [amber|boot|clock|music|navigation|faults|temps|
-    //                     injection|lambda|ignition|idle|admission] png
+    //                     injection|lambda|ignition|idle|admission|settings]
+    //                    png [offline]
     const char *style = (argc > 1) ? argv[1] : "amber";
     const char *out = (argc > 2) ? argv[2] : "rpm_amber.png";
 
@@ -129,7 +131,9 @@ int main(int argc, char **argv) {
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
 
-    const ecu_data_t mock = {
+    // 3e argument « offline » : ECU déconnectée (vérification des états « -- »).
+    const bool offline = argc > 3 && strcmp(argv[3], "offline") == 0;
+    const ecu_data_t online = {
         .connected = true, .faults_available = true,
         .fault_flags = ECU_FAULT_INTAKE_AIR_SENSOR,
         .rpm = 875, .throttle = 7, .coolant_temp = 89,
@@ -145,12 +149,36 @@ int main(int argc, char **argv) {
         .idle_setpoint = 850, .idle_adjuster_rpm = 18, .idle_error = 25,
         .idle_valve_position = 34, .idle_base_position = 30,
     };
+    const ecu_data_t mock = offline ? ecu_data_unavailable() : online;
 
     if (strcmp(style, "boot") == 0) boot_screen_create(screen);
     else if (strcmp(style, "amber") == 0) amber_screen_update(amber_screen_create(screen), &mock);
     else if (strcmp(style, "clock") == 0) clock_screen_update(clock_screen_create(screen), &mock);
-    else if (strcmp(style, "music") == 0) music_screen_update(music_screen_create(screen), &mock);
-    else if (strcmp(style, "navigation") == 0) navigation_screen_update(navigation_screen_create(screen), &mock);
+    else if (strcmp(style, "music") == 0) {
+        // Morceau de démonstration tel que l'application compagnon l'envoie ;
+        // « offline » : téléphone non connecté.
+        music_screen_t *music = music_screen_create(screen);
+        if (!offline) {
+            companion_media_t media;
+            const char *json = "{\"title\":\"Midnight Drive\",\"artist\":"
+                               "\"MGF / Synthwave\",\"state\":\"playing\","
+                               "\"position_ms\":142000,\"duration_ms\":228000}";
+            companion_parse_media(json, strlen(json), &media);
+            music_screen_set_link(music, true, 0);
+            music_screen_set_media(music, &media, 0);
+        }
+    } else if (strcmp(style, "navigation") == 0) {
+        navigation_screen_t *navigation = navigation_screen_create(screen);
+        if (!offline) {
+            companion_nav_t nav;
+            const char *json = "{\"active\":true,\"instruction\":\"Tournez à "
+                               "droite sur Rue des Lilas\",\"distance\":\"300 m\","
+                               "\"eta\":\"Arrivée 14:32\"}";
+            companion_parse_nav(json, strlen(json), &nav);
+            navigation_screen_set_link(navigation, true);
+            navigation_screen_set_route(navigation, &nav);
+        }
+    }
     else if (strcmp(style, "faults") == 0) faults_screen_update(faults_screen_create(screen), &mock);
     else if (strcmp(style, "temps") == 0) temps_screen_update(temps_screen_create(screen), &mock);
     else if (strcmp(style, "injection") == 0) injection_screen_update(injection_screen_create(screen), &mock);
@@ -158,6 +186,21 @@ int main(int argc, char **argv) {
     else if (strcmp(style, "ignition") == 0) ignition_screen_update(ignition_screen_create(screen), &mock);
     else if (strcmp(style, "idle") == 0) idle_screen_update(idle_screen_create(screen), &mock);
     else if (strcmp(style, "admission") == 0) admission_screen_update(admission_screen_create(screen), &mock);
+    else if (strcmp(style, "settings") == 0) {
+        // Réglages ouverts : luminosité ~60 %, démarrage sur le compte-tours,
+        // fenêtre BLE ouverte (ou image sans BLE en mode « offline »).
+        const settings_screen_actions_t actions = {0};
+        settings_screen_t *settings = settings_screen_create(screen, &actions);
+        app_settings_t values;
+        app_settings_defaults(&values);
+        values.brightness_percent = 60;
+        values.startup_page = APP_SETTINGS_PAGE_RPM;
+        settings_screen_show(settings, &values);
+        settings_screen_set_bluetooth(settings,
+                                      offline ? SETTINGS_BLE_UNAVAILABLE
+                                              : SETTINGS_BLE_OPEN,
+                                      272);
+    }
     else {
         fprintf(stderr, "style inconnu : %s\n", style);
         return 2;

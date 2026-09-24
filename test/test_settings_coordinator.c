@@ -113,11 +113,34 @@ static void test_future_setting_setters(void) {
     settings_coordinator_destroy(coordinator);
 }
 
+static void test_startup_page(void) {
+    struct save_spy spy = {0};
+    settings_coordinator_t *coordinator = new_coordinator(&spy);
+    assert(coordinator != NULL);
+
+    assert(settings_coordinator_set_startup_page(coordinator,
+                                                 APP_SETTINGS_PAGE_CLOCK));
+    assert(settings_coordinator_is_dirty(coordinator));
+    assert(!settings_coordinator_tick(coordinator, 0));
+    assert(settings_coordinator_tick(coordinator, 3000));
+    assert(spy.saved.startup_page == APP_SETTINGS_PAGE_CLOCK);
+
+    assert(settings_coordinator_set_startup_page(
+        coordinator, APP_SETTINGS_STARTUP_LAST_PAGE));
+    assert(!settings_coordinator_set_startup_page(
+        coordinator, APP_SETTINGS_STARTUP_LAST_PAGE + 1));
+    assert(settings_coordinator_current(coordinator)->startup_page ==
+           APP_SETTINGS_STARTUP_LAST_PAGE);
+
+    settings_coordinator_destroy(coordinator);
+}
+
 int main(void) {
     test_selection_debounce_and_noop();
     test_changes_reset_quiet_period_and_revert();
     test_save_failure_is_retried();
     test_future_setting_setters();
+    test_startup_page();
     puts("settings coordinator tests: OK");
     return 0;
 }

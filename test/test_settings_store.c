@@ -15,19 +15,19 @@ struct mock_semaphore {
 struct mock_nvs_state {
     bool schema_present;
     uint32_t schema;
-    uint8_t values[4];
-    bool value_present[4];
+    uint8_t values[6];
+    bool value_present[6];
     uint32_t set_calls;
     uint32_t value_sets_before_schema;
     uint32_t commit_calls;
     esp_err_t flash_error;
     esp_err_t open_error;
     esp_err_t schema_error;
-    esp_err_t value_errors[4];
+    esp_err_t value_errors[6];
     esp_err_t stage_error;
     esp_err_t commit_error;
     uint32_t staged_schema;
-    uint8_t staged_values[4];
+    uint8_t staged_values[6];
 };
 
 static struct mock_nvs_state g_nvs;
@@ -35,7 +35,7 @@ static struct mock_semaphore g_mutex;
 
 static int value_index(const char *key) {
     static const char *const keys[] = {
-        "brightness", "page", "theme", "units",
+        "brightness", "page", "theme", "units", "startup", "utc_q15",
     };
     for (size_t index = 0; index < sizeof(keys) / sizeof(keys[0]); index++) {
         if (strcmp(key, keys[index]) == 0) return (int)index;
@@ -91,7 +91,7 @@ esp_err_t nvs_set_u32(nvs_handle_t handle, const char *key, uint32_t value) {
     if (g_nvs.stage_error != ESP_OK) return g_nvs.stage_error;
     g_nvs.set_calls++;
     g_nvs.staged_schema = value;
-    assert(g_nvs.value_sets_before_schema == 4U);
+    assert(g_nvs.value_sets_before_schema == 6U);
     return ESP_OK;
 }
 
@@ -100,7 +100,7 @@ esp_err_t nvs_set_u8(nvs_handle_t handle, const char *key, uint8_t value) {
     const int index = value_index(key);
     assert(index >= 0);
     if (g_nvs.stage_error != ESP_OK) return g_nvs.stage_error;
-    if (g_nvs.value_sets_before_schema == 4U) {
+    if (g_nvs.value_sets_before_schema == 6U) {
         g_nvs.value_sets_before_schema = 0;
     }
     g_nvs.set_calls++;
@@ -158,12 +158,12 @@ static void test_transaction_and_reload(void) {
     changed.brightness_percent = 42;
 
     assert(settings_store_save(&changed) == ESP_OK);
-    assert(g_nvs.set_calls == 5U);
+    assert(g_nvs.set_calls == 7U);
     assert(g_nvs.commit_calls == 1U);
     assert(g_nvs.schema == APP_SETTINGS_SCHEMA_VERSION);
     assert(g_nvs.values[0] == 42U);
     assert(settings_store_save(&changed) == ESP_OK);
-    assert(g_nvs.set_calls == 5U);
+    assert(g_nvs.set_calls == 7U);
     assert(g_nvs.commit_calls == 1U);
 
     app_settings_t out = {0};
@@ -217,6 +217,45 @@ static void test_unexpected_errors_disable_save_until_reload(void) {
     assert(g_nvs.commit_calls == 3U);
 }
 
+static void test_schema_1_is_migrated(void) {
+    // Enregistrement schéma 1 : pas de clé « startup ».
+    g_nvs.schema = 1U;
+    g_nvs.values[0] = 60U;
+    g_nvs.values[1] = APP_SETTINGS_PAGE_TEMPERATURES;
+    g_nvs.values[2] = APP_SETTINGS_THEME_AMBER;
+    g_nvs.values[3] = APP_SETTINGS_UNITS_IMPERIAL;
+    g_nvs.value_present[4] = false;
+    g_nvs.value_errors[4] = ESP_OK;
+    g_nvs.value_present[5] = false;
+
+    app_settings_t out = {0};
+    assert(settings_store_load(&out) == ESP_OK);
+    assert(out.brightness_percent == 60U);
+    assert(out.selected_page == APP_SETTINGS_PAGE_TEMPERATURES);
+    assert(out.units == APP_SETTINGS_UNITS_IMPERIAL);
+    assert(out.startup_page == APP_SETTINGS_STARTUP_LAST_PAGE);
+    assert(app_settings_boot_page(&out) == APP_SETTINGS_PAGE_TEMPERATURES);
+
+    // Mêmes valeurs, mais la flash est encore au schéma 1 : réécriture.
+    const uint32_t commits = g_nvs.commit_calls;
+    assert(settings_store_save(&out) == ESP_OK);
+    assert(g_nvs.commit_calls == commits + 1U);
+    assert(g_nvs.schema == APP_SETTINGS_SCHEMA_VERSION);
+    assert(g_nvs.values[4] == (uint8_t)APP_SETTINGS_STARTUP_LAST_PAGE);
+    assert(g_nvs.values[5] == 64U); // UTC+0
+    assert(settings_store_save(&out) == ESP_OK);
+    assert(g_nvs.commit_calls == commits + 1U);
+
+    // Schéma 2 : la page de démarrage fixe est relue.
+    out.startup_page = APP_SETTINGS_PAGE_RPM;
+    out.utc_offset_minutes = -570; // UTC-09:30
+    assert(settings_store_save(&out) == ESP_OK);
+    app_settings_t reloaded = {0};
+    assert(settings_store_load(&reloaded) == ESP_OK);
+    assert(app_settings_equal(&reloaded, &out));
+    assert(app_settings_boot_page(&reloaded) == APP_SETTINGS_PAGE_RPM);
+}
+
 static void test_invalid_save_values_are_rejected(void) {
     app_settings_t settings;
     app_settings_defaults(&settings);
@@ -230,6 +269,7 @@ int main(void) {
     test_transaction_and_reload();
     test_invalid_records_use_defaults();
     test_unexpected_errors_disable_save_until_reload();
+    test_schema_1_is_migrated();
     test_invalid_save_values_are_rejected();
     puts("settings store tests: OK");
     return 0;

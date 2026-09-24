@@ -9,6 +9,7 @@ static void test_defaults(void) {
 
     assert(settings.brightness_percent == 100U);
     assert(settings.selected_page == APP_SETTINGS_PAGE_RPM);
+    assert(settings.startup_page == APP_SETTINGS_STARTUP_LAST_PAGE);
     assert(settings.theme == APP_SETTINGS_THEME_AMBER);
     assert(settings.units == APP_SETTINGS_UNITS_METRIC);
     assert(app_settings_is_valid(&settings));
@@ -36,6 +37,25 @@ static void test_validation_boundaries(void) {
     assert(!app_settings_is_valid(&settings));
 
     app_settings_defaults(&settings);
+    settings.startup_page = APP_SETTINGS_PAGE_COUNT + 1;
+    assert(!app_settings_is_valid(&settings));
+    settings.startup_page = (app_settings_page_t)-1;
+    assert(!app_settings_is_valid(&settings));
+    settings.startup_page = APP_SETTINGS_PAGE_CLOCK;
+    assert(app_settings_is_valid(&settings));
+
+    app_settings_defaults(&settings);
+    assert(settings.utc_offset_minutes == 0);
+    settings.utc_offset_minutes = 840;
+    assert(app_settings_is_valid(&settings));
+    settings.utc_offset_minutes = 855;
+    assert(!app_settings_is_valid(&settings));
+    settings.utc_offset_minutes = -735;
+    assert(!app_settings_is_valid(&settings));
+    settings.utc_offset_minutes = 10;
+    assert(!app_settings_is_valid(&settings));
+
+    app_settings_defaults(&settings);
     settings.selected_page = (app_settings_page_t)-1;
     assert(!app_settings_is_valid(&settings));
     app_settings_defaults(&settings);
@@ -58,10 +78,34 @@ static void test_equality(void) {
     assert(!app_settings_equal(NULL, &right));
 }
 
+static void test_boot_page(void) {
+    app_settings_t settings;
+    app_settings_defaults(&settings);
+    settings.selected_page = APP_SETTINGS_PAGE_LAMBDA;
+    assert(app_settings_boot_page(&settings) == APP_SETTINGS_PAGE_LAMBDA);
+    settings.startup_page = APP_SETTINGS_PAGE_CLOCK;
+    assert(app_settings_boot_page(&settings) == APP_SETTINGS_PAGE_CLOCK);
+
+    app_settings_t other = settings;
+    other.startup_page = APP_SETTINGS_STARTUP_LAST_PAGE;
+    assert(!app_settings_equal(&settings, &other));
+
+    // Fusion BLE v1 : page de démarrage et fuseau restent locaux.
+    app_settings_t incoming;
+    app_settings_defaults(&incoming);
+    incoming.brightness_percent = 30;
+    settings.utc_offset_minutes = 120;
+    app_settings_merge_ble_v1(&settings, &incoming);
+    assert(incoming.brightness_percent == 30);
+    assert(incoming.startup_page == APP_SETTINGS_PAGE_CLOCK);
+    assert(incoming.utc_offset_minutes == 120);
+}
+
 int main(void) {
     test_defaults();
     test_validation_boundaries();
     test_equality();
+    test_boot_page();
     puts("app settings tests: OK");
     return 0;
 }

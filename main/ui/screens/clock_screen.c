@@ -4,6 +4,7 @@
 #include "ui/themes/ui_theme.h"
 #include "ui/ui_layout.h"
 #include "ui/widgets/amber_ui.h"
+#include "domain/rtc_time.h"
 
 #include <math.h>
 #include <time.h>
@@ -32,6 +33,7 @@ struct clock_screen_s {
     int hour;
     int minute;
     rtc_t *rtc;
+    int16_t utc_offset_minutes;
 };
 
 static ui_layout_t layout_of(const lv_area_t *area) {
@@ -206,9 +208,9 @@ static void hands_draw_cb(lv_event_t *event) {
     draw_hands(layer, &layout, screen);
 }
 
-// The RTC contract is UTC. Until a timezone/DST policy is configured, the
-// clock page deliberately displays UTC too; the no-RTC fallback uses the same
-// basis instead of mixing an RTC UTC value with a local libc value.
+// The RTC contract is UTC. The page displays legal time: UTC plus the offset
+// (timezone + DST) last received from the phone. The no-RTC fallback uses
+// the same UTC basis (system time, set by the same phone sync).
 static bool read_clock_time(const clock_screen_t *screen, int *hour, int *minute) {
 #ifdef MGF_SIMULATOR
     (void)screen;
@@ -218,14 +220,20 @@ static bool read_clock_time(const clock_screen_t *screen, int *hour, int *minute
 #else
     if (screen != NULL && screen->rtc != NULL) {
         rtc_datetime_t date_time;
-        if (rtc_read(screen->rtc, &date_time) == RTC_OK) {
-            *hour = date_time.hour;
-            *minute = date_time.minute;
+        rtc_datetime_t local;
+        if (rtc_read(screen->rtc, &date_time) == RTC_OK &&
+            rtc_datetime_add_minutes(&date_time, screen->utc_offset_minutes,
+                                     &local)) {
+            *hour = local.hour;
+            *minute = local.minute;
             return true;
         }
     }
 
-    const time_t now = time(NULL);
+    time_t now = time(NULL);
+    if (now != (time_t)-1 && screen != NULL) {
+        now += (time_t)screen->utc_offset_minutes * 60;
+    }
     const struct tm *utc = now != (time_t)-1 ? gmtime(&now) : NULL;
     const int utc_year = utc != NULL ? utc->tm_year + 1900 : 0;
     if (utc != NULL && utc_year >= 2000 && utc_year <= 2099 &&
@@ -293,6 +301,12 @@ void clock_screen_set_rtc(clock_screen_t *screen, rtc_t *rtc) {
     screen->hour = hour;
     screen->minute = minute;
     lv_obj_invalidate(screen->hands);
+}
+
+void clock_screen_set_utc_offset(clock_screen_t *screen, int16_t minutes) {
+    if (screen == NULL || screen->utc_offset_minutes == minutes) return;
+    screen->utc_offset_minutes = minutes;
+    clock_screen_update(screen, NULL);
 }
 
 void clock_screen_update(clock_screen_t *screen, const ecu_data_t *data) {

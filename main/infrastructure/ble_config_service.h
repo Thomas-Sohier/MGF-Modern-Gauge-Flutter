@@ -26,9 +26,14 @@ typedef rtc_result_t (*ble_config_datetime_set_cb)(
 #define BLE_CONFIG_REQUIRE_MITM 0U
 #define BLE_CONFIG_REQUIRE_SECURE_CONNECTIONS 1U
 
-// The service is closed by default. Set open_on_start only for a controlled
-// bench/service image; production code should call ble_config_service_open()
-// after an explicit local maintenance action.
+// Lien BLE unique de la jauge : service de réglages (0111b043-…) et service
+// de l'application compagnon (7f3a0001-…, cf. companion_gatt.h).
+//
+// Politique : la jauge annonce en permanence pour que le téléphone appairé se
+// reconnecte seul au démarrage, mais seul un téléphone appairé (bond stocké
+// en NVS) garde la connexion. Un nouvel appairage n'est possible que pendant
+// la fenêtre ouverte depuis l'écran de réglages (ou au boot sur une image de
+// banc avec pairing_open_on_start).
 typedef struct {
     const char *device_name;
     void *settings_context;
@@ -36,21 +41,26 @@ typedef struct {
     ble_config_settings_update_cb settings_update;
     void *rtc_context;
     ble_config_datetime_set_cb datetime_set;
-    bool open_on_start;
+    bool pairing_open_on_start;
 } ble_config_service_config_t;
 
-// Initializes NimBLE, registers the version-1 service, enables bonded
-// encrypted writes, and starts the NimBLE host task. The service does not
-// advertise unless open_on_start is true or ble_config_service_open() is
-// called explicitly.
+// Initializes NimBLE, registers both services, enables bonded encrypted
+// writes, starts advertising and the NimBLE host task.
 esp_err_t ble_config_service_start(const ble_config_service_config_t *config);
 
 bool ble_config_service_is_started(void);
-esp_err_t ble_config_service_open(void);
-esp_err_t ble_config_service_close(void);
+// Lectures d'état pour l'UI (tâche LVGL) ; valeurs indicatives, écrites par
+// la tâche NimBLE.
+bool ble_config_service_is_pairing_open(void);
+// Un téléphone appairé est connecté, lien chiffré avec sa clé.
+bool ble_config_service_phone_linked(void);
+// Fenêtre d'appairage : autorise la création d'un bond. La fermeture coupe un
+// lien encore non authentifié mais garde le téléphone appairé connecté.
+esp_err_t ble_config_service_open_pairing(void);
+esp_err_t ble_config_service_close_pairing(void);
 
-// Deletes every NimBLE bond. Call only while the service is closed and no
-// connection is active. The next explicit open will require fresh pairing.
+// Deletes every NimBLE bond. Call only while pairing is closed and no
+// connection is active. Every phone will then need to pair again.
 esp_err_t ble_config_service_forget_bonds(void);
 
 // Settings written over BLE are validated by settings_update and then queued

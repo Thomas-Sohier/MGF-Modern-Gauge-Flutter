@@ -37,6 +37,8 @@ typedef struct {
 bool ble_config_settings_encode(const app_settings_t *settings,
                                 uint8_t *payload, size_t capacity,
                                 size_t *payload_size);
+// startup_page is not carried by protocol v1: decode leaves it at
+// APP_SETTINGS_STARTUP_LAST_PAGE and the application must keep its own value.
 ble_config_parse_result_t ble_config_settings_decode(
     const uint8_t *payload, size_t payload_size, app_settings_t *settings);
 

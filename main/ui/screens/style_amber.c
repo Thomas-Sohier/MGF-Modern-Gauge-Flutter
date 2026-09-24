@@ -4,6 +4,7 @@
 #include "ui/themes/ui_theme.h"
 #include "ui/widgets/amber_ui.h"
 #include "ui/widgets/amber_value.h"
+#include "ui/widgets/amber_kit.h"
 #include "ui/ui_layout.h"
 #include "domain/value_smoothing.h"
 
@@ -70,6 +71,13 @@ static const ind_def_t kInd[M_COUNT] = {
     {DASH_ICON_OBD_LINK,275.0f,  190.333f, 225.333f},
 };
 #define IND_ICON_SZ   48.0f
+// Décalage entre le centre de boîte des labels et le centre des capitales.
+#define IND_CAP_DY    1.0f
+
+static const char *unit_of(int index, app_settings_units_t units) {
+    if (index == M_BATTERY) return "V";
+    return units == APP_SETTINGS_UNITS_IMPERIAL ? "°F" : "°C";
+}
 
 // ── État / mise à l'échelle ──────────────────────────────────────────────────
 struct amber_screen_s {
@@ -78,6 +86,8 @@ struct amber_screen_s {
     amber_value_widget_t *value;
     amber_value_widget_t *unit;
     amber_value_widget_t *ind_value[M_COUNT];
+    // Mesures physiques : valeur + unité réduite (vrai « ° » vectoriel).
+    amber_readout_t readout[M_COUNT];
     lv_obj_t *icons[M_COUNT];
     float rpm;
     float rpm_smoothed;     // valeur affichée, lissée entre deux trames ECU
@@ -174,7 +184,10 @@ static void canvas_draw_cb(lv_event_t *e) {
     amber_screen_t *scr = lv_obj_get_user_data(obj);
     if (scr == NULL) return;
 
-    const float prog = LV_CLAMP(0.0f, (scr->rpm - RPM_MIN) / (RPM_MAX - RPM_MIN), 1.0f);
+    // LV_CLAMP(0, NAN, 1) vaut 1 : une ECU absente allumerait tout le cadran.
+    const float prog = isfinite(scr->rpm)
+        ? LV_CLAMP(0.0f, (scr->rpm - RPM_MIN) / (RPM_MAX - RPM_MIN), 1.0f)
+        : 0.0f;
     const int bright = (int)lroundf(prog * SEG_COUNT);
 
     // Dessin direct des 26 barres
@@ -247,10 +260,18 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
         amber_ui_place_centered(scr->icons[i], parent, kInd[i].x,
                                 kInd[i].icon_y, 0.0f, 0.0f);
 
-        scr->ind_value[i] = amber_value_widget_create(
-            parent, amber_ui_font_value(),
-            kInd[i].x, kInd[i].label_y, BOLD_SM, "");
-        if (scr->ind_value[i] == NULL) goto fail;
+        if (i == M_OBD) {
+            scr->ind_value[i] = amber_value_widget_create(
+                parent, amber_ui_font_value(),
+                kInd[i].x, kInd[i].label_y, BOLD_SM, "");
+            if (scr->ind_value[i] == NULL) goto fail;
+        } else if (!amber_readout_create(&scr->readout[i], parent,
+                                         amber_ui_font_value(),
+                                         amber_kit_font_caption(), kInd[i].x,
+                                         kInd[i].label_y + IND_CAP_DY,
+                                         unit_of(i, scr->units))) {
+            goto fail;
+        }
     }
 
     return scr;
@@ -272,19 +293,19 @@ void amber_screen_set_units(amber_screen_t *scr, app_settings_units_t units) {
         return;
     }
     scr->units = units;
+    amber_readout_set_unit(&scr->readout[M_COOLANT], unit_of(M_COOLANT, units));
+    amber_readout_set_unit(&scr->readout[M_OIL], unit_of(M_OIL, units));
     scr->has_snapshot = false;
     if (scr->has_latest_data) amber_screen_update(scr, &scr->latest_data);
 }
 
 // NAN (mesure indisponible) s'affiche « -- » plutôt que « nan°C ».
-static void format_temperature(char *buf, size_t size, float value,
-                               app_settings_units_t units) {
+static void format_temperature(char *buf, size_t size, float value) {
     if (!isfinite(value)) {
         snprintf(buf, size, "--");
         return;
     }
-    snprintf(buf, size, "%.0f°%c", value,
-             units == APP_SETTINGS_UNITS_IMPERIAL ? 'F' : 'C');
+    snprintf(buf, size, "%.0f", value);
 }
 
 void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
@@ -330,20 +351,21 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
         amber_value_widget_set(scr->value, buf);
     }
     if (coolant_display != scr->coolant_display || !scr->has_snapshot) {
-        format_temperature(buf, sizeof(buf), coolant, scr->units);
-        amber_value_widget_set(scr->ind_value[M_COOLANT], buf);
+        format_temperature(buf, sizeof(buf), coolant);
+        amber_readout_set(&scr->readout[M_COOLANT], buf, isfinite(coolant));
     }
     if (battery_display != scr->battery_display || !scr->has_snapshot) {
         if (isfinite(d->battery_voltage)) {
-            snprintf(buf, sizeof(buf), "%.1fV", d->battery_voltage);
+            snprintf(buf, sizeof(buf), "%.1f", d->battery_voltage);
         } else {
             snprintf(buf, sizeof(buf), "--");
         }
-        amber_value_widget_set(scr->ind_value[M_BATTERY], buf);
+        amber_readout_set(&scr->readout[M_BATTERY], buf,
+                          isfinite(d->battery_voltage));
     }
     if (oil_display != scr->oil_display || !scr->has_snapshot) {
-        format_temperature(buf, sizeof(buf), oil, scr->units);
-        amber_value_widget_set(scr->ind_value[M_OIL], buf);
+        format_temperature(buf, sizeof(buf), oil);
+        amber_readout_set(&scr->readout[M_OIL], buf, isfinite(oil));
     }
     if (d->connected != scr->connected_display || !scr->has_snapshot) {
         amber_value_widget_set(scr->ind_value[M_OBD], d->connected ? "OBD" : "--");

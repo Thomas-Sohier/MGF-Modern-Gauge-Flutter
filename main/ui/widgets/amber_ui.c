@@ -25,7 +25,9 @@ lv_obj_t *amber_ui_root_create(lv_obj_t *parent) {
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(root, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_clip_corner(root, true, 0);
-    lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE);
+    // lv_obj_create rend l'objet cliquable : il capterait alors les appuis
+    // destinés au navigateur (tap gauche/droite, maintien réglages).
+    lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     lv_obj_update_layout(root);
     return root;
 }
@@ -37,7 +39,7 @@ lv_obj_t *amber_ui_canvas_create(lv_obj_t *root, void *context,
     if (canvas == NULL) return NULL;
     lv_obj_remove_style_all(canvas);
     lv_obj_set_size(canvas, LV_PCT(100), LV_PCT(100));
-    lv_obj_clear_flag(canvas, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(canvas, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_user_data(canvas, context);
     lv_obj_add_event_cb(canvas, draw_callback, LV_EVENT_DRAW_MAIN, NULL);
     return canvas;

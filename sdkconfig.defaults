@@ -42,11 +42,25 @@ CONFIG_LV_DEF_REFR_PERIOD=30
 CONFIG_LV_FONT_MONTSERRAT_20=y        # fallback si le TTF échoue
 CONFIG_LV_FONT_MONTSERRAT_48=y
 
-# ── Bluetooth : désactivé dans le firmware normal ─────────────────────────────
-# La pile NimBLE coûte ~36 Ko de DIRAM statique, plus son tas au démarrage.
-# L'image de configuration BLE ajoute sdkconfig.ble, cf.
-# docs/ble-config.md.
-CONFIG_BT_ENABLED=n
+# ── Bluetooth : lien permanent avec l'application compagnon ───────────────────
+# NimBLE seul (pas de Bluedroid ni de BT classique, absent de l'ESP32-S3).
+# ~36 Ko de DIRAM statique, cf. docs/ble-config.md.
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_BLUEDROID_ENABLED=n
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_MAX_BONDS=3
+# Bonds conservés en NVS : sans cela le téléphone devrait se ré-appairer à
+# chaque démarrage et la reconnexion automatique serait impossible.
+CONFIG_BT_NIMBLE_NVS_PERSIST=y
+# Périphérique uniquement.
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+# Le JSON du compagnon est décodé dans la tâche hôte (~1,5 Ko de pile).
+CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=6144
+# Écritures longues (JSON jusqu'à 512 octets en « prepare write ») : marge de
+# tampons au-delà des 12 blocs par défaut.
+CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=24
 
 # ── Log ───────────────────────────────────────────────────────────────────────
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y

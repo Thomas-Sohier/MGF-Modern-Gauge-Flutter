@@ -4,6 +4,9 @@
 
 #define DASHBOARD_MAX_PAGES 12
 #define GESTURE_CLICK_SUPPRESSION_MS 300U
+// Maintien volontairement plus long que l'appui long LVGL (400 ms) : un
+// effleurement en roulant ne doit pas ouvrir les réglages.
+#define HOLD_ACTION_MS 1000U
 
 typedef struct {
     lv_obj_t *object;
@@ -22,6 +25,11 @@ struct dashboard_navigator_s {
     uint32_t last_gesture_ms;
     dashboard_page_changed_cb_t page_changed;
     void *page_changed_context;
+    dashboard_hold_cb_t hold;
+    void *hold_context;
+    uint32_t press_started_ms;
+    bool press_is_gesture;
+    bool press_held;
 };
 
 static void update_current(dashboard_navigator_t *navigator, bool force) {
@@ -97,7 +105,33 @@ static void navigation_event_cb(lv_event_t *event) {
     dashboard_navigator_t *navigator = lv_event_get_user_data(event);
     if (navigator == NULL) return;
 
-    if (lv_event_get_code(event) == LV_EVENT_GESTURE) {
+    const lv_event_code_t code = lv_event_get_code(event);
+    if (code == LV_EVENT_PRESSED) {
+        navigator->press_started_ms = lv_tick_get();
+        navigator->press_is_gesture = false;
+        navigator->press_held = false;
+        return;
+    }
+
+    if (code == LV_EVENT_PRESSING) {
+        if (navigator->hold == NULL || navigator->press_held ||
+            navigator->press_is_gesture ||
+            !dashboard_period_elapsed(lv_tick_get(),
+                                      navigator->press_started_ms,
+                                      HOLD_ACTION_MS)) {
+            return;
+        }
+        lv_point_t point;
+        lv_indev_t *indev = lv_event_get_indev(event);
+        if (indev == NULL) return;
+        lv_indev_get_point(indev, &point);
+        if (!point_in_visible_disc(navigator, &point)) return;
+        navigator->press_held = true;
+        navigator->hold(navigator->hold_context);
+        return;
+    }
+
+    if (code == LV_EVENT_GESTURE) {
         lv_indev_t *indev = lv_event_get_indev(event);
         lv_point_t point;
         if (indev == NULL) return;
@@ -105,6 +139,7 @@ static void navigation_event_cb(lv_event_t *event) {
         if (!point_in_visible_disc(navigator, &point)) return;
         const lv_dir_t direction = lv_indev_get_gesture_dir(indev);
         const uint32_t now = lv_tick_get();
+        navigator->press_is_gesture = true;
         if (direction == LV_DIR_LEFT) {
             dashboard_navigator_next(navigator);
             navigator->last_gesture_ms = now;
@@ -115,10 +150,13 @@ static void navigation_event_cb(lv_event_t *event) {
         return;
     }
 
-    if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_CLICKED) {
         // Les contrôles enfants, notamment les boutons musique, gardent leur
         // événement et leur bubbling de geste sans devenir une navigation.
         if (lv_event_get_target(event) != navigator->root) return;
+        // LVGL émet CLICKED au relâcher même après un maintien : ce n'est
+        // pas un tap de navigation.
+        if (navigator->press_held) return;
 
         // LVGL peut ne pas émettre CLICKED après un geste. Le délai borné
         // expire tout de même, et la soustraction reste sûre au wrap du tick.
@@ -164,6 +202,8 @@ dashboard_navigator_t *dashboard_navigator_create(lv_obj_t *parent) {
     navigator->last_gesture_ms = lv_tick_get() - GESTURE_CLICK_SUPPRESSION_MS;
     lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_GESTURE, navigator);
     lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_CLICKED, navigator);
+    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_PRESSED, navigator);
+    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_PRESSING, navigator);
     return navigator;
 }
 
@@ -174,7 +214,9 @@ lv_obj_t *dashboard_navigator_create_page(dashboard_navigator_t *navigator) {
     lv_obj_remove_style_all(page);
     lv_obj_set_size(page, LV_PCT(100), LV_PCT(100));
     lv_obj_center(page);
-    lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE);
+    // Conteneur transparent aux appuis : seuls les contrôles explicites des
+    // pages (boutons musique) interceptent le toucher.
+    lv_obj_clear_flag(page, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     return page;
 }
 
@@ -200,6 +242,14 @@ void dashboard_navigator_set_page_changed_callback(
     if (navigator == NULL) return;
     navigator->page_changed = callback;
     navigator->page_changed_context = context;
+}
+
+void dashboard_navigator_set_hold_callback(dashboard_navigator_t *navigator,
+                                            dashboard_hold_cb_t callback,
+                                            void *context) {
+    if (navigator == NULL) return;
+    navigator->hold = callback;
+    navigator->hold_context = context;
 }
 
 void dashboard_navigator_set_units(dashboard_navigator_t *navigator,

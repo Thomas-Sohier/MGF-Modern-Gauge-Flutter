@@ -2,6 +2,7 @@
 
 #include "ui/themes/ui_theme.h"
 #include "ui/widgets/amber_draw.h"
+#include "ui/widgets/amber_kit.h"
 #include "ui/widgets/amber_ui.h"
 
 #define BOOT_CENTER 160.0f
@@ -115,12 +116,10 @@ boot_screen_t *boot_screen_create(lv_obj_t *parent) {
                                             boot_canvas_draw_cb);
     if (screen->canvas == NULL) goto fail;
 
-    screen->label = amber_ui_label_create(
-        screen->root, amber_ui_font_caption(), ui_theme_amber_dim(),
-        "DEMARRAGE", 0.0f);
+    screen->label = amber_kit_caption(screen->root, "DEMARRAGE");
     if (screen->label == NULL) goto fail;
-    amber_ui_place_centered(screen->label, screen->root, BOOT_CENTER, 224.0f,
-                            0.0f, 0.0f);
+    lv_obj_set_style_text_letter_space(screen->label, 3, 0);
+    amber_kit_place(screen->label, BOOT_CENTER, 222.0f, AMBER_ALIGN_CENTER);
 
     return screen;
 

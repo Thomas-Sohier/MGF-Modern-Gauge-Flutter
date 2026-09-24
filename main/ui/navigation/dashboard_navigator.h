@@ -13,6 +13,7 @@ typedef void (*dashboard_page_destroy_cb_t)(void *context);
 typedef void (*dashboard_page_settings_cb_t)(
     void *context, app_settings_units_t units);
 typedef void (*dashboard_page_changed_cb_t)(void *context, size_t page_index);
+typedef void (*dashboard_hold_cb_t)(void *context);
 
 typedef struct {
     const char *name;
@@ -48,6 +49,11 @@ bool dashboard_navigator_select_page(dashboard_navigator_t *navigator,
 void dashboard_navigator_set_page_changed_callback(
     dashboard_navigator_t *navigator, dashboard_page_changed_cb_t callback,
     void *context);
+// Installe l'action du maintien prolongé (~1 s, doigt immobile, dans le
+// disque visible) : ouverture des réglages. Le relâcher n'est pas un tap.
+void dashboard_navigator_set_hold_callback(dashboard_navigator_t *navigator,
+                                            dashboard_hold_cb_t callback,
+                                            void *context);
 // Propagates the unit preference to pages that display physical quantities.
 // Must run in the LVGL task (or under its platform lock).
 void dashboard_navigator_set_units(dashboard_navigator_t *navigator,

@@ -2,14 +2,25 @@
 
 Application preferences are stored in the ESP-IDF `nvs` partition through
 `main/infrastructure/settings_store.[ch]`. The small typed model currently
-contains brightness (0–100%), selected dashboard page, theme, and units. The
-current defaults are 100% brightness, RPM page, amber theme, and metric units.
+contains brightness (0–100%), last viewed dashboard page, startup page, theme,
+units, and the UTC offset used to display legal time. The current defaults are
+100% brightness, RPM page, startup on the last viewed page, amber theme,
+metric units, and UTC+0.
+
+`utc_offset_minutes` (multiple of 15, −720..+840) comes from the companion
+phone's time sync and is stored as a biased quarter-hour count in one `u8`
+key (`utc_q15`).
+
+`startup_page` is either a fixed page or `APP_SETTINGS_STARTUP_LAST_PAGE`;
+`app_settings_boot_page()` resolves which page to open at boot.
 
 The application schema is versioned (`APP_SETTINGS_SCHEMA_VERSION`). A missing
 namespace, unsupported schema, incomplete record, NVS type mismatch, or invalid
 enum/range is treated as a clean first boot and loaded from defaults. Loading
-does not rewrite flash. Future schema migrations should be added explicitly
-rather than interpreting an unknown version as a current record.
+does not rewrite flash. Schema 1 (no `startup` key) is migrated explicitly in
+memory with "last viewed page", which was its behaviour, and UTC+0; the next save
+rewrites the record as schema 2 even if no value changed. Other versions are
+never guessed.
 
 The intended lifecycle is:
 
@@ -37,8 +48,9 @@ Brightness is mapped from 0–100% to the AW9364's 0–16 discrete levels. Units
 currently update temperatures (°C/°F) and MAP pressure (kPa/psi) on the amber
 RPM, temperatures and admission pages; RPM, voltage, percentages and timing
 values are unchanged. The theme field remains validated and persisted, but the
-only compiled theme is amber. There is still no dedicated on-device settings
-screen; the public runtime setters are the application boundary for one.
+only compiled theme is amber. The on-device settings screen
+(`ui/screens/settings_screen.c`, opened by a ~1 s hold) edits brightness and
+the startup page through the public runtime setters.
 
 The coordinator remains independent of LVGL and NVS. `settings_store_save()`
 remains the only NVS adapter; it skips both `nvs_set_*` calls and `nvs_commit()`

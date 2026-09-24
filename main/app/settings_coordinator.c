@@ -86,6 +86,14 @@ bool settings_coordinator_set_page(settings_coordinator_t *coordinator,
     return settings_coordinator_update(coordinator, &next);
 }
 
+bool settings_coordinator_set_startup_page(settings_coordinator_t *coordinator,
+                                           app_settings_page_t page) {
+    if (coordinator == NULL) return false;
+    app_settings_t next = coordinator->current;
+    next.startup_page = page;
+    return settings_coordinator_update(coordinator, &next);
+}
+
 bool settings_coordinator_set_theme(settings_coordinator_t *coordinator,
                                     app_settings_theme_t theme) {
     if (coordinator == NULL || theme >= APP_SETTINGS_THEME_COUNT) return false;

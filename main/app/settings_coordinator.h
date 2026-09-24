@@ -30,6 +30,9 @@ bool settings_coordinator_set_brightness(settings_coordinator_t *coordinator,
                                           uint8_t brightness_percent);
 bool settings_coordinator_set_page(settings_coordinator_t *coordinator,
                                    app_settings_page_t page);
+// Page fixe, ou APP_SETTINGS_STARTUP_LAST_PAGE pour rouvrir la dernière vue.
+bool settings_coordinator_set_startup_page(settings_coordinator_t *coordinator,
+                                           app_settings_page_t page);
 bool settings_coordinator_set_theme(settings_coordinator_t *coordinator,
                                     app_settings_theme_t theme);
 bool settings_coordinator_set_units(settings_coordinator_t *coordinator,
