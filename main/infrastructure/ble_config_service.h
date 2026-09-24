@@ -10,20 +10,20 @@
 // The service owns neither settings storage nor the RTC. Callbacks execute in
 // the NimBLE host task and must be short and safe to call from that context.
 typedef bool (*ble_config_settings_read_cb)(void *context,
-                                             app_settings_t *settings);
+                                            app_settings_t *settings);
 typedef bool (*ble_config_settings_update_cb)(void *context,
-                                               const app_settings_t *settings);
+                                              const app_settings_t *settings);
 typedef rtc_result_t (*ble_config_datetime_set_cb)(
     void *context, const rtc_datetime_t *date_time,
     ble_config_time_basis_t basis);
 
 // Policy limits are also reflected in sdkconfig.defaults. They are kept here
 // so a client and the firmware have an explicit, reviewable contract.
-#define BLE_CONFIG_DEVICE_NAME_MAX_LENGTH 31U
-#define BLE_CONFIG_MAX_CONNECTIONS 1U
-#define BLE_CONFIG_MAX_BONDS 3U
-#define BLE_CONFIG_REQUIRE_BONDING 1U
-#define BLE_CONFIG_REQUIRE_MITM 0U
+#define BLE_CONFIG_DEVICE_NAME_MAX_LENGTH     31U
+#define BLE_CONFIG_MAX_CONNECTIONS            1U
+#define BLE_CONFIG_MAX_BONDS                  3U
+#define BLE_CONFIG_REQUIRE_BONDING            1U
+#define BLE_CONFIG_REQUIRE_MITM               0U
 #define BLE_CONFIG_REQUIRE_SECURE_CONNECTIONS 1U
 
 // Lien BLE unique de la jauge : service de réglages (0111b043-…) et service

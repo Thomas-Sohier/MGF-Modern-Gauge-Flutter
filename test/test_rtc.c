@@ -12,10 +12,8 @@ static void check(bool condition, const char *message) {
 
 static void test_bcd(void) {
     uint8_t value = 0;
-    check(rtc_bcd_decode(0x00, 59, &value) && value == 0,
-          "BCD zero decodes");
-    check(rtc_bcd_decode(0x59, 59, &value) && value == 59,
-          "BCD 59 decodes");
+    check(rtc_bcd_decode(0x00, 59, &value) && value == 0, "BCD zero decodes");
+    check(rtc_bcd_decode(0x59, 59, &value) && value == 59, "BCD 59 decodes");
     check(rtc_bcd_encode(42) == 0x42, "42 encodes as BCD");
     check(!rtc_bcd_decode(0x6A, 99, &value), "invalid BCD digit rejected");
     check(!rtc_bcd_decode(0x60, 59, &value), "BCD value above bound rejected");
@@ -31,8 +29,13 @@ static void test_calendar(void) {
     check(rtc_days_in_month(2024, 13) == 0, "invalid month has no days");
 
     const rtc_datetime_t valid = {
-        .year = 2024, .month = 2, .day = 29, .weekday = 5,
-        .hour = 23, .minute = 59, .second = 59,
+        .year = 2024,
+        .month = 2,
+        .day = 29,
+        .weekday = 5,
+        .hour = 23,
+        .minute = 59,
+        .second = 59,
     };
     check(rtc_datetime_is_valid(&valid), "leap-day datetime is valid");
 
@@ -47,7 +50,8 @@ static void test_calendar(void) {
     check(!rtc_datetime_is_valid(&invalid), "weekday zero rejected");
     invalid = valid;
     invalid.year = 1999;
-    check(!rtc_datetime_is_valid(&invalid), "year before DS3231 range rejected");
+    check(!rtc_datetime_is_valid(&invalid),
+          "year before DS3231 range rejected");
     check(!rtc_datetime_is_valid(NULL), "NULL datetime rejected");
 }
 

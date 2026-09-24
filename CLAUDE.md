@@ -57,14 +57,16 @@ contre LVGL 9.x sur PC, rend hors-écran et exporte les golden PNG :
 ./build.sh          # compil UI + régénère test/golden/*_amber.png
 ./build.sh clean    # repart de zéro (efface le cache)
 bash test/run_tests.sh  # tests unitaires hôte (domaine, MEMS, K-line, NVS, RTC…)
+tools/format.sh check   # clang-format 23.1.1 : aucun écart attendu
+tools/format.sh         # applique le formatage en place
 ```
 
 LVGL est cloné (v9.2.2) et compilé **une seule fois** en cache
 (`sim/build/lvgl_obj/`) ; les rebuilds ne recompilent que l'UI (~3 s).
 `sim/build_golden.sh` = `./build.sh clean`. Tous les écrans sont rendus en
 **480×480 avec masque circulaire** (`write_png` dans `sim/main_sim.c`).
-La CI (`.github/workflows/ci.yml`) lance `test/run_tests.sh`, puis `./build.sh`
-et refuse tout écart de golden (`git diff -- test/golden`).
+La CI (`.github/workflows/ci.yml`) lance `test/run_tests.sh`, `tools/format.sh check`,
+puis `./build.sh` et refuse tout écart de golden (`git diff -- test/golden`).
 
 **Cible ESP-IDF** :
 
@@ -95,6 +97,7 @@ main/
 sim/                  # harnais de rendu hôte + lv_conf.h
 test/                 # tests hôte (run_tests.sh, mocks ESP-IDF) + golden/
 tools/check_iram.sh   # contrôle de marge IRAM après build IDF
+tools/format.sh       # clang-format (23.1.1) sur les sources C/H du projet
 specs/                # image de réf + pack matériel LILYGO
 docs/                 # K-line MEMS, NVS, BLE, RTC, roadmap LILYGO
 ```

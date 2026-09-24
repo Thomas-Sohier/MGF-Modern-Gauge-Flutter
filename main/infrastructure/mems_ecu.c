@@ -22,15 +22,15 @@ static const char *TAG = "mems_ecu";
 
 struct mems_ecu_s {
     kline_uart_t *kline;
-    mems_reader_t base_reader;    // impl commune (adresses stables : dans le tas)
-    mems19_reader_t reader19;     // décorateur 1.9 (utilisé si variant == 1.9)
+    mems_reader_t base_reader; // impl commune (adresses stables : dans le tas)
+    mems19_reader_t reader19;  // décorateur 1.9 (utilisé si variant == 1.9)
     mems_session_t session;
     uint32_t poll_period_ms;
     uint32_t reconnect_delay_ms;
 
-    SemaphoreHandle_t lock;   // protège `snapshot`
+    SemaphoreHandle_t lock;    // protège `snapshot`
     SemaphoreHandle_t stopped; // signal de fin de la tâche avant libération
-    ecu_data_t snapshot;      // dernier instantané publié
+    ecu_data_t snapshot;       // dernier instantané publié
 
     TaskHandle_t task;
     volatile bool running;
@@ -85,9 +85,8 @@ static void mems_ecu_task(void *arg) {
 }
 
 mems_ecu_t *mems_ecu_create(const mems_ecu_config_t *config) {
-    if (config == NULL ||
-        (config->variant != MEMS_VARIANT_1_6 &&
-         config->variant != MEMS_VARIANT_1_9)) {
+    if (config == NULL || (config->variant != MEMS_VARIANT_1_6 &&
+                           config->variant != MEMS_VARIANT_1_9)) {
         return NULL;
     }
 

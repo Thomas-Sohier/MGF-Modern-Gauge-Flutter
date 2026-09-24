@@ -43,7 +43,8 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
 
 void admission_screen_set_units(admission_screen_t *scr,
                                 app_settings_units_t units) {
-    if (scr == NULL || units >= APP_SETTINGS_UNITS_COUNT || scr->units == units) {
+    if (scr == NULL || units >= APP_SETTINGS_UNITS_COUNT ||
+        scr->units == units) {
         return;
     }
     scr->units = units;
@@ -85,9 +86,8 @@ void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
         amber_page_set_cell(&scr->page, i, text, ok);
     }
 
-    amber_page_set_status(&scr->page,
-                          connected ? "MOTEUR EN LIGNE" : "PAS DE LIAISON",
-                          false);
+    amber_page_set_status(
+        &scr->page, connected ? "MOTEUR EN LIGNE" : "PAS DE LIAISON", false);
 }
 
 void admission_screen_destroy(admission_screen_t *scr) {

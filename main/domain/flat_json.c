@@ -13,13 +13,12 @@ typedef struct {
     char *data;
     size_t capacity; // octets utiles, hors terminateur
     size_t length;
-    bool full;       // une fois tronqué, plus rien n'est ajouté
+    bool full; // une fois tronqué, plus rien n'est ajouté
 } text_buffer_t;
 
 static void skip_space(reader_t *r) {
-    while (r->cursor < r->end &&
-           (*r->cursor == ' ' || *r->cursor == '\t' || *r->cursor == '\n' ||
-            *r->cursor == '\r')) {
+    while (r->cursor < r->end && (*r->cursor == ' ' || *r->cursor == '\t' ||
+                                  *r->cursor == '\n' || *r->cursor == '\r')) {
         r->cursor++;
     }
 }
@@ -74,10 +73,14 @@ static bool read_hex4(reader_t *r, uint32_t *out) {
     for (int i = 0; i < 4; i++) {
         const char c = *r->cursor++;
         value <<= 4;
-        if (c >= '0' && c <= '9') value |= (uint32_t)(c - '0');
-        else if (c >= 'a' && c <= 'f') value |= (uint32_t)(c - 'a' + 10);
-        else if (c >= 'A' && c <= 'F') value |= (uint32_t)(c - 'A' + 10);
-        else return false;
+        if (c >= '0' && c <= '9')
+            value |= (uint32_t)(c - '0');
+        else if (c >= 'a' && c <= 'f')
+            value |= (uint32_t)(c - 'a' + 10);
+        else if (c >= 'A' && c <= 'F')
+            value |= (uint32_t)(c - 'A' + 10);
+        else
+            return false;
     }
     *out = value;
     return true;
@@ -106,7 +109,8 @@ static bool read_string(reader_t *r, text_buffer_t *out) {
         if (c < 0x20u) return false; // caractère de contrôle brut interdit
         if (c != '\\') {
             const size_t count = utf8_sequence_length(c);
-            if (count == 0 || (size_t)(r->end - r->cursor) < count) return false;
+            if (count == 0 || (size_t)(r->end - r->cursor) < count)
+                return false;
             for (size_t i = 1; i < count; i++) {
                 if ((((unsigned char)r->cursor[i]) & 0xC0u) != 0x80u) {
                     return false;
@@ -120,14 +124,30 @@ static bool read_string(reader_t *r, text_buffer_t *out) {
         if (r->cursor >= r->end) return false;
         const char escape = *r->cursor++;
         switch (escape) {
-        case '"': append_bytes(out, "\"", 1); break;
-        case '\\': append_bytes(out, "\\", 1); break;
-        case '/': append_bytes(out, "/", 1); break;
-        case 'b': append_bytes(out, "\b", 1); break;
-        case 'f': append_bytes(out, "\f", 1); break;
-        case 'n': append_bytes(out, "\n", 1); break;
-        case 'r': append_bytes(out, "\r", 1); break;
-        case 't': append_bytes(out, "\t", 1); break;
+        case '"':
+            append_bytes(out, "\"", 1);
+            break;
+        case '\\':
+            append_bytes(out, "\\", 1);
+            break;
+        case '/':
+            append_bytes(out, "/", 1);
+            break;
+        case 'b':
+            append_bytes(out, "\b", 1);
+            break;
+        case 'f':
+            append_bytes(out, "\f", 1);
+            break;
+        case 'n':
+            append_bytes(out, "\n", 1);
+            break;
+        case 'r':
+            append_bytes(out, "\r", 1);
+            break;
+        case 't':
+            append_bytes(out, "\t", 1);
+            break;
         case 'u': {
             uint32_t cp;
             if (!read_hex4(r, &cp)) return false;

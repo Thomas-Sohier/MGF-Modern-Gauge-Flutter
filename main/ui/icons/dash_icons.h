@@ -23,20 +23,18 @@ typedef enum {
  * @param size   largeur/hauteur du widget en pixels
  * @param color  couleur de l'icône
  */
-lv_obj_t * dash_icon_create(lv_obj_t * parent,
-                            dash_icon_type_t type,
-                            lv_coord_t size,
-                            lv_color_t color);
+lv_obj_t *dash_icon_create(lv_obj_t *parent, dash_icon_type_t type,
+                           lv_coord_t size, lv_color_t color);
 
 /**
  * Modifie la couleur d'une icône existante.
  */
-void dash_icon_set_color(lv_obj_t * obj, lv_color_t color);
+void dash_icon_set_color(lv_obj_t *obj, lv_color_t color);
 
 /**
  * Modifie la taille carrée du widget.
  */
-void dash_icon_set_size(lv_obj_t * obj, lv_coord_t size);
+void dash_icon_set_size(lv_obj_t *obj, lv_coord_t size);
 
 #ifdef __cplusplus
 }

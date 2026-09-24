@@ -127,9 +127,13 @@ esp_err_t gpio_set_level(int gpio_num, unsigned int level) {
     return ESP_OK;
 }
 
-int64_t esp_timer_get_time(void) { return uart_mock.now_us; }
+int64_t esp_timer_get_time(void) {
+    return uart_mock.now_us;
+}
 
-void vTaskDelay(TickType_t ticks) { uart_mock.now_us += (int64_t)ticks * 1000; }
+void vTaskDelay(TickType_t ticks) {
+    uart_mock.now_us += (int64_t)ticks * 1000;
+}
 
 static kline_uart_config_t valid_config(bool local_echo) {
     return (kline_uart_config_t){

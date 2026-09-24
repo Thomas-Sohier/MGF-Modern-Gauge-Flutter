@@ -13,16 +13,16 @@
 // à 12 h, sens horaire) ; le centre porte titre, artiste, temps et l'état de
 // lecture. Le lien BLE est à sens unique (téléphone -> jauge) : la pastille
 // centrale est un indicateur, pas une commande.
-#define RING_R_OUT          157.0f
-#define RING_WIDTH            8.0f
-#define TRACK_Y              92.0f
-#define ARTIST_Y            119.0f
-#define RULE_Y              137.0f
-#define TIME_Y              156.0f
-#define STATE_Y             212.0f
-#define STATE_RADIUS         27.0f
-#define TRACK_WIDTH         250.0f
-#define ARTIST_WIDTH        230.0f
+#define RING_R_OUT   157.0f
+#define RING_WIDTH   8.0f
+#define TRACK_Y      92.0f
+#define ARTIST_Y     119.0f
+#define RULE_Y       137.0f
+#define TIME_Y       156.0f
+#define STATE_Y      212.0f
+#define STATE_RADIUS 27.0f
+#define TRACK_WIDTH  250.0f
+#define ARTIST_WIDTH 230.0f
 
 struct music_screen_s {
     amber_page_t page;
@@ -95,8 +95,8 @@ static void format_time(char *out, size_t size, int64_t ms) {
     const int64_t total = ms / 1000;
     const int64_t hours = total / 3600;
     if (hours > 0) {
-        snprintf(out, size, "%d:%02d:%02d", (int)hours, (int)((total / 60) % 60),
-                 (int)(total % 60));
+        snprintf(out, size, "%d:%02d:%02d", (int)hours,
+                 (int)((total / 60) % 60), (int)(total % 60));
     } else {
         snprintf(out, size, "%02d:%02d", (int)(total / 60), (int)(total % 60));
     }
@@ -114,15 +114,18 @@ static void place_times(music_screen_t *scr) {
 // change (une fois par seconde en lecture).
 static void refresh_progress(music_screen_t *scr, uint32_t now_ms) {
     const bool active = scr->has_media && scr->linked;
-    const int64_t position = active
-        ? companion_media_position_at(&scr->media, scr->received_ms, now_ms)
-        : -1;
-    const int64_t duration = active && scr->media.duration_ms > 0
-        ? scr->media.duration_ms : -1;
+    const int64_t position =
+        active
+            ? companion_media_position_at(&scr->media, scr->received_ms, now_ms)
+            : -1;
+    const int64_t duration =
+        active && scr->media.duration_ms > 0 ? scr->media.duration_ms : -1;
     const int64_t seconds = position < 0 ? -1 : position / 1000;
     // Quantifiée à la seconde : un seul redessin par seconde en lecture.
-    const float progress = seconds >= 0 && duration > 0
-        ? (float)((double)(seconds * 1000) / (double)duration) : -1.0f;
+    const float progress =
+        seconds >= 0 && duration > 0
+            ? (float)((double)(seconds * 1000) / (double)duration)
+            : -1.0f;
 
     char text[16];
     format_time(text, sizeof(text), position);
@@ -140,18 +143,19 @@ static void refresh_progress(music_screen_t *scr, uint32_t now_ms) {
 
 static void refresh_texts(music_screen_t *scr) {
     const bool active = scr->has_media && scr->linked;
-    const char *title = !scr->linked ? "TELEPHONE"
-                        : !scr->has_media ? "AUCUN MEDIA"
+    const char *title = !scr->linked                  ? "TELEPHONE"
+                        : !scr->has_media             ? "AUCUN MEDIA"
                         : scr->media.title[0] != '\0' ? scr->media.title
-                        : "SANS TITRE";
+                                                      : "SANS TITRE";
     if (amber_kit_set_text(scr->track, title)) {
         amber_kit_place(scr->track, AMBER_KIT_CX, TRACK_Y, AMBER_ALIGN_CENTER);
     }
-    lv_obj_set_style_text_color(scr->track, active ? ui_theme_amber_bright()
-                                                   : ui_theme_amber_separator(),
-                                0);
+    lv_obj_set_style_text_color(
+        scr->track,
+        active ? ui_theme_amber_bright() : ui_theme_amber_separator(), 0);
     const char *artist = !scr->linked ? "NON CONNECTE"
-                         : active ? scr->media.artist : "";
+                         : active     ? scr->media.artist
+                                      : "";
     if (amber_kit_set_text(scr->artist, artist)) {
         amber_kit_place(scr->artist, AMBER_KIT_CX, ARTIST_Y,
                         AMBER_ALIGN_CENTER);
@@ -196,8 +200,8 @@ music_screen_t *music_screen_create(lv_obj_t *parent) {
     lv_obj_add_flag(scr->page.hero.value, LV_OBJ_FLAG_HIDDEN);
 
     lv_obj_t *root = scr->page.root;
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(root),
-                                             lv_obj_get_height(root));
+    const ui_layout_t layout =
+        ui_layout_fit(lv_obj_get_width(root), lv_obj_get_height(root));
     scr->track = amber_kit_label(root, amber_kit_font_value(),
                                  ui_theme_amber_bright(), "");
     scr->artist = amber_kit_caption(root, "");
@@ -213,7 +217,8 @@ music_screen_t *music_screen_create(lv_obj_t *parent) {
     }
     lv_obj_set_width(scr->track, (int32_t)lroundf(TRACK_WIDTH * layout.scale));
     lv_label_set_long_mode(scr->track, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(scr->artist, (int32_t)lroundf(ARTIST_WIDTH * layout.scale));
+    lv_obj_set_width(scr->artist,
+                     (int32_t)lroundf(ARTIST_WIDTH * layout.scale));
     lv_label_set_long_mode(scr->artist, LV_LABEL_LONG_DOT);
     place_times(scr);
     refresh_texts(scr);
@@ -224,8 +229,8 @@ fail:
     return NULL;
 }
 
-void music_screen_set_media(music_screen_t *scr,
-                            const companion_media_t *media, uint32_t now_ms) {
+void music_screen_set_media(music_screen_t *scr, const companion_media_t *media,
+                            uint32_t now_ms) {
     if (scr == NULL) return;
     scr->has_media = media != NULL;
     if (media != NULL) {
@@ -237,8 +242,7 @@ void music_screen_set_media(music_screen_t *scr,
     amber_page_invalidate(&scr->page);
 }
 
-void music_screen_set_link(music_screen_t *scr, bool linked,
-                           uint32_t now_ms) {
+void music_screen_set_link(music_screen_t *scr, bool linked, uint32_t now_ms) {
     if (scr == NULL || scr->linked == linked) return;
     scr->linked = linked;
     refresh_texts(scr);

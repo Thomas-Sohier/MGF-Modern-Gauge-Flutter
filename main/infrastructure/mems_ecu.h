@@ -8,8 +8,8 @@
 // Variante d'ECU. MEMS 1.6 et 1.9 partagent le même protocole ; la 1.9 exige un
 // réveil 5 bauds préalable (géré par le décorateur `mems19_reader`).
 typedef enum {
-    MEMS_VARIANT_1_6 = 0,  // handshake direct
-    MEMS_VARIANT_1_9 = 1,  // réveil 5 bauds puis handshake
+    MEMS_VARIANT_1_6 = 0, // handshake direct
+    MEMS_VARIANT_1_9 = 1, // réveil 5 bauds puis handshake
 } mems_variant_t;
 
 // Source ECU réelle : dialogue MEMS sur K-line depuis une tâche FreeRTOS
@@ -21,10 +21,10 @@ typedef enum {
 typedef struct mems_ecu_s mems_ecu_t;
 
 typedef struct {
-    kline_uart_config_t kline;  // brochage/UART du transceiver K-line
-    mems_variant_t variant;     // MEMS 1.6 (défaut) ou 1.9 (réveil 5 bauds)
-    uint32_t poll_period_ms;    // 0 => 200 ms
-    uint32_t reconnect_delay_ms;// 0 => 1000 ms
+    kline_uart_config_t kline;   // brochage/UART du transceiver K-line
+    mems_variant_t variant;      // MEMS 1.6 (défaut) ou 1.9 (réveil 5 bauds)
+    uint32_t poll_period_ms;     // 0 => 200 ms
+    uint32_t reconnect_delay_ms; // 0 => 1000 ms
 } mems_ecu_config_t;
 
 // Crée l'instance (UART + session), sans démarrer la tâche.

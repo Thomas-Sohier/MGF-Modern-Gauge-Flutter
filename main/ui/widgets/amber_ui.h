@@ -19,6 +19,6 @@ const lv_font_t *amber_ui_font_value(void);
 const lv_font_t *amber_ui_font_caption(void);
 float amber_ui_bold_spread(unsigned physical_pixels);
 
-void amber_ui_place_centered(lv_obj_t *object, lv_obj_t *parent,
-                             float x, float y, float logical_width,
+void amber_ui_place_centered(lv_obj_t *object, lv_obj_t *parent, float x,
+                             float y, float logical_width,
                              float logical_x_offset);

@@ -66,7 +66,8 @@ esp_err_t nvs_open(const char *namespace_name, nvs_open_mode_t open_mode,
     return ESP_OK;
 }
 
-esp_err_t nvs_get_u32(nvs_handle_t handle, const char *key, uint32_t *out_value) {
+esp_err_t nvs_get_u32(nvs_handle_t handle, const char *key,
+                      uint32_t *out_value) {
     (void)handle;
     assert(strcmp(key, "schema") == 0);
     if (g_nvs.schema_error != ESP_OK) return g_nvs.schema_error;

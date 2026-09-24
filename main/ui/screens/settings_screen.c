@@ -13,28 +13,28 @@
 // Trois réglages empilés dans le repère 320, chacun avec sa légende :
 // luminosité (−, 16 crans du AW9364, +), page de démarrage (‹ nom ›) et
 // fenêtre Bluetooth (pilule d'état). Le bouton OK referme la surimpression.
-#define CX                 160.0f
-#define BRIGHT_CAP_Y        84.0f
-#define BRIGHT_ROW_Y       108.0f
-#define RULE_1_Y           132.0f
-#define STARTUP_CAP_Y      150.0f
-#define STARTUP_ROW_Y      174.0f
-#define RULE_2_Y           198.0f
-#define BLE_CAP_Y          216.0f
-#define BLE_ROW_Y          242.0f
-#define OK_Y               286.0f
+#define CX            160.0f
+#define BRIGHT_CAP_Y  84.0f
+#define BRIGHT_ROW_Y  108.0f
+#define RULE_1_Y      132.0f
+#define STARTUP_CAP_Y 150.0f
+#define STARTUP_ROW_Y 174.0f
+#define RULE_2_Y      198.0f
+#define BLE_CAP_Y     216.0f
+#define BLE_ROW_Y     242.0f
+#define OK_Y          286.0f
 
-#define SIDE_LEFT           64.0f
-#define SIDE_RIGHT         256.0f
-#define SIDE_RADIUS         16.0f
-#define OK_RADIUS           19.0f
-#define STEPS_LEFT          92.0f
-#define STEPS_RIGHT        228.0f
-#define STEP_GAP             2.0f
-#define STEP_HEIGHT         16.0f
-#define PILL_WIDTH         172.0f
-#define PILL_HEIGHT         32.0f
-#define TARGET_SIZE         48.0f
+#define SIDE_LEFT   64.0f
+#define SIDE_RIGHT  256.0f
+#define SIDE_RADIUS 16.0f
+#define OK_RADIUS   19.0f
+#define STEPS_LEFT  92.0f
+#define STEPS_RIGHT 228.0f
+#define STEP_GAP    2.0f
+#define STEP_HEIGHT 16.0f
+#define PILL_WIDTH  172.0f
+#define PILL_HEIGHT 32.0f
+#define TARGET_SIZE 48.0f
 
 struct settings_screen_s {
     settings_screen_actions_t actions;
@@ -100,8 +100,8 @@ static void draw_rounded_rect(lv_layer_t *layer, const ui_layout_t *layout,
     lv_draw_rect(layer, &dsc, &area);
 }
 
-static void draw_chevron(lv_layer_t *layer, const ui_layout_t *layout,
-                         float x, float y, bool right, lv_color_t color) {
+static void draw_chevron(lv_layer_t *layer, const ui_layout_t *layout, float x,
+                         float y, bool right, lv_color_t color) {
     const float d = right ? 1.0f : -1.0f;
     amber_draw_line(layer, layout, x - d * 3.0f, y - 7.0f, x + d * 4.0f, y,
                     2.4f, color, true);
@@ -131,9 +131,8 @@ static void draw_brightness(lv_layer_t *layer, const ui_layout_t *layout,
     amber_draw_line(layer, layout, SIDE_RIGHT - 6.0f, BRIGHT_ROW_Y,
                     SIDE_RIGHT + 6.0f, BRIGHT_ROW_Y, 2.4f,
                     can_raise ? bright : dim, true);
-    amber_draw_line(layer, layout, SIDE_RIGHT, BRIGHT_ROW_Y - 6.0f,
-                    SIDE_RIGHT, BRIGHT_ROW_Y + 6.0f, 2.4f,
-                    can_raise ? bright : dim, true);
+    amber_draw_line(layer, layout, SIDE_RIGHT, BRIGHT_ROW_Y - 6.0f, SIDE_RIGHT,
+                    BRIGHT_ROW_Y + 6.0f, 2.4f, can_raise ? bright : dim, true);
 
     // Un cran par niveau matériel, hauteur croissante : lecture immédiate de
     // la position dans la plage.
@@ -141,8 +140,9 @@ static void draw_brightness(lv_layer_t *layer, const ui_layout_t *layout,
     const float width = pitch - STEP_GAP;
     for (unsigned i = 0; i < DISPLAY_BRIGHTNESS_LEVELS; i++) {
         const float x = STEPS_LEFT + pitch * (float)i + pitch * 0.5f;
-        const float h = STEP_HEIGHT * (0.45f + 0.55f * (float)i /
-                                       (DISPLAY_BRIGHTNESS_LEVELS - 1U));
+        const float h =
+            STEP_HEIGHT *
+            (0.45f + 0.55f * (float)i / (DISPLAY_BRIGHTNESS_LEVELS - 1U));
         const float bottom = BRIGHT_ROW_Y + STEP_HEIGHT * 0.5f;
         amber_draw_line(layer, layout, x, bottom - h, x, bottom, width,
                         i < scr->level ? bright : dim, false);
@@ -154,17 +154,17 @@ static void draw_bluetooth(lv_layer_t *layer, const ui_layout_t *layout,
     switch (scr->ble_state) {
     case SETTINGS_BLE_OPEN:
     case SETTINGS_BLE_CONNECTED:
-        draw_rounded_rect(layer, layout, CX, BLE_ROW_Y, PILL_WIDTH,
-                          PILL_HEIGHT, ui_theme_amber_bright(), true);
+        draw_rounded_rect(layer, layout, CX, BLE_ROW_Y, PILL_WIDTH, PILL_HEIGHT,
+                          ui_theme_amber_bright(), true);
         break;
     case SETTINGS_BLE_CLOSED:
-        draw_rounded_rect(layer, layout, CX, BLE_ROW_Y, PILL_WIDTH,
-                          PILL_HEIGHT, ui_theme_amber_separator(), false);
+        draw_rounded_rect(layer, layout, CX, BLE_ROW_Y, PILL_WIDTH, PILL_HEIGHT,
+                          ui_theme_amber_separator(), false);
         break;
     case SETTINGS_BLE_UNAVAILABLE:
     default:
-        draw_rounded_rect(layer, layout, CX, BLE_ROW_Y, PILL_WIDTH,
-                          PILL_HEIGHT, ui_theme_amber_dim(), false);
+        draw_rounded_rect(layer, layout, CX, BLE_ROW_Y, PILL_WIDTH, PILL_HEIGHT,
+                          ui_theme_amber_dim(), false);
         break;
     }
 }
@@ -274,10 +274,14 @@ static void button_event_cb(lv_event_t *event) {
     settings_screen_t *scr = lv_event_get_user_data(event);
     if (scr == NULL) return;
 
-    if (target == scr->minus) set_level(scr, (int)scr->level - 1);
-    else if (target == scr->plus) set_level(scr, (int)scr->level + 1);
-    else if (target == scr->previous) step_startup_page(scr, -1);
-    else if (target == scr->next) step_startup_page(scr, 1);
+    if (target == scr->minus)
+        set_level(scr, (int)scr->level - 1);
+    else if (target == scr->plus)
+        set_level(scr, (int)scr->level + 1);
+    else if (target == scr->previous)
+        step_startup_page(scr, -1);
+    else if (target == scr->next)
+        step_startup_page(scr, 1);
     else if (target == scr->bluetooth) {
         // APPAIRER ouvre la fenêtre, un second appui la referme ; téléphone
         // déjà lié ou BLE absent : rien à faire.
@@ -319,8 +323,8 @@ static lv_obj_t *create_target(settings_screen_t *scr, float x, float y,
     lv_obj_set_size(button, pw, ph);
     lv_obj_set_pos(button, (int32_t)lroundf(ui_layout_x(&layout, x)) - pw / 2,
                    (int32_t)lroundf(ui_layout_y(&layout, y)) - ph / 2);
-    lv_obj_clear_flag(button, LV_OBJ_FLAG_SCROLLABLE |
-                                  LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_clear_flag(button,
+                      LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_flag(button, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(button, button_event_cb, LV_EVENT_CLICKED, scr);
     return button;
@@ -336,8 +340,9 @@ static lv_obj_t *create_caption(settings_screen_t *scr, const char *text,
     return label;
 }
 
-settings_screen_t *settings_screen_create(
-    lv_obj_t *parent, const settings_screen_actions_t *actions) {
+settings_screen_t *
+settings_screen_create(lv_obj_t *parent,
+                       const settings_screen_actions_t *actions) {
     if (parent == NULL || actions == NULL) return NULL;
     settings_screen_t *scr = lv_malloc(sizeof(*scr));
     if (scr == NULL) return NULL;
@@ -357,8 +362,8 @@ settings_screen_t *settings_screen_create(
     lv_obj_center(scr->overlay);
     lv_obj_set_style_bg_color(scr->overlay, ui_theme_amber_bg(), 0);
     lv_obj_set_style_bg_opa(scr->overlay, LV_OPA_COVER, 0);
-    lv_obj_clear_flag(scr->overlay, LV_OBJ_FLAG_SCROLLABLE |
-                                        LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_clear_flag(scr->overlay,
+                      LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_obj_add_flag(scr->overlay, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(scr->overlay, overlay_event_cb, LV_EVENT_CLICKED, scr);
     lv_obj_update_layout(scr->overlay);
@@ -395,16 +400,15 @@ settings_screen_t *settings_screen_create(
     refresh_page_name(scr);
     refresh_bluetooth_text(scr);
 
-    scr->minus = create_target(scr, SIDE_LEFT, BRIGHT_ROW_Y, TARGET_SIZE,
-                               TARGET_SIZE);
-    scr->plus = create_target(scr, SIDE_RIGHT, BRIGHT_ROW_Y, TARGET_SIZE,
-                              TARGET_SIZE);
-    scr->previous = create_target(scr, SIDE_LEFT, STARTUP_ROW_Y, TARGET_SIZE,
-                                  TARGET_SIZE);
-    scr->next = create_target(scr, SIDE_RIGHT, STARTUP_ROW_Y, TARGET_SIZE,
-                              TARGET_SIZE);
-    scr->bluetooth = create_target(scr, CX, BLE_ROW_Y, PILL_WIDTH,
-                                   TARGET_SIZE);
+    scr->minus =
+        create_target(scr, SIDE_LEFT, BRIGHT_ROW_Y, TARGET_SIZE, TARGET_SIZE);
+    scr->plus =
+        create_target(scr, SIDE_RIGHT, BRIGHT_ROW_Y, TARGET_SIZE, TARGET_SIZE);
+    scr->previous =
+        create_target(scr, SIDE_LEFT, STARTUP_ROW_Y, TARGET_SIZE, TARGET_SIZE);
+    scr->next =
+        create_target(scr, SIDE_RIGHT, STARTUP_ROW_Y, TARGET_SIZE, TARGET_SIZE);
+    scr->bluetooth = create_target(scr, CX, BLE_ROW_Y, PILL_WIDTH, TARGET_SIZE);
     scr->ok = create_target(scr, CX, OK_Y, TARGET_SIZE, TARGET_SIZE);
     if (scr->minus == NULL || scr->plus == NULL || scr->previous == NULL ||
         scr->next == NULL || scr->bluetooth == NULL || scr->ok == NULL) {

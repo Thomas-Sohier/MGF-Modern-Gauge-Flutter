@@ -33,8 +33,9 @@ bool ble_config_settings_encode(const app_settings_t *settings,
     return true;
 }
 
-ble_config_parse_result_t ble_config_settings_decode(
-    const uint8_t *payload, size_t payload_size, app_settings_t *settings) {
+ble_config_parse_result_t ble_config_settings_decode(const uint8_t *payload,
+                                                     size_t payload_size,
+                                                     app_settings_t *settings) {
     if (payload == NULL || settings == NULL) {
         return BLE_CONFIG_PARSE_INVALID_ARGUMENT;
     }
@@ -84,9 +85,9 @@ bool ble_config_datetime_encode(const ble_config_datetime_t *datetime,
     return true;
 }
 
-ble_config_parse_result_t ble_config_datetime_decode(
-    const uint8_t *payload, size_t payload_size,
-    ble_config_datetime_t *datetime) {
+ble_config_parse_result_t
+ble_config_datetime_decode(const uint8_t *payload, size_t payload_size,
+                           ble_config_datetime_t *datetime) {
     if (payload == NULL || datetime == NULL) {
         return BLE_CONFIG_PARSE_INVALID_ARGUMENT;
     }
@@ -102,15 +103,16 @@ ble_config_parse_result_t ble_config_datetime_decode(
 
     const ble_config_datetime_t decoded = {
         .basis = (ble_config_time_basis_t)payload[1],
-        .date_time = {
-            .year = read_u16_le(&payload[2]),
-            .month = payload[4],
-            .day = payload[5],
-            .weekday = payload[6],
-            .hour = payload[7],
-            .minute = payload[8],
-            .second = payload[9],
-        },
+        .date_time =
+            {
+                .year = read_u16_le(&payload[2]),
+                .month = payload[4],
+                .day = payload[5],
+                .weekday = payload[6],
+                .hour = payload[7],
+                .minute = payload[8],
+                .second = payload[9],
+            },
     };
     if (!rtc_datetime_is_valid(&decoded.date_time)) {
         return BLE_CONFIG_PARSE_INVALID_VALUE;
@@ -122,11 +124,17 @@ ble_config_parse_result_t ble_config_datetime_decode(
 
 const char *ble_config_parse_result_name(ble_config_parse_result_t result) {
     switch (result) {
-    case BLE_CONFIG_PARSE_OK: return "ok";
-    case BLE_CONFIG_PARSE_INVALID_ARGUMENT: return "invalid-argument";
-    case BLE_CONFIG_PARSE_INVALID_LENGTH: return "invalid-length";
-    case BLE_CONFIG_PARSE_UNSUPPORTED_VERSION: return "unsupported-version";
-    case BLE_CONFIG_PARSE_INVALID_VALUE: return "invalid-value";
-    default: return "unknown";
+    case BLE_CONFIG_PARSE_OK:
+        return "ok";
+    case BLE_CONFIG_PARSE_INVALID_ARGUMENT:
+        return "invalid-argument";
+    case BLE_CONFIG_PARSE_INVALID_LENGTH:
+        return "invalid-length";
+    case BLE_CONFIG_PARSE_UNSUPPORTED_VERSION:
+        return "unsupported-version";
+    case BLE_CONFIG_PARSE_INVALID_VALUE:
+        return "invalid-value";
+    default:
+        return "unknown";
     }
 }

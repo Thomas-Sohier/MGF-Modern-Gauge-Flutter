@@ -11,8 +11,8 @@
 // transport puis délègue au lecteur de base ; `send_and_receive` et
 // `disconnect` sont de simples délégations.
 typedef struct {
-    ecu_reader_t base;            // lecteur MEMS commun (délégation)
-    kline_transport_t transport;  // pour le réveil 5 bauds (wake_up)
+    ecu_reader_t base;           // lecteur MEMS commun (délégation)
+    kline_transport_t transport; // pour le réveil 5 bauds (wake_up)
 } mems19_reader_t;
 
 // Initialise le décorateur. `base` est l'interface d'un `mems_reader` ; le

@@ -20,8 +20,8 @@ uint64_t ui_instrumentation_begin(void) {
 
 void ui_instrumentation_end(const char *page, uint64_t started_at) {
     const uint64_t now = (uint64_t)esp_timer_get_time();
-    const uint32_t elapsed_us = now >= started_at
-        ? (uint32_t)(now - started_at) : 0;
+    const uint32_t elapsed_us =
+        now >= started_at ? (uint32_t)(now - started_at) : 0;
     total_us += elapsed_us;
     if (elapsed_us > max_us) max_us = elapsed_us;
     tick_count++;
@@ -29,9 +29,10 @@ void ui_instrumentation_end(const char *page, uint64_t started_at) {
     if (last_log_us == 0) last_log_us = now;
     if (now - last_log_us < LOG_INTERVAL_US) return;
 
-    const uint32_t average_us = tick_count == 0
-        ? 0 : (uint32_t)(total_us / tick_count);
-    ESP_LOGI(TAG, "page=%s ticks=%u ui_us(avg/max)=%u/%u free_int=%u free_psram=%u",
+    const uint32_t average_us =
+        tick_count == 0 ? 0 : (uint32_t)(total_us / tick_count);
+    ESP_LOGI(TAG,
+             "page=%s ticks=%u ui_us(avg/max)=%u/%u free_int=%u free_psram=%u",
              page != NULL ? page : "?", tick_count, average_us, max_us,
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));

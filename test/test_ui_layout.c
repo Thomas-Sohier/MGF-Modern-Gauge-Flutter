@@ -9,7 +9,8 @@ static void close_to(float actual, float expected) {
 }
 
 static void test_target(void) {
-    const ui_layout_t layout = ui_layout_fit(UI_DISPLAY_SIZE_PX, UI_DISPLAY_SIZE_PX);
+    const ui_layout_t layout =
+        ui_layout_fit(UI_DISPLAY_SIZE_PX, UI_DISPLAY_SIZE_PX);
     close_to(layout.scale, 1.5f);
     close_to(layout.ox, 0);
     close_to(layout.oy, 0);

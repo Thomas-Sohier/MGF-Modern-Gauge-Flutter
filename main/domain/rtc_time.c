@@ -36,8 +36,7 @@ uint8_t rtc_days_in_month(uint16_t year, uint8_t month) {
 
 bool rtc_datetime_is_valid(const rtc_datetime_t *date_time) {
     if (date_time == NULL || !valid_year(date_time->year) ||
-        date_time->month < 1 || date_time->month > 12 ||
-        date_time->day < 1 ||
+        date_time->month < 1 || date_time->month > 12 || date_time->day < 1 ||
         date_time->day > rtc_days_in_month(date_time->year, date_time->month) ||
         date_time->weekday < 1 || date_time->weekday > 7 ||
         date_time->hour > 23 || date_time->minute > 59 ||
@@ -62,7 +61,8 @@ static void civil_from_days(int64_t z, int64_t *y, unsigned *m, unsigned *d) {
     z += 719468;
     const int64_t era = (z >= 0 ? z : z - 146096) / 146097;
     const unsigned doe = (unsigned)(z - era * 146097);
-    const unsigned yoe = (doe - doe / 1460u + doe / 36524u - doe / 146096u) / 365u;
+    const unsigned yoe =
+        (doe - doe / 1460u + doe / 36524u - doe / 146096u) / 365u;
     const unsigned doy = doe - (365u * yoe + yoe / 4u - yoe / 100u);
     const unsigned mp = (5u * doy + 2u) / 153u;
     *d = doy - (153u * mp + 2u) / 5u + 1u;
@@ -104,8 +104,8 @@ bool rtc_datetime_to_unix(const rtc_datetime_t *date_time,
         date_time->second > 59) {
         return false;
     }
-    const int64_t days = days_from_civil(date_time->year, date_time->month,
-                                         date_time->day);
+    const int64_t days =
+        days_from_civil(date_time->year, date_time->month, date_time->day);
     *unix_seconds = days * 86400 + date_time->hour * 3600 +
                     date_time->minute * 60 + date_time->second;
     return true;
@@ -120,11 +120,17 @@ bool rtc_datetime_add_minutes(const rtc_datetime_t *utc, int32_t minutes,
 
 const char *rtc_result_name(rtc_result_t result) {
     switch (result) {
-    case RTC_OK: return "ok";
-    case RTC_ERR_INVALID_ARGUMENT: return "invalid-argument";
-    case RTC_ERR_IO: return "io";
-    case RTC_ERR_OSCILLATOR_STOPPED: return "oscillator-stopped";
-    case RTC_ERR_INVALID_TIME: return "invalid-time";
-    default: return "unknown";
+    case RTC_OK:
+        return "ok";
+    case RTC_ERR_INVALID_ARGUMENT:
+        return "invalid-argument";
+    case RTC_ERR_IO:
+        return "io";
+    case RTC_ERR_OSCILLATOR_STOPPED:
+        return "oscillator-stopped";
+    case RTC_ERR_INVALID_TIME:
+        return "invalid-time";
+    default:
+        return "unknown";
     }
 }

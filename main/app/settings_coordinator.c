@@ -22,9 +22,10 @@ static void mark_changed(settings_coordinator_t *coordinator) {
     coordinator->change_sequence++;
 }
 
-settings_coordinator_t *settings_coordinator_create(
-    const app_settings_t *initial, settings_coordinator_save_cb_t save,
-    void *save_context) {
+settings_coordinator_t *
+settings_coordinator_create(const app_settings_t *initial,
+                            settings_coordinator_save_cb_t save,
+                            void *save_context) {
     if (initial == NULL || save == NULL || !app_settings_is_valid(initial)) {
         return NULL;
     }
@@ -43,13 +44,12 @@ void settings_coordinator_destroy(settings_coordinator_t *coordinator) {
     free(coordinator);
 }
 
-const app_settings_t *settings_coordinator_current(
-    const settings_coordinator_t *coordinator) {
+const app_settings_t *
+settings_coordinator_current(const settings_coordinator_t *coordinator) {
     return coordinator == NULL ? NULL : &coordinator->current;
 }
 
-bool settings_coordinator_is_dirty(
-    const settings_coordinator_t *coordinator) {
+bool settings_coordinator_is_dirty(const settings_coordinator_t *coordinator) {
     return coordinator != NULL && coordinator->dirty;
 }
 
@@ -71,7 +71,7 @@ bool settings_coordinator_update(settings_coordinator_t *coordinator,
 }
 
 bool settings_coordinator_set_brightness(settings_coordinator_t *coordinator,
-                                          uint8_t brightness_percent) {
+                                         uint8_t brightness_percent) {
     if (coordinator == NULL || brightness_percent > 100U) return false;
     app_settings_t next = coordinator->current;
     next.brightness_percent = brightness_percent;

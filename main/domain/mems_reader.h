@@ -15,9 +15,9 @@
 // respectivement dans `mems19_reader` et `mems_session`.
 typedef struct {
     kline_transport_t transport;
-    uint32_t read_timeout_ms;          // délai max par lecture d'octet(s)
-    bool connected;                    // vrai après un handshake réussi
-    uint8_t ecu_id[MEMS_RESP_ECU_ID];  // réponse D0 (écho + ID) du dernier init
+    uint32_t read_timeout_ms;         // délai max par lecture d'octet(s)
+    bool connected;                   // vrai après un handshake réussi
+    uint8_t ecu_id[MEMS_RESP_ECU_ID]; // réponse D0 (écho + ID) du dernier init
 } mems_reader_t;
 
 // Initialise le lecteur commun avec un transport et un délai de lecture.

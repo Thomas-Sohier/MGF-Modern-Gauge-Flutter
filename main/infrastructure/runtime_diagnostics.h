@@ -46,15 +46,21 @@ typedef struct {
 typedef bool (*runtime_diagnostics_rgb_counters_cb_t)(
     void *context, runtime_diagnostics_rgb_counters_t *out);
 
-static inline const char *runtime_diagnostics_state_name(
-    runtime_diagnostics_state_t state) {
+static inline const char *
+runtime_diagnostics_state_name(runtime_diagnostics_state_t state) {
     switch (state) {
-    case RUNTIME_DIAGNOSTICS_STATE_DISABLED: return "disabled";
-    case RUNTIME_DIAGNOSTICS_STATE_STARTING: return "starting";
-    case RUNTIME_DIAGNOSTICS_STATE_READY: return "ready";
-    case RUNTIME_DIAGNOSTICS_STATE_DEGRADED: return "degraded";
-    case RUNTIME_DIAGNOSTICS_STATE_ERROR: return "error";
-    default: return "unknown";
+    case RUNTIME_DIAGNOSTICS_STATE_DISABLED:
+        return "disabled";
+    case RUNTIME_DIAGNOSTICS_STATE_STARTING:
+        return "starting";
+    case RUNTIME_DIAGNOSTICS_STATE_READY:
+        return "ready";
+    case RUNTIME_DIAGNOSTICS_STATE_DEGRADED:
+        return "degraded";
+    case RUNTIME_DIAGNOSTICS_STATE_ERROR:
+        return "error";
+    default:
+        return "unknown";
     }
 }
 
@@ -62,40 +68,39 @@ static inline const char *runtime_diagnostics_state_name(
 
 // Starts one low-priority task. It uses a fixed task-status buffer and makes
 // no recurring allocations. The returned object is owned by the caller.
-runtime_diagnostics_t *runtime_diagnostics_start(
-    const runtime_diagnostics_config_t *config);
+runtime_diagnostics_t *
+runtime_diagnostics_start(const runtime_diagnostics_config_t *config);
 void runtime_diagnostics_stop(runtime_diagnostics_t *diagnostics);
 
 // State changes are sampled by the diagnostics task and are not logged by the
 // caller, which keeps startup/callback paths quiet and ISR-safe.
 void runtime_diagnostics_set_service_state(
-    runtime_diagnostics_t *diagnostics,
-    runtime_diagnostics_service_t service,
+    runtime_diagnostics_t *diagnostics, runtime_diagnostics_service_t service,
     runtime_diagnostics_state_t state);
 
 // Optional extension point for a future panel/SoC API that exposes hardware
 // counters. The callback is called from the diagnostics task, never an ISR.
 void runtime_diagnostics_set_rgb_counters_provider(
     runtime_diagnostics_t *diagnostics,
-    runtime_diagnostics_rgb_counters_cb_t provider,
-    void *context);
+    runtime_diagnostics_rgb_counters_cb_t provider, void *context);
 
 #else
 
-static inline runtime_diagnostics_t *runtime_diagnostics_start(
-    const runtime_diagnostics_config_t *config) {
+static inline runtime_diagnostics_t *
+runtime_diagnostics_start(const runtime_diagnostics_config_t *config) {
     (void)config;
     return NULL;
 }
 
-static inline void runtime_diagnostics_stop(runtime_diagnostics_t *diagnostics) {
+static inline void
+runtime_diagnostics_stop(runtime_diagnostics_t *diagnostics) {
     (void)diagnostics;
 }
 
-static inline void runtime_diagnostics_set_service_state(
-    runtime_diagnostics_t *diagnostics,
-    runtime_diagnostics_service_t service,
-    runtime_diagnostics_state_t state) {
+static inline void
+runtime_diagnostics_set_service_state(runtime_diagnostics_t *diagnostics,
+                                      runtime_diagnostics_service_t service,
+                                      runtime_diagnostics_state_t state) {
     (void)diagnostics;
     (void)service;
     (void)state;
@@ -103,8 +108,7 @@ static inline void runtime_diagnostics_set_service_state(
 
 static inline void runtime_diagnostics_set_rgb_counters_provider(
     runtime_diagnostics_t *diagnostics,
-    runtime_diagnostics_rgb_counters_cb_t provider,
-    void *context) {
+    runtime_diagnostics_rgb_counters_cb_t provider, void *context) {
     (void)diagnostics;
     (void)provider;
     (void)context;

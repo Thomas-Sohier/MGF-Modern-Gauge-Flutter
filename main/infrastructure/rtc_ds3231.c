@@ -6,9 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DS3231_REG_SECONDS 0x00u
-#define DS3231_REG_STATUS  0x0Fu
-#define DS3231_STATUS_OSF  0x80u
+#define DS3231_REG_SECONDS    0x00u
+#define DS3231_REG_STATUS     0x0Fu
+#define DS3231_STATUS_OSF     0x80u
 #define DS3231_REGISTER_COUNT 0x10u
 
 struct rtc_s {
@@ -23,7 +23,8 @@ static rtc_result_t map_i2c_error(esp_err_t error) {
 
 static rtc_result_t read_registers(const rtc_t *rtc, uint8_t start,
                                    uint8_t *data, size_t size) {
-    if (rtc == NULL || data == NULL || size == 0 || rtc->bus.write_read == NULL) {
+    if (rtc == NULL || data == NULL || size == 0 ||
+        rtc->bus.write_read == NULL) {
         return RTC_ERR_INVALID_ARGUMENT;
     }
     const esp_err_t error = rtc->bus.write_read(
@@ -41,8 +42,8 @@ static rtc_result_t write_registers(const rtc_t *rtc, uint8_t start,
     if (size > sizeof(buffer) - 1) return RTC_ERR_INVALID_ARGUMENT;
     buffer[0] = start;
     memcpy(&buffer[1], data, size);
-    const esp_err_t error = rtc->bus.write(
-        rtc->bus.context, rtc->address, buffer, size + 1, rtc->timeout_ms);
+    const esp_err_t error = rtc->bus.write(rtc->bus.context, rtc->address,
+                                           buffer, size + 1, rtc->timeout_ms);
     return map_i2c_error(error);
 }
 
@@ -54,8 +55,7 @@ static bool decode_time(const uint8_t *registers, rtc_datetime_t *out) {
     uint8_t month;
     uint8_t year;
 
-    if ((registers[0] & 0x80u) != 0u ||
-        (registers[1] & 0x80u) != 0u ||
+    if ((registers[0] & 0x80u) != 0u || (registers[1] & 0x80u) != 0u ||
         !rtc_bcd_decode(registers[0], 59, &seconds) ||
         !rtc_bcd_decode(registers[1], 59, &minutes) ||
         !rtc_bcd_decode(registers[4] & 0x3Fu, 31, &day) ||
@@ -70,7 +70,8 @@ static bool decode_time(const uint8_t *registers, rtc_datetime_t *out) {
     if ((registers[2] & 0x40u) != 0u) {
         const uint8_t hour_bcd = registers[2] & 0x1Fu;
         uint8_t hour_12;
-        if (!rtc_bcd_decode(hour_bcd, 12, &hour_12) || hour_12 == 0) return false;
+        if (!rtc_bcd_decode(hour_bcd, 12, &hour_12) || hour_12 == 0)
+            return false;
         const bool pm = (registers[2] & 0x20u) != 0u;
         hours = (uint8_t)(hour_12 % 12u + (pm ? 12u : 0u));
     } else if (!rtc_bcd_decode(registers[2], 23, &hours)) {
@@ -102,8 +103,7 @@ static void encode_time(const rtc_datetime_t *date_time, uint8_t *registers) {
 rtc_t *ds3231_create(const ds3231_config_t *config) {
     if (config == NULL ||
         (config->address != 0 && config->address != DS3231_I2C_ADDRESS) ||
-        config->bus.write == NULL ||
-        config->bus.write_read == NULL ||
+        config->bus.write == NULL || config->bus.write_read == NULL ||
         // This guard prevents accidentally probing the current Waveshare bus.
         // The LILYGO display branch must export the GPIO8/GPIO48 bus here.
         config->bus.sda_gpio != DS3231_I2C_SDA_GPIO ||
@@ -123,23 +123,22 @@ rtc_result_t rtc_probe(rtc_t *rtc) {
     if (rtc == NULL) return RTC_ERR_INVALID_ARGUMENT;
 
     uint8_t registers[DS3231_REGISTER_COUNT];
-    const rtc_result_t result = read_registers(
-        rtc, DS3231_REG_SECONDS, registers, sizeof(registers));
+    const rtc_result_t result =
+        read_registers(rtc, DS3231_REG_SECONDS, registers, sizeof(registers));
     if (result != RTC_OK) return result;
     if ((registers[DS3231_REG_STATUS] & DS3231_STATUS_OSF) != 0u) {
         return RTC_ERR_OSCILLATOR_STOPPED;
     }
-    return decode_time(registers, &(rtc_datetime_t){0})
-               ? RTC_OK
-               : RTC_ERR_INVALID_TIME;
+    return decode_time(registers, &(rtc_datetime_t){0}) ? RTC_OK
+                                                        : RTC_ERR_INVALID_TIME;
 }
 
 rtc_result_t rtc_read(rtc_t *rtc, rtc_datetime_t *out) {
     if (rtc == NULL || out == NULL) return RTC_ERR_INVALID_ARGUMENT;
 
     uint8_t registers[DS3231_REGISTER_COUNT];
-    const rtc_result_t result = read_registers(
-        rtc, DS3231_REG_SECONDS, registers, sizeof(registers));
+    const rtc_result_t result =
+        read_registers(rtc, DS3231_REG_SECONDS, registers, sizeof(registers));
     if (result != RTC_OK) return result;
     if ((registers[DS3231_REG_STATUS] & DS3231_STATUS_OSF) != 0u) {
         return RTC_ERR_OSCILLATOR_STOPPED;
@@ -157,7 +156,8 @@ rtc_result_t rtc_set(rtc_t *rtc, const rtc_datetime_t *date_time) {
 
     uint8_t registers[7];
     encode_time(date_time, registers);
-    result = write_registers(rtc, DS3231_REG_SECONDS, registers, sizeof(registers));
+    result =
+        write_registers(rtc, DS3231_REG_SECONDS, registers, sizeof(registers));
     if (result != RTC_OK) return result;
 
     status &= (uint8_t)~DS3231_STATUS_OSF;

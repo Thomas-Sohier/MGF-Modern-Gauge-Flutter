@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define APP_SETTINGS_SCHEMA_VERSION 2U
+#define APP_SETTINGS_SCHEMA_VERSION             2U
 #define APP_SETTINGS_DEFAULT_BRIGHTNESS_PERCENT 100U
 
 typedef enum {
@@ -23,7 +23,7 @@ typedef enum {
 
 // Valeur de startup_page : rouvrir la dernière page vue (comportement du
 // schéma 1). Toute autre valeur < APP_SETTINGS_PAGE_COUNT est une page fixe.
-#define APP_SETTINGS_STARTUP_LAST_PAGE \
+#define APP_SETTINGS_STARTUP_LAST_PAGE                                         \
     ((app_settings_page_t)APP_SETTINGS_PAGE_COUNT)
 
 typedef enum {
@@ -39,8 +39,8 @@ typedef enum {
 
 typedef struct {
     uint8_t brightness_percent;
-    app_settings_page_t selected_page;   // dernière page vue
-    app_settings_page_t startup_page;    // page fixe ou STARTUP_LAST_PAGE
+    app_settings_page_t selected_page; // dernière page vue
+    app_settings_page_t startup_page;  // page fixe ou STARTUP_LAST_PAGE
     app_settings_theme_t theme;
     app_settings_units_t units;
     // Décalage UTC -> heure légale (fuseau + heure d'été), fourni par le

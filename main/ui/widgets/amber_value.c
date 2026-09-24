@@ -33,7 +33,7 @@ static void place_centered(lv_obj_t *label, const amber_value_widget_t *value,
     lv_obj_update_layout(label);
 
     const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(value->parent),
-                                              lv_obj_get_height(value->parent));
+                                             lv_obj_get_height(value->parent));
     // Spread is specified in physical pixels at the target resolution.
     const int32_t offset = (int32_t)lroundf(
         dx * layout.scale * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX);
@@ -41,8 +41,10 @@ static void place_centered(lv_obj_t *label, const amber_value_widget_t *value,
     const int32_t label_h = lv_obj_get_height(label);
 
     lv_obj_align(label, LV_ALIGN_TOP_LEFT,
-                 (int32_t)lroundf(ui_layout_x(&layout, value->ref_x)) - label_w / 2 + offset,
-                 (int32_t)lroundf(ui_layout_y(&layout, value->ref_y)) - label_h / 2);
+                 (int32_t)lroundf(ui_layout_x(&layout, value->ref_x)) -
+                     label_w / 2 + offset,
+                 (int32_t)lroundf(ui_layout_y(&layout, value->ref_y)) -
+                     label_h / 2);
 }
 
 amber_value_widget_t *amber_value_widget_create(lv_obj_t *parent,

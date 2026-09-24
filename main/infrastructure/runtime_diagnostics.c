@@ -11,10 +11,10 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
-#define DEFAULT_PERIOD_MS 5000U
-#define DIAGNOSTICS_TASK_STACK 4096U
+#define DEFAULT_PERIOD_MS         5000U
+#define DIAGNOSTICS_TASK_STACK    4096U
 #define DIAGNOSTICS_TASK_PRIORITY (tskIDLE_PRIORITY + 1U)
-#define MAX_TASKS_SNAPSHOT 32U
+#define MAX_TASKS_SNAPSHOT        32U
 
 static const char *TAG = "mgf_diag";
 static portMUX_TYPE s_state_lock = portMUX_INITIALIZER_UNLOCKED;
@@ -25,7 +25,8 @@ struct runtime_diagnostics_s {
     SemaphoreHandle_t stopped;
     volatile bool running;
     uint32_t period_ms;
-    runtime_diagnostics_state_t service_states[RUNTIME_DIAGNOSTICS_SERVICE_COUNT];
+    runtime_diagnostics_state_t
+        service_states[RUNTIME_DIAGNOSTICS_SERVICE_COUNT];
     runtime_diagnostics_rgb_counters_cb_t rgb_provider;
     void *rgb_context;
 };
@@ -33,12 +34,18 @@ struct runtime_diagnostics_s {
 #if defined(configUSE_TRACE_FACILITY) && configUSE_TRACE_FACILITY
 static char task_state_name(eTaskState state) {
     switch (state) {
-    case eRunning: return 'R';
-    case eReady: return 'r';
-    case eBlocked: return 'B';
-    case eSuspended: return 'S';
-    case eDeleted: return 'D';
-    default: return '?';
+    case eRunning:
+        return 'R';
+    case eReady:
+        return 'r';
+    case eBlocked:
+        return 'B';
+    case eSuspended:
+        return 'S';
+    case eDeleted:
+        return 'D';
+    default:
+        return '?';
     }
 }
 #endif
@@ -51,11 +58,11 @@ static void log_task_snapshot(void) {
     static TaskStatus_t task_snapshot[MAX_TASKS_SNAPSHOT];
 
     const UBaseType_t task_count = uxTaskGetNumberOfTasks();
-    const UBaseType_t requested = task_count > MAX_TASKS_SNAPSHOT
-                                      ? MAX_TASKS_SNAPSHOT : task_count;
+    const UBaseType_t requested =
+        task_count > MAX_TASKS_SNAPSHOT ? MAX_TASKS_SNAPSHOT : task_count;
     configRUN_TIME_COUNTER_TYPE total_runtime = 0;
-    const UBaseType_t returned = uxTaskGetSystemState(
-        task_snapshot, requested, &total_runtime);
+    const UBaseType_t returned =
+        uxTaskGetSystemState(task_snapshot, requested, &total_runtime);
 
     ESP_LOGI(TAG, "tasks=%u%s", (unsigned)returned,
              task_count > MAX_TASKS_SNAPSHOT ? " (snapshot truncated)" : "");
@@ -68,7 +75,9 @@ static void log_task_snapshot(void) {
                  (unsigned)task->usStackHighWaterMark);
     }
 #else
-    ESP_LOGW(TAG, "task stack high-water marks unavailable: FreeRTOS trace facility disabled");
+    ESP_LOGW(
+        TAG,
+        "task stack high-water marks unavailable: FreeRTOS trace facility disabled");
 #endif
 }
 
@@ -85,24 +94,23 @@ static void log_snapshot(runtime_diagnostics_t *diagnostics) {
     rgb_context = diagnostics->rgb_context;
     portEXIT_CRITICAL(&s_state_lock);
 
-    ESP_LOGI(TAG,
-             "services display=%s lvgl=%s ecu=%s ble=%s "
-             "heap_int free/min/largest=%u/%u/%u "
-             "psram free/min/largest=%u/%u/%u",
-             runtime_diagnostics_state_name(
-                 states[RUNTIME_DIAGNOSTICS_SERVICE_DISPLAY]),
-             runtime_diagnostics_state_name(
-                 states[RUNTIME_DIAGNOSTICS_SERVICE_LVGL]),
-             runtime_diagnostics_state_name(
-                 states[RUNTIME_DIAGNOSTICS_SERVICE_ECU]),
-             runtime_diagnostics_state_name(
-                 states[RUNTIME_DIAGNOSTICS_SERVICE_BLE]),
-             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-             (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
-             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
-             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-             (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM),
-             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+    ESP_LOGI(
+        TAG,
+        "services display=%s lvgl=%s ecu=%s ble=%s "
+        "heap_int free/min/largest=%u/%u/%u "
+        "psram free/min/largest=%u/%u/%u",
+        runtime_diagnostics_state_name(
+            states[RUNTIME_DIAGNOSTICS_SERVICE_DISPLAY]),
+        runtime_diagnostics_state_name(
+            states[RUNTIME_DIAGNOSTICS_SERVICE_LVGL]),
+        runtime_diagnostics_state_name(states[RUNTIME_DIAGNOSTICS_SERVICE_ECU]),
+        runtime_diagnostics_state_name(states[RUNTIME_DIAGNOSTICS_SERVICE_BLE]),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+        (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+        (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM),
+        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
 
     runtime_diagnostics_rgb_counters_t counters = {0};
     if (rgb_provider != NULL && rgb_provider(rgb_context, &counters) &&
@@ -111,9 +119,8 @@ static void log_snapshot(runtime_diagnostics_t *diagnostics) {
                  (unsigned)counters.underrun_count,
                  (unsigned)counters.frame_error_count);
     } else {
-        ESP_LOGI(TAG,
-                 "rgb counters=unavailable "
-                 "(esp_lcd RGB API exposes no underrun counter)");
+        ESP_LOGI(TAG, "rgb counters=unavailable "
+                      "(esp_lcd RGB API exposes no underrun counter)");
     }
     log_task_snapshot();
 }
@@ -130,15 +137,15 @@ static void diagnostics_task(void *arg) {
     vTaskDelete(NULL);
 }
 
-runtime_diagnostics_t *runtime_diagnostics_start(
-    const runtime_diagnostics_config_t *config) {
+runtime_diagnostics_t *
+runtime_diagnostics_start(const runtime_diagnostics_config_t *config) {
     if (config == NULL || s_instance != NULL) return NULL;
 
     runtime_diagnostics_t *diagnostics = calloc(1, sizeof(*diagnostics));
     if (diagnostics == NULL) return NULL;
 
-    diagnostics->period_ms = config->period_ms > 0
-                                 ? config->period_ms : DEFAULT_PERIOD_MS;
+    diagnostics->period_ms =
+        config->period_ms > 0 ? config->period_ms : DEFAULT_PERIOD_MS;
     diagnostics->service_states[RUNTIME_DIAGNOSTICS_SERVICE_DISPLAY] =
         config->display_state;
     diagnostics->service_states[RUNTIME_DIAGNOSTICS_SERVICE_LVGL] =
@@ -180,8 +187,7 @@ void runtime_diagnostics_stop(runtime_diagnostics_t *diagnostics) {
 }
 
 void runtime_diagnostics_set_service_state(
-    runtime_diagnostics_t *diagnostics,
-    runtime_diagnostics_service_t service,
+    runtime_diagnostics_t *diagnostics, runtime_diagnostics_service_t service,
     runtime_diagnostics_state_t state) {
     if (diagnostics == NULL || service >= RUNTIME_DIAGNOSTICS_SERVICE_COUNT) {
         return;
@@ -193,8 +199,7 @@ void runtime_diagnostics_set_service_state(
 
 void runtime_diagnostics_set_rgb_counters_provider(
     runtime_diagnostics_t *diagnostics,
-    runtime_diagnostics_rgb_counters_cb_t provider,
-    void *context) {
+    runtime_diagnostics_rgb_counters_cb_t provider, void *context) {
     if (diagnostics == NULL) return;
     portENTER_CRITICAL(&s_state_lock);
     diagnostics->rgb_provider = provider;

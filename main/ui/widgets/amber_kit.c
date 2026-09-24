@@ -9,11 +9,11 @@
 #include <stdio.h>
 #include <string.h>
 
-#define DEGREE_UTF8 "\xC2\xB0"
+#define DEGREE_UTF8          "\xC2\xB0"
 #define CAPTION_LETTER_SPACE 1
-#define UNIT_GAP 3.0f          // logique, entre valeur et unité
-#define SEP_W 1.333f           // même trait que les séparateurs du RPM
-#define SEP_GAP 5.0f           // marge aux intersections de la grille
+#define UNIT_GAP             3.0f   // logique, entre valeur et unité
+#define SEP_W                1.333f // même trait que les séparateurs du RPM
+#define SEP_GAP              5.0f   // marge aux intersections de la grille
 
 // ── Polices ─────────────────────────────────────────────────────────────────
 const lv_font_t *amber_kit_font_hero(void) {
@@ -89,8 +89,8 @@ void amber_kit_place(lv_obj_t *label, float x, float y, amber_align_t align) {
     int32_t left = (int32_t)lroundf(px) - width / 2;
     if (align == AMBER_ALIGN_LEFT) left = (int32_t)lroundf(px);
     if (align == AMBER_ALIGN_RIGHT) left = (int32_t)lroundf(px) - width;
-    const int32_t top = (int32_t)lroundf(py + font_cap(font) * 0.5f) -
-                        font_ascent(font);
+    const int32_t top =
+        (int32_t)lroundf(py + font_cap(font) * 0.5f) - font_ascent(font);
     lv_obj_set_pos(label, left, top);
 }
 
@@ -112,8 +112,10 @@ bool amber_kit_set_text(lv_obj_t *label, const char *text) {
 void amber_kit_format(char *buffer, size_t size, bool available,
                       const char *format, float value) {
     if (buffer == NULL || size == 0) return;
-    if (available && isfinite(value)) snprintf(buffer, size, format, value);
-    else snprintf(buffer, size, "--");
+    if (available && isfinite(value))
+        snprintf(buffer, size, format, value);
+    else
+        snprintf(buffer, size, "--");
 }
 
 // ── Lecture valeur + unité ──────────────────────────────────────────────────
@@ -124,10 +126,10 @@ static const char *strip_degree(const char *unit, bool *degree) {
 }
 
 static void readout_colors(amber_readout_t *readout) {
-    const lv_color_t value = readout->available ? ui_theme_amber_bright()
-                                                : ui_theme_amber_dim();
-    const lv_color_t unit = readout->available ? ui_theme_amber_separator()
-                                               : ui_theme_amber_dim();
+    const lv_color_t value =
+        readout->available ? ui_theme_amber_bright() : ui_theme_amber_dim();
+    const lv_color_t unit =
+        readout->available ? ui_theme_amber_separator() : ui_theme_amber_dim();
     lv_obj_set_style_text_color(readout->value, value, 0);
     lv_obj_set_style_text_color(readout->unit, unit, 0);
     if (readout->degree != NULL) {
@@ -143,10 +145,10 @@ bool amber_readout_create(amber_readout_t *readout, lv_obj_t *parent,
                           const char *unit) {
     if (readout == NULL || parent == NULL) return false;
     *readout = (amber_readout_t){.parent = parent, .x = x, .y = y};
-    readout->value = amber_kit_label(parent, value_font, ui_theme_amber_dim(),
-                                     "--");
-    readout->unit = amber_kit_label(parent, unit_font, ui_theme_amber_dim(),
-                                    "");
+    readout->value =
+        amber_kit_label(parent, value_font, ui_theme_amber_dim(), "--");
+    readout->unit =
+        amber_kit_label(parent, unit_font, ui_theme_amber_dim(), "");
     readout->degree = lv_obj_create(parent);
     if (readout->value == NULL || readout->unit == NULL ||
         readout->degree == NULL) {
@@ -166,8 +168,8 @@ void amber_readout_layout(amber_readout_t *readout) {
     const ui_layout_t layout = parent_layout(readout->value);
     const lv_font_t *vf = label_font(readout->value);
     const lv_font_t *uf = label_font(readout->unit);
-    const bool has_degree = !lv_obj_has_flag(readout->degree,
-                                             LV_OBJ_FLAG_HIDDEN);
+    const bool has_degree =
+        !lv_obj_has_flag(readout->degree, LV_OBJ_FLAG_HIDDEN);
     const bool has_unit = lv_label_get_text(readout->unit)[0] != '\0';
 
     lv_obj_update_layout(readout->value);
@@ -177,7 +179,8 @@ void amber_readout_layout(amber_readout_t *readout) {
     const int32_t value_cap = font_cap(vf);
     const int32_t unit_cap = font_cap(uf);
     const int32_t gap = (has_unit || has_degree)
-        ? (int32_t)lroundf(UNIT_GAP * layout.scale) : 0;
+                            ? (int32_t)lroundf(UNIT_GAP * layout.scale)
+                            : 0;
 
     // L'anneau suit la capitale qu'il accompagne : celle de l'unité, ou celle
     // de la valeur lorsqu'il est seul (angle d'avance).
@@ -187,10 +190,10 @@ void amber_readout_layout(amber_readout_t *readout) {
     const int32_t ring_gap = has_degree && has_unit ? LV_MAX(1, ring / 3) : 0;
 
     const int32_t total = value_w + gap + ring + ring_gap + unit_w;
-    const int32_t left = (int32_t)lroundf(ui_layout_x(&layout, readout->x)) -
-                         total / 2;
-    const int32_t baseline = (int32_t)lroundf(
-        ui_layout_y(&layout, readout->y) + value_cap * 0.5f);
+    const int32_t left =
+        (int32_t)lroundf(ui_layout_x(&layout, readout->x)) - total / 2;
+    const int32_t baseline =
+        (int32_t)lroundf(ui_layout_y(&layout, readout->y) + value_cap * 0.5f);
 
     lv_obj_set_pos(readout->value, left, baseline - font_ascent(vf));
     int32_t cursor = left + value_w + gap;
@@ -208,8 +211,10 @@ void amber_readout_set_unit(amber_readout_t *readout, const char *unit) {
     bool degree = false;
     const char *text = strip_degree(unit, &degree);
     lv_label_set_text(readout->unit, text);
-    if (degree) lv_obj_remove_flag(readout->degree, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(readout->degree, LV_OBJ_FLAG_HIDDEN);
+    if (degree)
+        lv_obj_remove_flag(readout->degree, LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(readout->degree, LV_OBJ_FLAG_HIDDEN);
     readout_colors(readout);
     amber_readout_layout(readout);
 }
@@ -237,8 +242,8 @@ void amber_kit_draw_rim(lv_layer_t *layer, const ui_layout_t *layout,
     const lv_color_t off = ui_theme_amber_dim();
 
     for (int i = 0; i < segments; i++) {
-        const float a0 = AMBER_KIT_RIM_START + i * step +
-                         AMBER_KIT_RIM_GAP_DEG * 0.5f;
+        const float a0 =
+            AMBER_KIT_RIM_START + i * step + AMBER_KIT_RIM_GAP_DEG * 0.5f;
         const float a1 = a0 + step - AMBER_KIT_RIM_GAP_DEG;
         const bool lit = active && i >= lit_from && i < lit_to;
         amber_draw_arc_wrapped(layer, layout, AMBER_KIT_CX, AMBER_KIT_CX,
@@ -274,7 +279,8 @@ void amber_kit_draw_hairline(lv_layer_t *layer, const ui_layout_t *layout) {
                            ui_theme_amber_dim(), false);
     // Graduations horaires discrètes : 9 index sur l'arc, extrémités marquées.
     for (int i = 0; i <= 8; i++) {
-        const float angle = AMBER_KIT_RIM_START + i * AMBER_KIT_RIM_SWEEP / 8.0f;
+        const float angle =
+            AMBER_KIT_RIM_START + i * AMBER_KIT_RIM_SWEEP / 8.0f;
         const bool end = i == 0 || i == 8;
         amber_draw_tick(layer, layout, AMBER_KIT_CX, AMBER_KIT_CX, angle,
                         end ? AMBER_KIT_RIM_R_IN - 2.0f : r - 3.0f,
@@ -310,10 +316,10 @@ void amber_kit_draw_grid(lv_layer_t *layer, const ui_layout_t *layout) {
                     AMBER_KIT_GRID_MID_Y - SEP_GAP, SEP_W, sep, false);
     amber_draw_line(layer, layout, cx, AMBER_KIT_GRID_MID_Y + SEP_GAP, cx,
                     AMBER_KIT_GRID_BOT_Y, SEP_W, sep, false);
-    amber_draw_line(layer, layout, 62.0f, AMBER_KIT_GRID_MID_Y,
-                    cx - SEP_GAP, AMBER_KIT_GRID_MID_Y, SEP_W, sep, false);
-    amber_draw_line(layer, layout, cx + SEP_GAP, AMBER_KIT_GRID_MID_Y,
-                    258.0f, AMBER_KIT_GRID_MID_Y, SEP_W, sep, false);
+    amber_draw_line(layer, layout, 62.0f, AMBER_KIT_GRID_MID_Y, cx - SEP_GAP,
+                    AMBER_KIT_GRID_MID_Y, SEP_W, sep, false);
+    amber_draw_line(layer, layout, cx + SEP_GAP, AMBER_KIT_GRID_MID_Y, 258.0f,
+                    AMBER_KIT_GRID_MID_Y, SEP_W, sep, false);
 }
 
 // ── Gabarit de page ─────────────────────────────────────────────────────────
@@ -333,8 +339,7 @@ static void page_draw_cb(lv_event_t *event) {
     } else if (page->rim == AMBER_RIM_HAIRLINE) {
         amber_kit_draw_hairline(layer, &layout);
     }
-    amber_kit_draw_title_rules(layer, &layout, page->title,
-                               AMBER_KIT_TITLE_Y);
+    amber_kit_draw_title_rules(layer, &layout, page->title, AMBER_KIT_TITLE_Y);
     if (page->grid) amber_kit_draw_grid(layer, &layout);
     if (page->draw_extra != NULL) {
         page->draw_extra(layer, &layout, page->context);
@@ -393,8 +398,8 @@ bool amber_page_create(amber_page_t *page, lv_obj_t *parent,
                                       spec->cell_unit[i])) {
                 return false;
             }
-            page->cell_caption[i] = amber_kit_caption(page->root,
-                                                      spec->cell_caption[i]);
+            page->cell_caption[i] =
+                amber_kit_caption(page->root, spec->cell_caption[i]);
             if (page->cell_caption[i] == NULL) return false;
             amber_kit_place(page->cell_caption[i], xs[i], cap_ys[i],
                             AMBER_ALIGN_CENTER);
@@ -422,7 +427,8 @@ void amber_page_set_rim(amber_page_t *page, float from, float to, float marker,
     const int lit_from = (int)lroundf(amber_clampf(from, 0.0f, 1.0f) * n);
     const int lit_to = (int)lroundf(amber_clampf(to, 0.0f, 1.0f) * n);
     const int mark = marker >= 0.0f && isfinite(marker)
-        ? (int)lroundf(amber_clampf(marker, 0.0f, 1.0f) * n) : -1;
+                         ? (int)lroundf(amber_clampf(marker, 0.0f, 1.0f) * n)
+                         : -1;
     if (lit_from == page->rim_from && lit_to == page->rim_to &&
         mark == page->rim_marker && active == page->rim_active) {
         return;
@@ -443,10 +449,10 @@ void amber_page_set_hero_caption(amber_page_t *page, const char *text,
                                  bool emphasized) {
     if (page == NULL || page->hero_caption == NULL) return;
     set_text_color(page->hero_caption, emphasized ? ui_theme_amber_bright()
-                                           : ui_theme_amber_separator());
+                                                  : ui_theme_amber_separator());
     if (amber_kit_set_text(page->hero_caption, text)) {
-        amber_kit_place(page->hero_caption, AMBER_KIT_CX,
-                        AMBER_KIT_HERO_CAP_Y, AMBER_ALIGN_CENTER);
+        amber_kit_place(page->hero_caption, AMBER_KIT_CX, AMBER_KIT_HERO_CAP_Y,
+                        AMBER_ALIGN_CENTER);
     }
 }
 
@@ -462,7 +468,7 @@ void amber_page_set_status(amber_page_t *page, const char *text,
                            bool emphasized) {
     if (page == NULL || page->status == NULL) return;
     set_text_color(page->status, emphasized ? ui_theme_amber_bright()
-                                           : ui_theme_amber_separator());
+                                            : ui_theme_amber_separator());
     if (amber_kit_set_text(page->status, text)) {
         amber_kit_place(page->status, AMBER_KIT_CX, AMBER_KIT_STATUS_Y,
                         AMBER_ALIGN_CENTER);

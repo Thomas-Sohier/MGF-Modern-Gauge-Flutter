@@ -22,8 +22,10 @@
 #define TICK_RADIUS    (CLOCK_RADIUS * 0.87f)
 #define CARDINAL_COUNT 4
 
-static const char *const k_cardinal_text[CARDINAL_COUNT] = {"12", "3", "6", "9"};
-static const float k_cardinal_angle[CARDINAL_COUNT] = {-90.0f, 0.0f, 90.0f, 180.0f};
+static const char *const k_cardinal_text[CARDINAL_COUNT] = {"12", "3", "6",
+                                                            "9"};
+static const float k_cardinal_angle[CARDINAL_COUNT] = {-90.0f, 0.0f, 90.0f,
+                                                       180.0f};
 
 struct clock_screen_s {
     lv_obj_t *root;
@@ -37,8 +39,8 @@ struct clock_screen_s {
 };
 
 static ui_layout_t layout_of(const lv_area_t *area) {
-    ui_layout_t layout = ui_layout_fit(lv_area_get_width(area),
-                                       lv_area_get_height(area));
+    ui_layout_t layout =
+        ui_layout_fit(lv_area_get_width(area), lv_area_get_height(area));
     layout.ox += area->x1;
     layout.oy += area->y1;
     return layout;
@@ -105,8 +107,7 @@ static void draw_face(lv_layer_t *layer, const ui_layout_t *layout) {
 
     // Un seul anneau garde la marge avec le masque circulaire et évite une
     // double bordure qui rivaliserait avec les repères.
-    draw_arc(layer, cx, cy, radius - 1.0f * scale, 1.3f * scale,
-             separator);
+    draw_arc(layer, cx, cy, radius - 1.0f * scale, 1.3f * scale, separator);
 
     for (int i = 0; i < 60; i++) {
         const float angle = (-90.0f + (float)i * 6.0f) * (float)M_PI / 180.0f;
@@ -123,20 +124,19 @@ static void draw_face(lv_layer_t *layer, const ui_layout_t *layout) {
                       cardinal ? bright : separator);
         } else {
             draw_circle(layer, cx + cosine * TICK_RADIUS * scale,
-                        cy + sine * TICK_RADIUS * scale,
-                        0.9f * scale, dim);
+                        cy + sine * TICK_RADIUS * scale, 0.9f * scale, dim);
         }
     }
 }
 
 static void draw_hand(lv_layer_t *layer, float cx, float cy, float angle,
-                      float length, float width, float offset, lv_color_t color) {
+                      float length, float width, float offset,
+                      lv_color_t color) {
     const float radians = angle * (float)M_PI / 180.0f;
     const float x = cosf(radians);
     const float y = sinf(radians);
-    draw_line(layer, cx + offset, cy + offset,
-              cx + x * length + offset, cy + y * length + offset,
-              width, color);
+    draw_line(layer, cx + offset, cy + offset, cx + x * length + offset,
+              cy + y * length + offset, width, color);
 }
 
 static void draw_hands(lv_layer_t *layer, const ui_layout_t *layout,
@@ -145,8 +145,9 @@ static void draw_hands(lv_layer_t *layer, const ui_layout_t *layout,
     const float cy = ui_layout_y(layout, CLOCK_CY);
     const float scale = layout->scale;
     const float radius = CLOCK_RADIUS * scale;
-    const float hour_angle = ((float)(screen->hour % 12) +
-                              (float)screen->minute / 60.0f) * 30.0f - 90.0f;
+    const float hour_angle =
+        ((float)(screen->hour % 12) + (float)screen->minute / 60.0f) * 30.0f -
+        90.0f;
     const float minute_angle = (float)screen->minute * 6.0f - 90.0f;
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
@@ -162,10 +163,10 @@ static void draw_hands(lv_layer_t *layer, const ui_layout_t *layout,
     draw_hand(layer, cx, cy, minute_angle, radius * 0.80f,
               minute_width + 1.6f * scale, 1.0f * scale, dim);
 
-    draw_hand(layer, cx, cy, hour_angle, radius * 0.55f,
-              hour_width, 0.0f, bright);
-    draw_hand(layer, cx, cy, minute_angle, radius * 0.80f,
-              minute_width, 0.0f, bright);
+    draw_hand(layer, cx, cy, hour_angle, radius * 0.55f, hour_width, 0.0f,
+              bright);
+    draw_hand(layer, cx, cy, minute_angle, radius * 0.80f, minute_width, 0.0f,
+              bright);
 
     // Pivot en trois couches : disque séparateur, centre sombre et crêtes
     // radiales inspirées du widget Flutter, toutes en teintes ambre.
@@ -176,11 +177,8 @@ static void draw_hands(lv_layer_t *layer, const ui_layout_t *layout,
         const float angle = (float)i * 30.0f * (float)M_PI / 180.0f;
         const float sine = sinf(angle);
         const float cosine = cosf(angle);
-        draw_line(layer,
-                  cx + cosine * pivot * 0.78f,
-                  cy + sine * pivot * 0.78f,
-                  cx + cosine * pivot * 0.96f,
-                  cy + sine * pivot * 0.96f,
+        draw_line(layer, cx + cosine * pivot * 0.78f, cy + sine * pivot * 0.78f,
+                  cx + cosine * pivot * 0.96f, cy + sine * pivot * 0.96f,
                   0.9f * scale, dim);
     }
 }
@@ -211,7 +209,8 @@ static void hands_draw_cb(lv_event_t *event) {
 // The RTC contract is UTC. The page displays legal time: UTC plus the offset
 // (timezone + DST) last received from the phone. The no-RTC fallback uses
 // the same UTC basis (system time, set by the same phone sync).
-static bool read_clock_time(const clock_screen_t *screen, int *hour, int *minute) {
+static bool read_clock_time(const clock_screen_t *screen, int *hour,
+                            int *minute) {
 #ifdef MGF_SIMULATOR
     (void)screen;
     *hour = 10;
@@ -270,15 +269,16 @@ clock_screen_t *clock_screen_create(lv_obj_t *parent) {
 
     const lv_font_t *font = amber_ui_font_hero();
     for (int i = 0; i < CARDINAL_COUNT; i++) {
-        screen->labels[i] = amber_ui_label_create(
-            screen->root, font, ui_theme_amber_bright(), k_cardinal_text[i], 0.0f);
+        screen->labels[i] =
+            amber_ui_label_create(screen->root, font, ui_theme_amber_bright(),
+                                  k_cardinal_text[i], 0.0f);
         if (screen->labels[i] == NULL) goto fail;
 
         const float angle = k_cardinal_angle[i] * (float)M_PI / 180.0f;
-        amber_ui_place_centered(
-            screen->labels[i], screen->root,
-            CLOCK_CX + cosf(angle) * LABEL_RADIUS,
-            CLOCK_CY + sinf(angle) * LABEL_RADIUS, 0.0f, 0.0f);
+        amber_ui_place_centered(screen->labels[i], screen->root,
+                                CLOCK_CX + cosf(angle) * LABEL_RADIUS,
+                                CLOCK_CY + sinf(angle) * LABEL_RADIUS, 0.0f,
+                                0.0f);
     }
 
     read_clock_time(screen, &screen->hour, &screen->minute);

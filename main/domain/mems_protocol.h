@@ -21,58 +21,58 @@
 // tampons d'octets déjà reçus. Le dialogue est dans `mems_session.[ch]`.
 
 // --- Octets de commande (commands.go) ---------------------------------------
-#define MEMS_CMD_INIT_A   0xCAu  // 1er octet d'init « normale »
-#define MEMS_CMD_INIT_B   0x75u  // 2e octet d'init
-#define MEMS_CMD_HEARTBEAT 0xF4u // heartbeat / bascule mode diag 5
+#define MEMS_CMD_INIT_A      0xCAu // 1er octet d'init « normale »
+#define MEMS_CMD_INIT_B      0x75u // 2e octet d'init
+#define MEMS_CMD_HEARTBEAT   0xF4u // heartbeat / bascule mode diag 5
 #define MEMS_CMD_INIT_ECU_ID 0xD0u // requête ID ECU (dernier pas d'init)
-#define MEMS_CMD_DATA_80  0x80u  // requête trame 0x80 (RPM, temps, batterie…)
-#define MEMS_CMD_DATA_7D  0x7Du  // requête trame 0x7D (papillon, lambda…)
+#define MEMS_CMD_DATA_80     0x80u // requête trame 0x80 (RPM, temps, batterie…)
+#define MEMS_CMD_DATA_7D     0x7Du // requête trame 0x7D (papillon, lambda…)
 
 // Adresse ECU émise lors du réveil 5 bauds (slow init) de MEMS 1.9.
-#define MEMS_ECU_ADDRESS  0x16u
+#define MEMS_ECU_ADDRESS 0x16u
 
 // --- Tailles de réponse attendues, écho de commande inclus (ecureader.go) ---
 // (l'ECU renvoie [écho commande] + [données]).
-#define MEMS_RESP_INIT_A    1u   // CA
-#define MEMS_RESP_INIT_B    1u   // 75
-#define MEMS_RESP_HEARTBEAT 2u   // F4 00
-#define MEMS_RESP_ECU_ID    5u   // D0 99 00 xx 03
-#define MEMS_FRAME_80_LEN   29u  // 80 1C + 27 octets de données
-#define MEMS_FRAME_7D_LEN   33u  // 7D 20 + 31 octets de données
+#define MEMS_RESP_INIT_A    1u  // CA
+#define MEMS_RESP_INIT_B    1u  // 75
+#define MEMS_RESP_HEARTBEAT 2u  // F4 00
+#define MEMS_RESP_ECU_ID    5u  // D0 99 00 xx 03
+#define MEMS_FRAME_80_LEN   29u // 80 1C + 27 octets de données
+#define MEMS_FRAME_7D_LEN   33u // 7D 20 + 31 octets de données
 
 // Instantané « riche » décodé depuis les deux trames MEMS. On garde les champs
 // utiles au tableau de bord et au diagnostic ; les nombreux octets inconnus du
 // protocole ne sont pas exposés. Valeurs déjà converties en unités physiques.
 typedef struct {
     // Trame 0x80
-    int   engine_rpm;            // tr/min (big-endian 16 bits)
-    int   coolant_temp;          // °C (brut - 55)
-    int   ambient_temp;          // °C (brut - 55)
-    int   intake_air_temp;       // °C (brut - 55)
-    int   fuel_temp;             // °C (brut - 55 ; 0xFF => non supporté)
-    float map_kpa;               // pression collecteur (kPa)
-    float battery_voltage;       // V (brut / 10)
-    float throttle_pot_voltage;  // V (brut * 0.02)
-    bool  idle_switch;           // papillon fermé (ralenti)
-    bool  park_neutral_switch;   // point mort / parking
-    uint8_t dtc0;                // codes défaut (bitfield) trame 0x80
+    int engine_rpm;             // tr/min (big-endian 16 bits)
+    int coolant_temp;           // °C (brut - 55)
+    int ambient_temp;           // °C (brut - 55)
+    int intake_air_temp;        // °C (brut - 55)
+    int fuel_temp;              // °C (brut - 55 ; 0xFF => non supporté)
+    float map_kpa;              // pression collecteur (kPa)
+    float battery_voltage;      // V (brut / 10)
+    float throttle_pot_voltage; // V (brut * 0.02)
+    bool idle_switch;           // papillon fermé (ralenti)
+    bool park_neutral_switch;   // point mort / parking
+    uint8_t dtc0;               // codes défaut (bitfield) trame 0x80
     uint8_t dtc1;
-    int   iac_position;          // position moteur pas-à-pas ralenti (0..180)
-    float ignition_advance;      // ° (brut / 2 - 24)
-    float coil_time;             // ms (brut * 0.002)
+    int iac_position;       // position moteur pas-à-pas ralenti (0..180)
+    float ignition_advance; // ° (brut / 2 - 24)
+    float coil_time;        // ms (brut * 0.002)
 
     // Trame 0x7D
-    bool  ignition_switch;
-    int   throttle_angle;        // ° (round(brut * 6 / 10))
-    float air_fuel_ratio;        // (brut / 10)
-    int   lambda_voltage_mv;     // mV (brut * 5)
-    bool  closed_loop;           // régulation lambda en boucle fermée
+    bool ignition_switch;
+    int throttle_angle;    // ° (round(brut * 6 / 10))
+    float air_fuel_ratio;  // (brut / 10)
+    int lambda_voltage_mv; // mV (brut * 5)
+    bool closed_loop;      // régulation lambda en boucle fermée
 
     // Défauts dérivés des bits DTC (rosco.go)
-    bool  coolant_sensor_fault;
-    bool  intake_air_sensor_fault;
-    bool  fuel_pump_fault;
-    bool  throttle_pot_fault;
+    bool coolant_sensor_fault;
+    bool intake_air_sensor_fault;
+    bool fuel_pump_fault;
+    bool throttle_pot_fault;
 } mems_data_t;
 
 // Décode la trame 0x80 (RPM/températures/batterie…). `frame` doit contenir

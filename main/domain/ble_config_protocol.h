@@ -7,7 +7,7 @@
 #include "domain/app_settings.h"
 #include "domain/rtc.h"
 
-#define BLE_CONFIG_PROTOCOL_VERSION 1U
+#define BLE_CONFIG_PROTOCOL_VERSION      1U
 #define BLE_CONFIG_SETTINGS_PAYLOAD_SIZE 5U
 #define BLE_CONFIG_DATETIME_PAYLOAD_SIZE 10U
 
@@ -39,14 +39,15 @@ bool ble_config_settings_encode(const app_settings_t *settings,
                                 size_t *payload_size);
 // startup_page is not carried by protocol v1: decode leaves it at
 // APP_SETTINGS_STARTUP_LAST_PAGE and the application must keep its own value.
-ble_config_parse_result_t ble_config_settings_decode(
-    const uint8_t *payload, size_t payload_size, app_settings_t *settings);
+ble_config_parse_result_t ble_config_settings_decode(const uint8_t *payload,
+                                                     size_t payload_size,
+                                                     app_settings_t *settings);
 
 bool ble_config_datetime_encode(const ble_config_datetime_t *datetime,
                                 uint8_t *payload, size_t capacity,
                                 size_t *payload_size);
-ble_config_parse_result_t ble_config_datetime_decode(
-    const uint8_t *payload, size_t payload_size,
-    ble_config_datetime_t *datetime);
+ble_config_parse_result_t
+ble_config_datetime_decode(const uint8_t *payload, size_t payload_size,
+                           ble_config_datetime_t *datetime);
 
 const char *ble_config_parse_result_name(ble_config_parse_result_t result);

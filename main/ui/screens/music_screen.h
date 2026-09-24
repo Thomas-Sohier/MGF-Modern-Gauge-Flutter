@@ -17,8 +17,8 @@ music_screen_t *music_screen_create(lv_obj_t *parent);
 
 // Dernier état reçu (NULL : aucun média). `now_ms` date la position reçue,
 // extrapolée ensuite pendant la lecture.
-void music_screen_set_media(music_screen_t *scr,
-                            const companion_media_t *media, uint32_t now_ms);
+void music_screen_set_media(music_screen_t *scr, const companion_media_t *media,
+                            uint32_t now_ms);
 // Téléphone appairé connecté ou non.
 void music_screen_set_link(music_screen_t *scr, bool linked, uint32_t now_ms);
 // Avance position et anneau ; à appeler périodiquement (page visible).

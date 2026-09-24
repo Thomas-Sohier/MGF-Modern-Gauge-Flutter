@@ -11,8 +11,8 @@ static int32_t scaled(float value) {
 }
 
 ui_layout_t amber_draw_layout(const lv_area_t *area) {
-    ui_layout_t layout = ui_layout_fit(lv_area_get_width(area),
-                                       lv_area_get_height(area));
+    ui_layout_t layout =
+        ui_layout_fit(lv_area_get_width(area), lv_area_get_height(area));
     layout.ox += area->x1;
     layout.oy += area->y1;
     return layout;
@@ -29,8 +29,8 @@ float amber_progress(float value, float low, float high) {
     return (amber_clampf(value, low, high) - low) / (high - low);
 }
 
-void amber_draw_line(lv_layer_t *layer, const ui_layout_t *layout,
-                     float x1, float y1, float x2, float y2, float width,
+void amber_draw_line(lv_layer_t *layer, const ui_layout_t *layout, float x1,
+                     float y1, float x2, float y2, float width,
                      lv_color_t color, bool rounded) {
     lv_draw_line_dsc_t dsc;
     lv_draw_line_dsc_init(&dsc);
@@ -46,9 +46,9 @@ void amber_draw_line(lv_layer_t *layer, const ui_layout_t *layout,
     lv_draw_line(layer, &dsc);
 }
 
-void amber_draw_arc(lv_layer_t *layer, const ui_layout_t *layout,
-                    float cx, float cy, float radius, float width,
-                    float start, float end, lv_color_t color, bool rounded) {
+void amber_draw_arc(lv_layer_t *layer, const ui_layout_t *layout, float cx,
+                    float cy, float radius, float width, float start, float end,
+                    lv_color_t color, bool rounded) {
     lv_draw_arc_dsc_t dsc;
     lv_draw_arc_dsc_init(&dsc);
     dsc.center.x = scaled(ui_layout_x(layout, cx));
@@ -92,15 +92,14 @@ void amber_draw_arc_wrapped(lv_layer_t *layer, const ui_layout_t *layout,
     }
 }
 
-void amber_draw_circle(lv_layer_t *layer, const ui_layout_t *layout,
-                       float cx, float cy, float radius, float width,
-                       lv_color_t color) {
-    amber_draw_arc(layer, layout, cx, cy, radius, width, 0.0f, 360.0f,
-                   color, false);
+void amber_draw_circle(lv_layer_t *layer, const ui_layout_t *layout, float cx,
+                       float cy, float radius, float width, lv_color_t color) {
+    amber_draw_arc(layer, layout, cx, cy, radius, width, 0.0f, 360.0f, color,
+                   false);
 }
 
-void amber_draw_dot(lv_layer_t *layer, const ui_layout_t *layout,
-                    float x, float y, float radius, lv_color_t color) {
+void amber_draw_dot(lv_layer_t *layer, const ui_layout_t *layout, float x,
+                    float y, float radius, lv_color_t color) {
     lv_draw_rect_dsc_t dsc;
     lv_draw_rect_dsc_init(&dsc);
     dsc.bg_color = color;
@@ -116,10 +115,9 @@ void amber_draw_dot(lv_layer_t *layer, const ui_layout_t *layout,
     lv_draw_rect(layer, &dsc, &area);
 }
 
-void amber_draw_tick(lv_layer_t *layer, const ui_layout_t *layout,
-                     float cx, float cy, float angle_deg, float inner,
-                     float outer, float width, lv_color_t color,
-                     bool rounded) {
+void amber_draw_tick(lv_layer_t *layer, const ui_layout_t *layout, float cx,
+                     float cy, float angle_deg, float inner, float outer,
+                     float width, lv_color_t color, bool rounded) {
     const float radians = angle_deg * (float)M_PI / 180.0f;
     const float cosine = cosf(radians);
     const float sine = sinf(radians);

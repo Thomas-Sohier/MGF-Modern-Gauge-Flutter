@@ -25,12 +25,12 @@
 #define F80_COIL_LO      25
 
 // --- Trame 0x7D -------------------------------------------------------------
-#define F7D_CMD          0
-#define F7D_IGN_SWITCH   2
-#define F7D_THROTTLE     3
-#define F7D_AFR          5
-#define F7D_LAMBDA_V     7
-#define F7D_LOOP         11
+#define F7D_CMD        0
+#define F7D_IGN_SWITCH 2
+#define F7D_THROTTLE   3
+#define F7D_AFR        5
+#define F7D_LAMBDA_V   7
+#define F7D_LOOP       11
 
 // --- Bits DTC (structures.go) -----------------------------------------------
 #define DTC0_COOLANT_SENSOR 0x01u

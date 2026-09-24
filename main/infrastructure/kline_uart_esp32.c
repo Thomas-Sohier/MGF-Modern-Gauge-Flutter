@@ -14,47 +14,47 @@
 
 static const char *TAG = "kline_uart";
 
-#define KLINE_RX_BUF_SIZE 256
-#define KLINE_DEFAULT_BAUD 9600
-#define KLINE_SLOW_INIT_BIT_MS 200  // 5 bauds
+#define KLINE_RX_BUF_SIZE               256
+#define KLINE_DEFAULT_BAUD              9600
+#define KLINE_SLOW_INIT_BIT_MS          200 // 5 bauds
 #define KLINE_SLOW_INIT_SYNC_TIMEOUT_MS 1000
 
 static bool kline_gpio_is_reserved(int gpio) {
     switch (gpio) {
-        case 0:
-        case 1:
-        case 2:
-        case 3:
-        case 4:
-        case 5:
-        case 6:
-        case 7:
-        case 8:
-        case 9:
-        case 10:
-        case 11:
-        case 12:
-        case 13:
-        case 14:
-        case 15:
-        case 16:
-        case 17:
-        case 18:
-        case 19:
-        case 20:
-        case 21:
-        case 39:
-        case 41:
-        case 42:
-        case 43:
-        case 44:
-        case 45:
-        case 46:
-        case 47:
-        case 48:
-            return true;
-        default:
-            return false;
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    case 8:
+    case 9:
+    case 10:
+    case 11:
+    case 12:
+    case 13:
+    case 14:
+    case 15:
+    case 16:
+    case 17:
+    case 18:
+    case 19:
+    case 20:
+    case 21:
+    case 39:
+    case 41:
+    case 42:
+    case 43:
+    case 44:
+    case 45:
+    case 46:
+    case 47:
+    case 48:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -88,8 +88,7 @@ static int kline_write(void *ctx, const uint8_t *buf, size_t len) {
     int written = uart_write_bytes(k->uart_num, (const char *)buf, len);
     if (written < 0 || (size_t)written != len) return -1;
     // Attendre l'émission complète pour respecter le rythme half-duplex.
-    if (uart_wait_tx_done(k->uart_num, pdMS_TO_TICKS(50)) != ESP_OK)
-        return -1;
+    if (uart_wait_tx_done(k->uart_num, pdMS_TO_TICKS(50)) != ESP_OK) return -1;
 
     // Dans un montage avec loopback local, l'écho arrive avant la réponse ECU.
     // Une absence d'écho est une erreur lorsque l'option est activée : il ne
@@ -101,7 +100,8 @@ static int kline_write(void *ctx, const uint8_t *buf, size_t len) {
         while (offset < len) {
             size_t chunk = len - offset;
             if (chunk > sizeof(echo)) chunk = sizeof(echo);
-            int n = uart_read_bytes(k->uart_num, echo, chunk, pdMS_TO_TICKS(50));
+            int n =
+                uart_read_bytes(k->uart_num, echo, chunk, pdMS_TO_TICKS(50));
             if (n <= 0 || (size_t)n > chunk ||
                 memcmp(echo, buf + offset, (size_t)n) != 0) {
                 return -1;
@@ -112,12 +112,13 @@ static int kline_write(void *ctx, const uint8_t *buf, size_t len) {
     return written;
 }
 
-static int kline_read(void *ctx, uint8_t *buf, size_t len, uint32_t timeout_ms) {
+static int kline_read(void *ctx, uint8_t *buf, size_t len,
+                      uint32_t timeout_ms) {
     kline_uart_t *k = ctx;
     if (k == NULL || (buf == NULL && len != 0)) return -1;
     if (len == 0) return 0;
     int n = uart_read_bytes(k->uart_num, buf, len, pdMS_TO_TICKS(timeout_ms));
-    return n;  // >=0 nombre d'octets, <0 erreur
+    return n; // >=0 nombre d'octets, <0 erreur
 }
 
 static void kline_flush(void *ctx) {
@@ -137,10 +138,9 @@ static void sleep_until(int64_t start_us, int plus_ms) {
 }
 
 static bool kline_wait_for_slow_init_sync(kline_uart_t *k,
-                                           uint32_t timeout_ms) {
+                                          uint32_t timeout_ms) {
     static const uint8_t sync[] = {0x55, 0x76, 0x83};
-    const int64_t deadline =
-        esp_timer_get_time() + (int64_t)timeout_ms * 1000;
+    const int64_t deadline = esp_timer_get_time() + (int64_t)timeout_ms * 1000;
     size_t matched = 0;
 
     // The UART RX pin may have sampled the 5-baud waveform while TX was
@@ -151,8 +151,8 @@ static bool kline_wait_for_slow_init_sync(kline_uart_t *k,
         if (remaining_us <= 0) return false;
         uint32_t remaining_ms = (uint32_t)((remaining_us + 999) / 1000);
         uint8_t byte = 0;
-        int n = uart_read_bytes(k->uart_num, &byte, 1,
-                                pdMS_TO_TICKS(remaining_ms));
+        int n =
+            uart_read_bytes(k->uart_num, &byte, 1, pdMS_TO_TICKS(remaining_ms));
         if (n <= 0) return false;
         if (byte == sync[matched]) {
             matched++;
@@ -181,14 +181,14 @@ static int kline_wake_up(void *ctx, uint8_t ecu_address) {
         gpio_set_level(k->tx_gpio, 1) != ESP_OK) {
         return -1;
     }
-    vTaskDelay(pdMS_TO_TICKS(2000));    // ligne stable avant le start bit
+    vTaskDelay(pdMS_TO_TICKS(2000)); // ligne stable avant le start bit
 
     const int b = KLINE_SLOW_INIT_BIT_MS;
     int64_t start = esp_timer_get_time();
 
     if (gpio_set_level(k->tx_gpio, 0) != ESP_OK) return -1; // start bit
     sleep_until(start, b);
-    for (int i = 0; i < 8; i++) {       // 8 bits de données, LSB d'abord
+    for (int i = 0; i < 8; i++) { // 8 bits de données, LSB d'abord
         if (gpio_set_level(k->tx_gpio, (ecu_address >> i) & 1) != ESP_OK)
             return -1;
         sleep_until(start, b + (i + 1) * b);
@@ -202,7 +202,8 @@ static int kline_wake_up(void *ctx, uint8_t ecu_address) {
     esp_err_t err = uart_set_pin(k->uart_num, k->tx_gpio, k->rx_gpio,
                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "reattache UART après slow init: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "reattache UART après slow init: %s",
+                 esp_err_to_name(err));
         return -1;
     }
 
@@ -230,7 +231,8 @@ kline_uart_t *kline_uart_create(const kline_uart_config_t *config) {
     k->local_echo = config->local_echo;
 
     const uart_config_t uart_config = {
-        .baud_rate = config->baud_rate > 0 ? config->baud_rate : KLINE_DEFAULT_BAUD,
+        .baud_rate =
+            config->baud_rate > 0 ? config->baud_rate : KLINE_DEFAULT_BAUD,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
@@ -238,7 +240,8 @@ kline_uart_t *kline_uart_create(const kline_uart_config_t *config) {
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    esp_err_t err = uart_driver_install(k->uart_num, KLINE_RX_BUF_SIZE, 0, 0, NULL, 0);
+    esp_err_t err =
+        uart_driver_install(k->uart_num, KLINE_RX_BUF_SIZE, 0, 0, NULL, 0);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "uart_driver_install: %s", esp_err_to_name(err));
         free(k);
@@ -246,7 +249,8 @@ kline_uart_t *kline_uart_create(const kline_uart_config_t *config) {
     }
     if ((err = uart_param_config(k->uart_num, &uart_config)) != ESP_OK ||
         (err = uart_set_pin(k->uart_num, config->tx_gpio, config->rx_gpio,
-                            UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE)) != ESP_OK) {
+                            UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE)) !=
+            ESP_OK) {
         ESP_LOGE(TAG, "uart config/pin: %s", esp_err_to_name(err));
         uart_driver_delete(k->uart_num);
         free(k);

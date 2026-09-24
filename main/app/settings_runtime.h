@@ -11,13 +11,14 @@
 // it, updates widgets, and performs the debounced NVS write in the LVGL task.
 typedef struct settings_runtime_s settings_runtime_t;
 
-typedef bool (*settings_runtime_apply_cb_t)(
-    void *context, const app_settings_t *settings);
+typedef bool (*settings_runtime_apply_cb_t)(void *context,
+                                            const app_settings_t *settings);
 
-settings_runtime_t *settings_runtime_create(
-    const app_settings_t *initial, settings_coordinator_save_cb_t save,
-    void *save_context, settings_runtime_apply_cb_t apply,
-    void *apply_context);
+settings_runtime_t *settings_runtime_create(const app_settings_t *initial,
+                                            settings_coordinator_save_cb_t save,
+                                            void *save_context,
+                                            settings_runtime_apply_cb_t apply,
+                                            void *apply_context);
 void settings_runtime_destroy(settings_runtime_t *runtime);
 
 // These callbacks are safe to pass to the NimBLE configuration service. They
@@ -28,7 +29,7 @@ bool settings_runtime_submit(void *context, const app_settings_t *settings);
 // The following functions run in the LVGL task. They apply the setting
 // immediately; persistence remains debounced by settings_runtime_process().
 bool settings_runtime_set_brightness(settings_runtime_t *runtime,
-                                      uint8_t brightness_percent);
+                                     uint8_t brightness_percent);
 bool settings_runtime_set_page(settings_runtime_t *runtime,
                                app_settings_page_t page);
 bool settings_runtime_set_startup_page(settings_runtime_t *runtime,

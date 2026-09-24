@@ -99,23 +99,28 @@ void faults_screen_update(faults_screen_t *scr, const ecu_data_t *data) {
         const bool fault = (flags & kFaults[i].flag) != 0;
         if (fault) count++;
         amber_page_set_cell(&scr->page, i,
-                            !available ? "--" : fault ? "DEFAUT" : "OK",
+                            !available ? "--"
+                            : fault    ? "DEFAUT"
+                                       : "OK",
                             available);
     }
 
     char text[8];
-    if (available) snprintf(text, sizeof(text), "%u", count);
-    else snprintf(text, sizeof(text), "--");
+    if (available)
+        snprintf(text, sizeof(text), "%u", count);
+    else
+        snprintf(text, sizeof(text), "--");
     amber_page_set_hero(&scr->page, text, available);
-    amber_page_set_hero_caption(
-        &scr->page,
-        !available ? "DEFAUTS INCONNUS"
-        : count == 0 ? "AUCUN DEFAUT"
-        : count == 1 ? "DEFAUT ACTIF" : "DEFAUTS ACTIFS",
-        available && count > 0);
+    amber_page_set_hero_caption(&scr->page,
+                                !available   ? "DEFAUTS INCONNUS"
+                                : count == 0 ? "AUCUN DEFAUT"
+                                : count == 1 ? "DEFAUT ACTIF"
+                                             : "DEFAUTS ACTIFS",
+                                available && count > 0);
     amber_page_set_status(&scr->page,
                           !data->connected ? "ECU NON CONNECTEE"
-                          : available ? "LIAISON ACTIVE" : "CODES NON FOURNIS",
+                          : available      ? "LIAISON ACTIVE"
+                                           : "CODES NON FOURNIS",
                           false);
     amber_page_invalidate(&scr->page);
 }

@@ -70,8 +70,7 @@
 static const char *TAG = "mgf_gauge";
 
 #if MGF_ENABLE_BLE_CONFIG
-static bool ble_settings_accept(void *context,
-                                const app_settings_t *settings) {
+static bool ble_settings_accept(void *context, const app_settings_t *settings) {
     (void)context;
     return app_settings_is_valid(settings);
 }
@@ -125,8 +124,8 @@ static bool apply_settings(void *context, const app_settings_t *settings) {
         settings == NULL || !app_settings_is_valid(settings)) {
         return false;
     }
-    if (!dashboard_navigator_select_page(
-            apply_context->navigator, (size_t)settings->selected_page)) {
+    if (!dashboard_navigator_select_page(apply_context->navigator,
+                                         (size_t)settings->selected_page)) {
         return false;
     }
     dashboard_navigator_set_units(apply_context->navigator, settings->units);
@@ -282,8 +281,7 @@ static void apply_phone_time(companion_ui_t *ui, const companion_time_t *time) {
     // Persisté (anti-rebond) et appliqué à l'horloge via apply_settings.
     settings_runtime_set_utc_offset(ui->settings->runtime,
                                     time->utc_offset_min);
-    ESP_LOGI(TAG, "time synced from phone (UTC%+d min)",
-             time->utc_offset_min);
+    ESP_LOGI(TAG, "time synced from phone (UTC%+d min)", time->utc_offset_min);
 }
 
 static void apply_remote_key(companion_ui_t *ui, companion_key_t key) {
@@ -348,9 +346,11 @@ static rtc_t *optional_rtc_start(void) {
     }
     if (bus.sda_gpio != DS3231_I2C_SDA_GPIO ||
         bus.scl_gpio != DS3231_I2C_SCL_GPIO) {
-        ESP_LOGW(TAG, "RTC DS3231 disabled: bus GPIO%d/GPIO%d, expected GPIO%d/GPIO%d",
-                 bus.sda_gpio, bus.scl_gpio, DS3231_I2C_SDA_GPIO,
-                 DS3231_I2C_SCL_GPIO);
+        ESP_LOGW(
+            TAG,
+            "RTC DS3231 disabled: bus GPIO%d/GPIO%d, expected GPIO%d/GPIO%d",
+            bus.sda_gpio, bus.scl_gpio, DS3231_I2C_SDA_GPIO,
+            DS3231_I2C_SCL_GPIO);
         return NULL;
     }
 
@@ -383,17 +383,17 @@ static rtc_t *optional_rtc_start(void) {
 
 // TTF Michroma embarqué (cf. EMBED_FILES dans main/CMakeLists.txt).
 extern const uint8_t michroma_start[] asm("_binary_Michroma_Regular_ttf_start");
-extern const uint8_t michroma_end[]   asm("_binary_Michroma_Regular_ttf_end");
+extern const uint8_t michroma_end[] asm("_binary_Michroma_Regular_ttf_end");
 
-#define DEFINE_PAGE_ADAPTER(prefix)                                           \
-    static void *prefix##_page_create(lv_obj_t *parent) {                     \
-        return prefix##_screen_create(parent);                                \
-    }                                                                         \
-    static void prefix##_page_update(void *context, const ecu_data_t *data) { \
-        prefix##_screen_update(context, data);                                \
-    }                                                                         \
-    static void prefix##_page_destroy(void *context) {                        \
-        prefix##_screen_destroy(context);                                     \
+#define DEFINE_PAGE_ADAPTER(prefix)                                            \
+    static void *prefix##_page_create(lv_obj_t *parent) {                      \
+        return prefix##_screen_create(parent);                                 \
+    }                                                                          \
+    static void prefix##_page_update(void *context, const ecu_data_t *data) {  \
+        prefix##_screen_update(context, data);                                 \
+    }                                                                          \
+    static void prefix##_page_destroy(void *context) {                         \
+        prefix##_screen_destroy(context);                                      \
     }
 
 DEFINE_PAGE_ADAPTER(clock)
@@ -426,12 +426,20 @@ typedef struct {
     uint32_t update_period_ms;
 } page_row_t;
 
-#define PAGE_ROW(prefix, label, period)                                    \
-    { label, prefix##_page_create, prefix##_page_update,                   \
-      prefix##_page_destroy, NULL, period }
-#define PAGE_ROW_UNITS(prefix, label, period, units_cb)                    \
-    { label, prefix##_page_create, prefix##_page_update,                   \
-      prefix##_page_destroy, units_cb, period }
+#define PAGE_ROW(prefix, label, period)                                        \
+    {label,                                                                    \
+     prefix##_page_create,                                                     \
+     prefix##_page_update,                                                     \
+     prefix##_page_destroy,                                                    \
+     NULL,                                                                     \
+     period}
+#define PAGE_ROW_UNITS(prefix, label, period, units_cb)                        \
+    {label,                                                                    \
+     prefix##_page_create,                                                     \
+     prefix##_page_update,                                                     \
+     prefix##_page_destroy,                                                    \
+     units_cb,                                                                 \
+     period}
 
 static void amber_page_settings(void *context, app_settings_units_t units) {
     amber_screen_set_units(context, units);
@@ -482,7 +490,8 @@ void app_main(void) {
 
     display = board_display_start();
     if (display == NULL) {
-        ESP_LOGE(TAG, "display startup failed; no optional device was required");
+        ESP_LOGE(TAG,
+                 "display startup failed; no optional device was required");
         goto cleanup;
     }
 
@@ -527,8 +536,11 @@ void app_main(void) {
         clock_screen_set_rtc(view, rtc);
         clock_view = view;
         const dashboard_page_t descriptor = {
-            .name = "HEURE", .context = view, .update = clock_page_update,
-            .destroy = clock_page_destroy, .update_period_ms = 1000,
+            .name = "HEURE",
+            .context = view,
+            .update = clock_page_update,
+            .destroy = clock_page_destroy,
+            .update_period_ms = 1000,
         };
         if (page == NULL || view == NULL ||
             !dashboard_navigator_register_page(navigator, page, &descriptor)) {
@@ -541,7 +553,8 @@ void app_main(void) {
         lv_obj_t *page = dashboard_navigator_create_page(navigator);
         music_view = music_screen_create(page);
         const dashboard_page_t descriptor = {
-            .name = "MUSIQUE", .context = music_view,
+            .name = "MUSIQUE",
+            .context = music_view,
             .destroy = music_page_destroy,
         };
         if (page == NULL || music_view == NULL ||
@@ -555,13 +568,15 @@ void app_main(void) {
         lv_obj_t *page = dashboard_navigator_create_page(navigator);
         navigation_view = navigation_screen_create(page);
         const dashboard_page_t descriptor = {
-            .name = "NAVIGATION", .context = navigation_view,
+            .name = "NAVIGATION",
+            .context = navigation_view,
             .destroy = navigation_page_destroy,
         };
         if (page == NULL || navigation_view == NULL ||
             !dashboard_navigator_register_page(navigator, page, &descriptor)) {
             ESP_LOGE(TAG, "could not create page NAVIGATION");
-            if (navigation_view != NULL) navigation_screen_destroy(navigation_view);
+            if (navigation_view != NULL)
+                navigation_screen_destroy(navigation_view);
             goto cleanup;
         }
     }
@@ -580,7 +595,9 @@ void app_main(void) {
         lv_obj_t *page = dashboard_navigator_create_page(navigator);
         void *view = page != NULL ? row->create(page) : NULL;
         const dashboard_page_t descriptor = {
-            .name = row->label, .context = view, .update = row->update,
+            .name = row->label,
+            .context = view,
+            .update = row->update,
             .destroy = row->destroy,
             .settings_changed = row->settings_changed,
             .update_period_ms = row->update_period_ms,
@@ -606,9 +623,9 @@ void app_main(void) {
     };
     // Page fixe choisie dans les réglages, sinon la dernière page vue.
     settings.selected_page = app_settings_boot_page(&settings);
-    settings_runtime = settings_runtime_create(
-        &settings, save_settings, NULL, apply_settings,
-        &s_settings_apply_context);
+    settings_runtime =
+        settings_runtime_create(&settings, save_settings, NULL, apply_settings,
+                                &s_settings_apply_context);
     if (settings_runtime == NULL ||
         !settings_runtime_apply_current(settings_runtime)) {
         ESP_LOGE(TAG, "could not create/apply settings runtime");
@@ -635,8 +652,7 @@ void app_main(void) {
     dashboard_navigator_set_hold_callback(navigator, settings_open_on_hold,
                                           &s_settings_ui);
 
-    settings_timer = lv_timer_create(
-        settings_timer_tick, 250, &s_settings_ui);
+    settings_timer = lv_timer_create(settings_timer_tick, 250, &s_settings_ui);
     if (settings_timer == NULL) {
         ESP_LOGE(TAG, "could not create settings persistence timer");
         goto cleanup;
@@ -649,8 +665,8 @@ void app_main(void) {
         .settings = &s_settings_ui,
         .rtc = rtc,
     };
-    companion_timer = lv_timer_create(companion_timer_tick, 200,
-                                      &s_companion_ui);
+    companion_timer =
+        lv_timer_create(companion_timer_tick, 200, &s_companion_ui);
     if (companion_timer == NULL) {
         ESP_LOGE(TAG, "could not create companion timer");
         goto cleanup;
@@ -660,13 +676,14 @@ void app_main(void) {
     ecu_source_t ecu_source = disconnected_ecu_source();
 #if MGF_USE_MEMS_KLINE
     const mems_ecu_config_t mems_cfg = {
-        .kline = {
-            .uart_num = MGF_KLINE_UART_NUM,
-            .tx_gpio = MGF_KLINE_TX_GPIO,
-            .rx_gpio = MGF_KLINE_RX_GPIO,
-            .baud_rate = 9600,
-            .local_echo = MGF_KLINE_LOCAL_ECHO != 0,
-        },
+        .kline =
+            {
+                .uart_num = MGF_KLINE_UART_NUM,
+                .tx_gpio = MGF_KLINE_TX_GPIO,
+                .rx_gpio = MGF_KLINE_RX_GPIO,
+                .baud_rate = 9600,
+                .local_echo = MGF_KLINE_LOCAL_ECHO != 0,
+            },
         .variant = MGF_MEMS_VARIANT,
         .poll_period_ms = 200,
     };

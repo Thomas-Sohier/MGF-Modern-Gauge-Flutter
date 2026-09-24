@@ -8,10 +8,10 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define TICK_MS 40.0f
+#define TICK_MS      40.0f
 #define SWEEP_PERIOD 6.0f
-#define RPM_IDLE 850.0f
-#define RPM_PEAK 7800.0f
+#define RPM_IDLE     850.0f
+#define RPM_PEAK     7800.0f
 
 struct fake_ecu_s {
     ecu_data_t data;
@@ -61,18 +61,31 @@ fake_ecu_t *fake_ecu_create(void) {
     fake_ecu_t *ecu = calloc(1, sizeof(*ecu));
     if (ecu == NULL) return NULL;
     ecu->data = (ecu_data_t){
-        .connected = true, .faults_available = true,
-        .rpm = RPM_IDLE, .coolant_temp = 89.0f,
-        .battery_voltage = 14.2f, .oil_temp = 96.0f,
-        .ambient_temp = 22.0f, .intake_air_temp = 31.0f,
-        .fuel_rail_temp = 38.0f, .map_sensor_kpa = 32.0f,
-        .throttle_pot_voltage = 0.48f, .ignition_advance = 12.0f,
-        .coil_1_charge_time = 2.4f, .coil_2_charge_time = 2.5f,
-        .coil_time_microseconds = 2450.0f, .injector_1_pw = 2.1f,
-        .injector_2_pw = 2.2f, .fuelling_feedback_percent = 98.0f,
-        .long_term_trim = -1.8f, .lambda_mv = 450.0f, .o2_mv = 450.0f,
-        .estimated_air_fuel = 14.7f, .lambda_sensor_duty_cycle = 50.0f,
-        .idle_setpoint = RPM_IDLE, .idle_valve_position = 34.0f,
+        .connected = true,
+        .faults_available = true,
+        .rpm = RPM_IDLE,
+        .coolant_temp = 89.0f,
+        .battery_voltage = 14.2f,
+        .oil_temp = 96.0f,
+        .ambient_temp = 22.0f,
+        .intake_air_temp = 31.0f,
+        .fuel_rail_temp = 38.0f,
+        .map_sensor_kpa = 32.0f,
+        .throttle_pot_voltage = 0.48f,
+        .ignition_advance = 12.0f,
+        .coil_1_charge_time = 2.4f,
+        .coil_2_charge_time = 2.5f,
+        .coil_time_microseconds = 2450.0f,
+        .injector_1_pw = 2.1f,
+        .injector_2_pw = 2.2f,
+        .fuelling_feedback_percent = 98.0f,
+        .long_term_trim = -1.8f,
+        .lambda_mv = 450.0f,
+        .o2_mv = 450.0f,
+        .estimated_air_fuel = 14.7f,
+        .lambda_sensor_duty_cycle = 50.0f,
+        .idle_setpoint = RPM_IDLE,
+        .idle_valve_position = 34.0f,
         .idle_base_position = 30.0f,
     };
     return ecu;

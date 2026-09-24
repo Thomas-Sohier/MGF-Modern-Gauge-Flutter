@@ -4,7 +4,7 @@
 
 // Nombre de lectures infructueuses tolérées avant d'abandonner un paquet
 // (calqué sur les 5 essais de `ecureader_mems.go::readSerial`).
-#define READ_RETRY_MAX 5
+#define READ_RETRY_MAX          5
 #define DEFAULT_READ_TIMEOUT_MS 100
 
 void mems_reader_init(mems_reader_t *r, kline_transport_t transport,
@@ -12,8 +12,8 @@ void mems_reader_init(mems_reader_t *r, kline_transport_t transport,
     if (r == NULL) return;
     memset(r, 0, sizeof(*r));
     r->transport = transport;
-    r->read_timeout_ms = read_timeout_ms > 0 ? read_timeout_ms
-                                             : DEFAULT_READ_TIMEOUT_MS;
+    r->read_timeout_ms =
+        read_timeout_ms > 0 ? read_timeout_ms : DEFAULT_READ_TIMEOUT_MS;
     r->connected = false;
 }
 
@@ -36,8 +36,8 @@ static bool mems_reader_send_and_receive(void *ctx, uint8_t cmd, uint8_t *resp,
     int retry = 0;
     while (got < expected) {
         int n = t->read(t->ctx, resp + got, expected - got, r->read_timeout_ms);
-        if (n < 0) return false;  // erreur de transport
-        if (n == 0) {             // timeout : on retente
+        if (n < 0) return false; // erreur de transport
+        if (n == 0) {            // timeout : on retente
             if (++retry >= READ_RETRY_MAX) return false;
             continue;
         }
@@ -45,7 +45,7 @@ static bool mems_reader_send_and_receive(void *ctx, uint8_t cmd, uint8_t *resp,
         got += (size_t)n;
     }
 
-    return resp[0] == cmd;  // l'ECU ré-émet la commande en tête de réponse
+    return resp[0] == cmd; // l'ECU ré-émet la commande en tête de réponse
 }
 
 static bool mems_reader_connect(void *ctx) {
@@ -57,9 +57,11 @@ static bool mems_reader_connect(void *ctx) {
     if (r->transport.flush != NULL) r->transport.flush(r->transport.ctx);
 
     uint8_t buf[MEMS_RESP_ECU_ID];
-    if (!mems_reader_send_and_receive(r, MEMS_CMD_INIT_A, buf, MEMS_RESP_INIT_A))
+    if (!mems_reader_send_and_receive(r, MEMS_CMD_INIT_A, buf,
+                                      MEMS_RESP_INIT_A))
         return false;
-    if (!mems_reader_send_and_receive(r, MEMS_CMD_INIT_B, buf, MEMS_RESP_INIT_B))
+    if (!mems_reader_send_and_receive(r, MEMS_CMD_INIT_B, buf,
+                                      MEMS_RESP_INIT_B))
         return false;
     if (!mems_reader_send_and_receive(r, MEMS_CMD_HEARTBEAT, buf,
                                       MEMS_RESP_HEARTBEAT))

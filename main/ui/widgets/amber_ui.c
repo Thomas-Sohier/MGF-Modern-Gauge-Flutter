@@ -49,8 +49,8 @@ lv_obj_t *amber_ui_label_create(lv_obj_t *parent, const lv_font_t *font,
                                 lv_color_t color, const char *text,
                                 float logical_width) {
     if (parent == NULL || font == NULL || text == NULL) return NULL;
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
-                                              lv_obj_get_height(parent));
+    const ui_layout_t layout =
+        ui_layout_fit(lv_obj_get_width(parent), lv_obj_get_height(parent));
     lv_obj_t *label = lv_label_create(parent);
     if (label == NULL) return NULL;
     lv_obj_remove_style_all(label);
@@ -81,22 +81,21 @@ float amber_ui_bold_spread(unsigned physical_pixels) {
     return (float)physical_pixels * UI_REFERENCE_SIZE / UI_DISPLAY_SIZE_PX;
 }
 
-void amber_ui_place_centered(lv_obj_t *object, lv_obj_t *parent,
-                             float x, float y, float logical_width,
+void amber_ui_place_centered(lv_obj_t *object, lv_obj_t *parent, float x,
+                             float y, float logical_width,
                              float logical_x_offset) {
     if (object == NULL || parent == NULL) return;
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(parent),
-                                              lv_obj_get_height(parent));
+    const ui_layout_t layout =
+        ui_layout_fit(lv_obj_get_width(parent), lv_obj_get_height(parent));
     if (logical_width > 0.0f) {
         lv_obj_set_width(object,
                          (int32_t)lroundf(logical_width * layout.scale));
     }
     lv_obj_update_layout(object);
-    lv_obj_set_pos(
-        object,
-        (int32_t)lroundf(ui_layout_x(&layout, x) +
-                        logical_x_offset * layout.scale) -
-            lv_obj_get_width(object) / 2,
-        (int32_t)lroundf(ui_layout_y(&layout, y)) -
-            lv_obj_get_height(object) / 2);
+    lv_obj_set_pos(object,
+                   (int32_t)lroundf(ui_layout_x(&layout, x) +
+                                    logical_x_offset * layout.scale) -
+                       lv_obj_get_width(object) / 2,
+                   (int32_t)lroundf(ui_layout_y(&layout, y)) -
+                       lv_obj_get_height(object) / 2);
 }

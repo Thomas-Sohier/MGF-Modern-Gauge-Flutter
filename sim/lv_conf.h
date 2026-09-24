@@ -19,14 +19,14 @@
 
 // Boot screen vectoriel (LVGL 9).
 #define LV_USE_VECTOR_GRAPHIC 1
-#define LV_USE_MATRIX 1
-#define LV_USE_FLOAT 1
+#define LV_USE_MATRIX         1
+#define LV_USE_FLOAT          1
 
 // Snapshot d'objet -> buffer image (utilisé pour exporter le golden).
 #define LV_USE_SNAPSHOT 1
 
 // Rendu de la police Michroma à la volée.
-#define LV_USE_TINY_TTF 1
+#define LV_USE_TINY_TTF          1
 #define LV_TINY_TTF_FILE_SUPPORT 0
 
 // Polices utilisées par l'écran RPM (mêmes tailles qu'en cible).
@@ -34,6 +34,6 @@
 #define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_28 1
 #define LV_FONT_MONTSERRAT_48 1
-#define LV_FONT_DEFAULT &lv_font_montserrat_14
+#define LV_FONT_DEFAULT       &lv_font_montserrat_14
 
 #endif // LV_CONF_H

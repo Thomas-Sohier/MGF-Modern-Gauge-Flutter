@@ -27,7 +27,8 @@ int main(void) {
           "tau reaches 63 percent");
 
     float v = 800.0f;
-    for (int i = 0; i < 50; i++) v = value_smoothing_step(v, 3000.0f, 40, 100.0f, 1.0f);
+    for (int i = 0; i < 50; i++)
+        v = value_smoothing_step(v, 3000.0f, 40, 100.0f, 1.0f);
     check(v == 3000.0f, "converges and snaps exactly to target");
 
     printf("value smoothing tests: OK\n");

@@ -14,7 +14,8 @@ static inline uint64_t ui_instrumentation_begin(void) {
     return 0;
 }
 
-static inline void ui_instrumentation_end(const char *page, uint64_t started_at) {
+static inline void ui_instrumentation_end(const char *page,
+                                          uint64_t started_at) {
     (void)page;
     (void)started_at;
 }

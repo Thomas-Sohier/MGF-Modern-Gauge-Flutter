@@ -7,7 +7,7 @@
 
 // Régime de ralenti en héros ; l'écart à la consigne ECU est rappelé sous la
 // valeur.
-#define ERROR_WARN_RPM     50.0f
+#define ERROR_WARN_RPM 50.0f
 
 enum { CELL_SETPOINT = 0, CELL_VALVE, CELL_BASE, CELL_ADJUSTER };
 
@@ -70,10 +70,9 @@ void idle_screen_update(idle_screen_t *scr, const ecu_data_t *data) {
     }
     amber_page_set_hero_caption(&scr->page, text,
                                 error_ok &&
-                                fabsf(data->idle_error) >= ERROR_WARN_RPM);
-    amber_page_set_status(&scr->page,
-                          connected ? "BOUCLE ACTIVE" : "PAS DE LIAISON",
-                          false);
+                                    fabsf(data->idle_error) >= ERROR_WARN_RPM);
+    amber_page_set_status(
+        &scr->page, connected ? "BOUCLE ACTIVE" : "PAS DE LIAISON", false);
 }
 
 void idle_screen_destroy(idle_screen_t *scr) {

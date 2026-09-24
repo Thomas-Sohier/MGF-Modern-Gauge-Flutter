@@ -22,11 +22,11 @@
 // La couche session ne voit alors que l'écho de commande renvoyé par l'ECU.
 
 typedef struct {
-    uart_port_t uart_num;   // ex. UART_NUM_1
-    int tx_gpio;            // GPIO relié au TX du transceiver
-    int rx_gpio;            // GPIO relié au RX du transceiver
-    int baud_rate;          // 0 => 9600 (défaut MEMS)
-    bool local_echo;        // rejeter l'écho local des octets émis
+    uart_port_t uart_num; // ex. UART_NUM_1
+    int tx_gpio;          // GPIO relié au TX du transceiver
+    int rx_gpio;          // GPIO relié au RX du transceiver
+    int baud_rate;        // 0 => 9600 (défaut MEMS)
+    bool local_echo;      // rejeter l'écho local des octets émis
 } kline_uart_config_t;
 
 typedef struct kline_uart_s kline_uart_t;

@@ -46,14 +46,14 @@ static portMUX_TYPE s_settings_lock = portMUX_INITIALIZER_UNLOCKED;
 // UUIDs are intentionally private to this service; the wire protocol version
 // is carried in every value so clients can reject incompatible payloads.
 static const ble_uuid128_t s_service_uuid =
-    BLE_UUID128_INIT(0x9a, 0x54, 0x72, 0x31, 0x91, 0x6a, 0x4d, 0x2c,
-                     0x8e, 0x44, 0x70, 0x18, 0x43, 0xb0, 0x11, 0x01);
+    BLE_UUID128_INIT(0x9a, 0x54, 0x72, 0x31, 0x91, 0x6a, 0x4d, 0x2c, 0x8e, 0x44,
+                     0x70, 0x18, 0x43, 0xb0, 0x11, 0x01);
 static const ble_uuid128_t s_settings_uuid =
-    BLE_UUID128_INIT(0x9a, 0x54, 0x72, 0x31, 0x91, 0x6a, 0x4d, 0x2c,
-                     0x8e, 0x44, 0x70, 0x18, 0x43, 0xb0, 0x11, 0x02);
+    BLE_UUID128_INIT(0x9a, 0x54, 0x72, 0x31, 0x91, 0x6a, 0x4d, 0x2c, 0x8e, 0x44,
+                     0x70, 0x18, 0x43, 0xb0, 0x11, 0x02);
 static const ble_uuid128_t s_datetime_uuid =
-    BLE_UUID128_INIT(0x9a, 0x54, 0x72, 0x31, 0x91, 0x6a, 0x4d, 0x2c,
-                     0x8e, 0x44, 0x70, 0x18, 0x43, 0xb0, 0x11, 0x03);
+    BLE_UUID128_INIT(0x9a, 0x54, 0x72, 0x31, 0x91, 0x6a, 0x4d, 0x2c, 0x8e, 0x44,
+                     0x70, 0x18, 0x43, 0xb0, 0x11, 0x03);
 
 // Implemented by the ESP-IDF NimBLE port; it wires bond key persistence to
 // the Bluetooth NVS namespace rather than this application's settings store.
@@ -75,12 +75,13 @@ static int append_settings(struct os_mbuf *om) {
     const bool valid = s_cached_settings_valid;
     settings = s_cached_settings;
     portEXIT_CRITICAL(&s_settings_lock);
-    if (!valid || !ble_config_settings_encode(&settings, payload, sizeof(payload),
-                                              &payload_size)) {
+    if (!valid || !ble_config_settings_encode(&settings, payload,
+                                              sizeof(payload), &payload_size)) {
         return BLE_ATT_ERR_UNLIKELY;
     }
     return os_mbuf_append(om, payload, payload_size) == 0
-               ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+               ? 0
+               : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 
 static int write_settings(uint16_t conn_handle,
@@ -95,7 +96,8 @@ static int write_settings(uint16_t conn_handle,
     if (OS_MBUF_PKTLEN(ctxt->om) != sizeof(payload)) {
         return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
     }
-    if (ble_hs_mbuf_to_flat(ctxt->om, payload, sizeof(payload), &copied_len) != 0 ||
+    if (ble_hs_mbuf_to_flat(ctxt->om, payload, sizeof(payload), &copied_len) !=
+            0 ||
         copied_len != sizeof(payload)) {
         return BLE_ATT_ERR_UNLIKELY;
     }
@@ -132,7 +134,8 @@ static int write_datetime(uint16_t conn_handle,
     if (OS_MBUF_PKTLEN(ctxt->om) != sizeof(payload)) {
         return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
     }
-    if (ble_hs_mbuf_to_flat(ctxt->om, payload, sizeof(payload), &copied_len) != 0 ||
+    if (ble_hs_mbuf_to_flat(ctxt->om, payload, sizeof(payload), &copied_len) !=
+            0 ||
         copied_len != sizeof(payload)) {
         return BLE_ATT_ERR_UNLIKELY;
     }
@@ -171,7 +174,8 @@ static int gatt_access(uint16_t conn_handle, uint16_t attr_handle,
     }
     if (ble_uuid_cmp(ctxt->chr->uuid, &s_datetime_uuid.u) == 0) {
         return ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR
-                   ? write_datetime(conn_handle, ctxt) : BLE_ATT_ERR_UNLIKELY;
+                   ? write_datetime(conn_handle, ctxt)
+                   : BLE_ATT_ERR_UNLIKELY;
     }
     return BLE_ATT_ERR_UNLIKELY;
 }
@@ -182,22 +186,23 @@ static const struct ble_gatt_svc_def s_services[] = {
     {
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
         .uuid = &s_service_uuid.u,
-        .characteristics = (struct ble_gatt_chr_def[]){
-            {
-                .uuid = &s_settings_uuid.u,
-                .access_cb = gatt_access,
-                .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE |
-                         BLE_GATT_CHR_F_WRITE_ENC,
+        .characteristics =
+            (struct ble_gatt_chr_def[]){
+                {
+                    .uuid = &s_settings_uuid.u,
+                    .access_cb = gatt_access,
+                    .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE |
+                             BLE_GATT_CHR_F_WRITE_ENC,
+                },
+                {
+                    .uuid = &s_datetime_uuid.u,
+                    .access_cb = gatt_access,
+                    .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_ENC,
+                },
+                {0},
             },
-            {
-                .uuid = &s_datetime_uuid.u,
-                .access_cb = gatt_access,
-                .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_ENC,
-            },
-            { 0 },
-        },
     },
-    { 0 },
+    {0},
 };
 
 static void advertise(void) {
@@ -214,7 +219,8 @@ static void advertise(void) {
     // Annonce : UUID 128 bits du service compagnon (filtre de scan de
     // l'application) ; le nom part dans la réponse de scan (31 octets max).
     fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
-    fields.uuids128 = (ble_uuid128_t *)BLE_UUID128(companion_gatt_service_uuid());
+    fields.uuids128 =
+        (ble_uuid128_t *)BLE_UUID128(companion_gatt_service_uuid());
     fields.num_uuids128 = 1;
     fields.uuids128_is_complete = 0;
     rc = ble_gap_adv_set_fields(&fields);
@@ -296,7 +302,8 @@ static int gap_event(struct ble_gap_event *event, void *arg) {
             esp_timer_start_once(s_auth_timer, AUTH_TIMEOUT_US);
             // Un téléphone appairé chiffre avec sa clé ; un nouveau n'est
             // appairé que si la fenêtre est ouverte.
-            const int rc = ble_gap_security_initiate(event->connect.conn_handle);
+            const int rc =
+                ble_gap_security_initiate(event->connect.conn_handle);
             if (rc != 0) {
                 ESP_LOGW(TAG, "security initiation failed: %d", rc);
             }
@@ -420,10 +427,10 @@ esp_err_t ble_config_service_start(const ble_config_service_config_t *config) {
     ble_hs_cfg.sm_bonding = s_pairing_open ? BLE_CONFIG_REQUIRE_BONDING : 0;
     ble_hs_cfg.sm_mitm = BLE_CONFIG_REQUIRE_MITM;
     ble_hs_cfg.sm_sc = BLE_CONFIG_REQUIRE_SECURE_CONNECTIONS;
-    ble_hs_cfg.sm_our_key_dist |= BLE_SM_PAIR_KEY_DIST_ENC |
-                                  BLE_SM_PAIR_KEY_DIST_ID;
-    ble_hs_cfg.sm_their_key_dist |= BLE_SM_PAIR_KEY_DIST_ENC |
-                                    BLE_SM_PAIR_KEY_DIST_ID;
+    ble_hs_cfg.sm_our_key_dist |=
+        BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+    ble_hs_cfg.sm_their_key_dist |=
+        BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
     ble_store_config_init();
     s_started = true;
     nimble_port_freertos_init(host_task);
@@ -467,7 +474,8 @@ esp_err_t ble_config_service_close_pairing(void) {
 }
 
 esp_err_t ble_config_service_forget_bonds(void) {
-    if (!s_started || s_pairing_open || s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+    if (!s_started || s_pairing_open ||
+        s_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
         return ESP_ERR_INVALID_STATE;
     }
     return ble_store_clear() == 0 ? ESP_OK : ESP_FAIL;

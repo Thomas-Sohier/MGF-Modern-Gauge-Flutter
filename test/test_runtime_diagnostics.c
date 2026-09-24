@@ -18,13 +18,13 @@ int main(void) {
 #endif
 
     assert(diagnostics == NULL);
-    assert(runtime_diagnostics_state_name(
-               RUNTIME_DIAGNOSTICS_STATE_DEGRADED) != NULL);
+    assert(runtime_diagnostics_state_name(RUNTIME_DIAGNOSTICS_STATE_DEGRADED) !=
+           NULL);
     assert(runtime_diagnostics_state_name(
                RUNTIME_DIAGNOSTICS_STATE_DEGRADED)[0] == 'd');
-    runtime_diagnostics_set_service_state(
-        diagnostics, RUNTIME_DIAGNOSTICS_SERVICE_ECU,
-        RUNTIME_DIAGNOSTICS_STATE_READY);
+    runtime_diagnostics_set_service_state(diagnostics,
+                                          RUNTIME_DIAGNOSTICS_SERVICE_ECU,
+                                          RUNTIME_DIAGNOSTICS_STATE_READY);
     runtime_diagnostics_set_rgb_counters_provider(diagnostics, NULL, NULL);
     runtime_diagnostics_stop(diagnostics);
     return 0;

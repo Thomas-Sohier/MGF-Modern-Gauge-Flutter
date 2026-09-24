@@ -11,14 +11,14 @@
 static const char *TAG = "settings";
 
 #define SETTINGS_NAMESPACE "app_settings"
-#define KEY_SCHEMA "schema"
-#define KEY_BRIGHTNESS "brightness"
-#define KEY_PAGE "page"
-#define KEY_THEME "theme"
-#define KEY_UNITS "units"
-#define KEY_STARTUP "startup"
+#define KEY_SCHEMA         "schema"
+#define KEY_BRIGHTNESS     "brightness"
+#define KEY_PAGE           "page"
+#define KEY_THEME          "theme"
+#define KEY_UNITS          "units"
+#define KEY_STARTUP        "startup"
 // Décalage UTC en quarts d'heure + 64 (0..120) : tient dans un u8.
-#define KEY_UTC_OFFSET "utc_q15"
+#define KEY_UTC_OFFSET  "utc_q15"
 #define UTC_OFFSET_BIAS 64
 
 // Schéma 1 : sans page de démarrage, l'écran rouvrait toujours la dernière
@@ -142,7 +142,8 @@ esp_err_t settings_store_load(app_settings_t *out) {
     }
     if (err != ESP_OK) {
         if (is_invalid_record_error(err)) {
-            err = finish_with_defaults(out, "settings are incomplete or invalid");
+            err =
+                finish_with_defaults(out, "settings are incomplete or invalid");
             unlock_store();
             return err;
         }
@@ -155,8 +156,7 @@ esp_err_t settings_store_load(app_settings_t *out) {
         .brightness_percent = brightness,
         .selected_page = (app_settings_page_t)page,
         .startup_page = (app_settings_page_t)startup,
-        .utc_offset_minutes =
-            (int16_t)(((int)utc_q15 - UTC_OFFSET_BIAS) * 15),
+        .utc_offset_minutes = (int16_t)(((int)utc_q15 - UTC_OFFSET_BIAS) * 15),
         .theme = (app_settings_theme_t)theme,
         .units = (app_settings_units_t)units,
     };
@@ -191,8 +191,8 @@ esp_err_t settings_store_save(const app_settings_t *settings) {
 
     // Keep all keys in one commit. The schema is staged last so a record is
     // never advertised as current before all of its values are staged.
-    esp_err_t err = nvs_set_u8(s_handle, KEY_BRIGHTNESS,
-                               settings->brightness_percent);
+    esp_err_t err =
+        nvs_set_u8(s_handle, KEY_BRIGHTNESS, settings->brightness_percent);
     if (err == ESP_OK) {
         err = nvs_set_u8(s_handle, KEY_PAGE, (uint8_t)settings->selected_page);
     }
@@ -203,17 +203,16 @@ esp_err_t settings_store_save(const app_settings_t *settings) {
         err = nvs_set_u8(s_handle, KEY_UNITS, (uint8_t)settings->units);
     }
     if (err == ESP_OK) {
-        err = nvs_set_u8(s_handle, KEY_STARTUP,
-                         (uint8_t)settings->startup_page);
+        err =
+            nvs_set_u8(s_handle, KEY_STARTUP, (uint8_t)settings->startup_page);
     }
     if (err == ESP_OK) {
-        err = nvs_set_u8(s_handle, KEY_UTC_OFFSET,
-                         (uint8_t)(settings->utc_offset_minutes / 15 +
-                                   UTC_OFFSET_BIAS));
+        err = nvs_set_u8(
+            s_handle, KEY_UTC_OFFSET,
+            (uint8_t)(settings->utc_offset_minutes / 15 + UTC_OFFSET_BIAS));
     }
     if (err == ESP_OK) {
-        err = nvs_set_u32(s_handle, KEY_SCHEMA,
-                          APP_SETTINGS_SCHEMA_VERSION);
+        err = nvs_set_u32(s_handle, KEY_SCHEMA, APP_SETTINGS_SCHEMA_VERSION);
     }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "cannot stage settings: %s", esp_err_to_name(err));

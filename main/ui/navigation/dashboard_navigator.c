@@ -4,7 +4,7 @@
 #include "ui/themes/ui_theme.h"
 #include "ui/widgets/amber_draw.h"
 
-#define DASHBOARD_MAX_PAGES 12
+#define DASHBOARD_MAX_PAGES          12
 #define GESTURE_CLICK_SUPPRESSION_MS 300U
 // Maintien volontairement plus long que l'appui long LVGL (400 ms) : un
 // effleurement en roulant ne doit pas ouvrir les réglages.
@@ -12,11 +12,11 @@
 
 // Indicateur de position : un point par page dans l'ouverture basse du cadran,
 // point courant éclairci. Visible dès qu'il y a plus d'une page à parcourir.
-#define INDICATOR_CX       160.0f
-#define INDICATOR_Y        298.0f
-#define INDICATOR_SPACING  11.0f
-#define INDICATOR_R          2.6f
-#define INDICATOR_R_CURRENT  3.6f
+#define INDICATOR_CX        160.0f
+#define INDICATOR_Y         298.0f
+#define INDICATOR_SPACING   11.0f
+#define INDICATOR_R         2.6f
+#define INDICATOR_R_CURRENT 3.6f
 
 typedef struct {
     lv_obj_t *object;
@@ -48,10 +48,10 @@ static void update_current(dashboard_navigator_t *navigator, bool force) {
 
     page_entry_t *page = &navigator->pages[navigator->current];
     const uint32_t period = page->descriptor.update_period_ms;
-    if (!force && (period == 0 ||
-                   (page->has_presented_data &&
-                    !dashboard_period_elapsed(lv_tick_get(),
-                                              page->last_update_ms, period)))) {
+    if (!force &&
+        (period == 0 || (page->has_presented_data &&
+                         !dashboard_period_elapsed(
+                             lv_tick_get(), page->last_update_ms, period)))) {
         return;
     }
 
@@ -67,8 +67,10 @@ static void update_current(dashboard_navigator_t *navigator, bool force) {
 
 static void show_current(dashboard_navigator_t *navigator) {
     for (size_t i = 0; i < navigator->count; i++) {
-        if (i == navigator->current) lv_obj_remove_flag(navigator->pages[i].object, LV_OBJ_FLAG_HIDDEN);
-        else lv_obj_add_flag(navigator->pages[i].object, LV_OBJ_FLAG_HIDDEN);
+        if (i == navigator->current)
+            lv_obj_remove_flag(navigator->pages[i].object, LV_OBJ_FLAG_HIDDEN);
+        else
+            lv_obj_add_flag(navigator->pages[i].object, LV_OBJ_FLAG_HIDDEN);
     }
     // La pile de pages est au-dessus de l'indicateur : le remettre au premier
     // plan après toute bascule, puis redessiner le point courant.
@@ -92,15 +94,14 @@ static void indicator_draw_cb(lv_event_t *event) {
     for (size_t i = 0; i < navigator->count; i++) {
         const bool current = i == navigator->current;
         amber_draw_dot(layer, &layout, x0 + INDICATOR_SPACING * (float)i,
-                       INDICATOR_Y, current ? INDICATOR_R_CURRENT
-                                            : INDICATOR_R,
+                       INDICATOR_Y, current ? INDICATOR_R_CURRENT : INDICATOR_R,
                        current ? ui_theme_amber_bright()
                                : ui_theme_amber_dim());
     }
 }
 
 bool dashboard_navigator_select_page(dashboard_navigator_t *navigator,
-                                      size_t page_index) {
+                                     size_t page_index) {
     if (navigator == NULL || page_index >= navigator->count) return false;
     if (page_index == navigator->current) return true;
 
@@ -115,14 +116,15 @@ bool dashboard_navigator_select_page(dashboard_navigator_t *navigator,
 
 void dashboard_navigator_next(dashboard_navigator_t *navigator) {
     if (navigator == NULL || navigator->count < 2) return;
-    dashboard_navigator_select_page(navigator,
-                                    (navigator->current + 1) % navigator->count);
+    dashboard_navigator_select_page(navigator, (navigator->current + 1) %
+                                                   navigator->count);
 }
 
 void dashboard_navigator_previous(dashboard_navigator_t *navigator) {
     if (navigator == NULL || navigator->count < 2) return;
     dashboard_navigator_select_page(
-        navigator, (navigator->current + navigator->count - 1) % navigator->count);
+        navigator,
+        (navigator->current + navigator->count - 1) % navigator->count);
 }
 
 static bool point_in_visible_disc(const dashboard_navigator_t *navigator,
@@ -154,9 +156,8 @@ static void navigation_event_cb(lv_event_t *event) {
     if (code == LV_EVENT_PRESSING) {
         if (navigator->hold == NULL || navigator->press_held ||
             navigator->press_is_gesture ||
-            !dashboard_period_elapsed(lv_tick_get(),
-                                      navigator->press_started_ms,
-                                      HOLD_ACTION_MS)) {
+            !dashboard_period_elapsed(
+                lv_tick_get(), navigator->press_started_ms, HOLD_ACTION_MS)) {
             return;
         }
         lv_point_t point;
@@ -200,7 +201,7 @@ static void navigation_event_cb(lv_event_t *event) {
         // expire tout de même, et la soustraction reste sûre au wrap du tick.
         const uint32_t now = lv_tick_get();
         if (!dashboard_period_elapsed(now, navigator->last_gesture_ms,
-                                       GESTURE_CLICK_SUPPRESSION_MS)) {
+                                      GESTURE_CLICK_SUPPRESSION_MS)) {
             navigator->last_gesture_ms = now - GESTURE_CLICK_SUPPRESSION_MS;
             return;
         }
@@ -214,8 +215,7 @@ static void navigation_event_cb(lv_event_t *event) {
         const int32_t width = lv_obj_get_width(navigator->root);
         if (point.x < lv_obj_get_x(navigator->root) + width / 3) {
             dashboard_navigator_previous(navigator);
-        } else if (point.x >= lv_obj_get_x(navigator->root) +
-                   (width * 2) / 3) {
+        } else if (point.x >= lv_obj_get_x(navigator->root) + (width * 2) / 3) {
             dashboard_navigator_next(navigator);
         }
     }
@@ -236,7 +236,8 @@ dashboard_navigator_t *dashboard_navigator_create(lv_obj_t *parent) {
     lv_obj_set_size(navigator->root, LV_PCT(100), LV_PCT(100));
     lv_obj_center(navigator->root);
     lv_obj_clear_flag(navigator->root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(navigator->root, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_add_flag(navigator->root,
+                    LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
 
     // Superposition transparente et non cliquable : elle n'intercepte aucun
     // appui (les gestes continuent d'atteindre la racine).
@@ -256,15 +257,20 @@ dashboard_navigator_t *dashboard_navigator_create(lv_obj_t *parent) {
                         LV_EVENT_DRAW_MAIN, NULL);
     lv_obj_add_flag(navigator->indicator, LV_OBJ_FLAG_HIDDEN);
     navigator->last_gesture_ms = lv_tick_get() - GESTURE_CLICK_SUPPRESSION_MS;
-    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_GESTURE, navigator);
-    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_CLICKED, navigator);
-    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_PRESSED, navigator);
-    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_PRESSING, navigator);
+    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_GESTURE,
+                        navigator);
+    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_CLICKED,
+                        navigator);
+    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_PRESSED,
+                        navigator);
+    lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_PRESSING,
+                        navigator);
     return navigator;
 }
 
 lv_obj_t *dashboard_navigator_create_page(dashboard_navigator_t *navigator) {
-    if (navigator == NULL || navigator->count >= DASHBOARD_MAX_PAGES) return NULL;
+    if (navigator == NULL || navigator->count >= DASHBOARD_MAX_PAGES)
+        return NULL;
     lv_obj_t *page = lv_obj_create(navigator->root);
     if (page == NULL) return NULL;
     lv_obj_remove_style_all(page);
@@ -281,7 +287,8 @@ bool dashboard_navigator_register_page(dashboard_navigator_t *navigator,
                                        const dashboard_page_t *descriptor) {
     if (navigator == NULL || page == NULL || descriptor == NULL ||
         descriptor->name == NULL || navigator->count >= DASHBOARD_MAX_PAGES ||
-        lv_obj_get_parent(page) != navigator->root) return false;
+        lv_obj_get_parent(page) != navigator->root)
+        return false;
 
     navigator->pages[navigator->count] = (page_entry_t){
         .object = page,
@@ -306,8 +313,8 @@ void dashboard_navigator_set_page_changed_callback(
 }
 
 void dashboard_navigator_set_hold_callback(dashboard_navigator_t *navigator,
-                                            dashboard_hold_cb_t callback,
-                                            void *context) {
+                                           dashboard_hold_cb_t callback,
+                                           void *context) {
     if (navigator == NULL) return;
     navigator->hold = callback;
     navigator->hold_context = context;
@@ -332,7 +339,8 @@ size_t dashboard_navigator_count(const dashboard_navigator_t *navigator) {
     return navigator == NULL ? 0 : navigator->count;
 }
 
-const char *dashboard_navigator_current_name(const dashboard_navigator_t *navigator) {
+const char *
+dashboard_navigator_current_name(const dashboard_navigator_t *navigator) {
     if (navigator == NULL || navigator->count == 0) return NULL;
     return navigator->pages[navigator->current].descriptor.name;
 }
@@ -349,7 +357,8 @@ void dashboard_navigator_update(dashboard_navigator_t *navigator,
 void dashboard_navigator_destroy(dashboard_navigator_t *navigator) {
     if (navigator == NULL) return;
     for (size_t i = 0; i < navigator->count; i++) {
-        dashboard_page_destroy_cb_t destroy = navigator->pages[i].descriptor.destroy;
+        dashboard_page_destroy_cb_t destroy =
+            navigator->pages[i].descriptor.destroy;
         if (destroy != NULL) destroy(navigator->pages[i].descriptor.context);
     }
     if (navigator->root != NULL) lv_obj_delete(navigator->root);

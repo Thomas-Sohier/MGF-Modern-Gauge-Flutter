@@ -18,8 +18,9 @@
 // `ecu_data_t`.
 typedef struct {
     ecu_reader_t reader;
-    bool connected;         // reflète le dernier connect/poll
-    uint8_t poll_failures;  // échecs de poll consécutifs depuis le dernier succès
+    bool connected; // reflète le dernier connect/poll
+    uint8_t
+        poll_failures; // échecs de poll consécutifs depuis le dernier succès
 } mems_session_t;
 
 // Initialise la session avec un lecteur ECU déjà construit.

@@ -22,8 +22,8 @@ static bool mems19_reader_connect(void *ctx) {
     return ecu_reader_connect(&r->base);
 }
 
-static bool mems19_reader_send_and_receive(void *ctx, uint8_t cmd, uint8_t *resp,
-                                           size_t expected) {
+static bool mems19_reader_send_and_receive(void *ctx, uint8_t cmd,
+                                           uint8_t *resp, size_t expected) {
     mems19_reader_t *r = ctx;
     if (r == NULL) return false;
     return ecu_reader_send_and_receive(&r->base, cmd, resp, expected);

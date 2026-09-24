@@ -7,8 +7,8 @@
 #include "infrastructure/rtc_ds3231.h"
 
 #define REG_SECONDS 0x00u
-#define REG_STATUS 0x0Fu
-#define STATUS_OSF 0x80u
+#define REG_STATUS  0x0Fu
+#define STATUS_OSF  0x80u
 
 typedef struct {
     uint8_t registers[0x20];
@@ -16,9 +16,8 @@ typedef struct {
     bool fail_write;
 } fake_ds3231_t;
 
-static esp_err_t fake_write(void *context, uint8_t address,
-                            const uint8_t *data, size_t data_size,
-                            uint32_t timeout_ms) {
+static esp_err_t fake_write(void *context, uint8_t address, const uint8_t *data,
+                            size_t data_size, uint32_t timeout_ms) {
     (void)address;
     (void)timeout_ms;
     fake_ds3231_t *fake = context;
@@ -63,7 +62,7 @@ static void load_valid_time(fake_ds3231_t *fake) {
     fake->registers[0] = 0x58; // 23:59:58
     fake->registers[1] = 0x59;
     fake->registers[2] = 0x23;
-    fake->registers[3] = 5;    // Thursday
+    fake->registers[3] = 5; // Thursday
     fake->registers[4] = 0x29;
     fake->registers[5] = 0x02;
     fake->registers[6] = 0x24;
@@ -88,8 +87,13 @@ static void test_oscillator_stop_and_sync(void) {
     assert(rtc_probe(rtc) == RTC_ERR_OSCILLATOR_STOPPED);
 
     const rtc_datetime_t synchronized = {
-        .year = 2024, .month = 2, .day = 29, .weekday = 5,
-        .hour = 12, .minute = 34, .second = 56,
+        .year = 2024,
+        .month = 2,
+        .day = 29,
+        .weekday = 5,
+        .hour = 12,
+        .minute = 34,
+        .second = 56,
     };
     assert(rtc_set(rtc, &synchronized) == RTC_OK);
     assert((fake.registers[REG_STATUS] & STATUS_OSF) == 0);

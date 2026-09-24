@@ -75,10 +75,8 @@ typedef struct {
 // modifié qu'en cas de succès.
 bool companion_parse_media(const char *json, size_t length,
                            companion_media_t *out);
-bool companion_parse_nav(const char *json, size_t length,
-                         companion_nav_t *out);
-bool companion_parse_key(const char *json, size_t length,
-                         companion_key_t *out);
+bool companion_parse_nav(const char *json, size_t length, companion_nav_t *out);
+bool companion_parse_key(const char *json, size_t length, companion_key_t *out);
 bool companion_parse_time(const char *json, size_t length,
                           companion_time_t *out);
 

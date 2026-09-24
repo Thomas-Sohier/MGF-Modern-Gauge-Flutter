@@ -9,7 +9,7 @@
 // Avance à l'allumage de -10° à +50°, repère au PMH (0°) : la couronne se
 // remplit depuis ce repère, en arrière pour un retard.
 #define ADVANCE_MIN (-10.0f)
-#define ADVANCE_MAX  50.0f
+#define ADVANCE_MAX 50.0f
 
 enum { CELL_OFFSET = 0, CELL_DWELL, CELL_COIL_1, CELL_COIL_2 };
 
@@ -51,11 +51,10 @@ void ignition_screen_update(ignition_screen_t *scr, const ecu_data_t *data) {
     amber_kit_format(text, sizeof(text), advance_ok, "%.1f", advance);
     amber_page_set_hero(&scr->page, text, advance_ok);
     const float tdc = amber_progress(0.0f, ADVANCE_MIN, ADVANCE_MAX);
-    amber_page_set_rim(&scr->page, tdc,
-                       advance_ok ? amber_progress(advance, ADVANCE_MIN,
-                                                   ADVANCE_MAX)
-                                  : tdc,
-                       tdc, advance_ok);
+    amber_page_set_rim(
+        &scr->page, tdc,
+        advance_ok ? amber_progress(advance, ADVANCE_MIN, ADVANCE_MAX) : tdc,
+        tdc, advance_ok);
 
     const struct {
         float value;

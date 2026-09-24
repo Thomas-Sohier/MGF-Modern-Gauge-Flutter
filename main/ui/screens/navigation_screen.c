@@ -12,15 +12,15 @@
 // voie sous un filet, heure d'arrivée dans la ligne d'état commune. La
 // manœuvre est déduite du texte de la consigne : l'icône PNG envoyée par le
 // téléphone n'est pas exploitée par le rendu ambre.
-#define DISTANCE_Y       158.0f
-#define INSTRUCTION_Y    199.0f
-#define STREET_Y         225.0f
-#define TEXT_WIDTH       236.0f
-#define ROUTE_CORE_W       5.0f
-#define ROUTE_ROAD_W      15.0f
-#define ARROW_CORE_W       6.0f
-#define ARROW_ROAD_W      17.0f
-#define HEAD_LEN          15.0f
+#define DISTANCE_Y    158.0f
+#define INSTRUCTION_Y 199.0f
+#define STREET_Y      225.0f
+#define TEXT_WIDTH    236.0f
+#define ROUTE_CORE_W  5.0f
+#define ROUTE_ROAD_W  15.0f
+#define ARROW_CORE_W  6.0f
+#define ARROW_ROAD_W  17.0f
+#define HEAD_LEN      15.0f
 
 struct navigation_screen_s {
     amber_page_t page;
@@ -51,25 +51,34 @@ static route_shape_t shape_of(companion_maneuver_t maneuver, bool *mirror) {
         *mirror = true;
         // fall through
     case COMPANION_MANEUVER_RIGHT:
-        return (route_shape_t){{{140, 124}, {140, 100}, {158, 82}, {196, 82}}, 4,
-                               false, false};
+        return (route_shape_t){
+            {{140, 124}, {140, 100}, {158, 82}, {196, 82}}, 4, false, false};
     case COMPANION_MANEUVER_SLIGHT_LEFT:
         *mirror = true;
         // fall through
     case COMPANION_MANEUVER_SLIGHT_RIGHT:
-        return (route_shape_t){{{150, 126}, {150, 104}, {184, 70}}, 3, false,
-                               false};
+        return (route_shape_t){
+            {{150, 126}, {150, 104}, {184, 70}}, 3, false, false};
     case COMPANION_MANEUVER_SHARP_LEFT:
         *mirror = true;
         // fall through
     case COMPANION_MANEUVER_SHARP_RIGHT:
-        return (route_shape_t){{{142, 126}, {142, 74}, {186, 118}}, 3, false,
-                               false};
+        return (route_shape_t){
+            {{142, 126}, {142, 74}, {186, 118}}, 3, false, false};
     case COMPANION_MANEUVER_UTURN:
         // Demi-tour par la gauche (circulation à droite).
-        return (route_shape_t){{{182, 126}, {182, 92}, {178, 79}, {170, 71},
-                                {160, 68}, {150, 71}, {142, 79}, {138, 92},
-                                {138, 122}}, 9, false, false};
+        return (route_shape_t){{{182, 126},
+                                {182, 92},
+                                {178, 79},
+                                {170, 71},
+                                {160, 68},
+                                {150, 71},
+                                {142, 79},
+                                {138, 92},
+                                {138, 122}},
+                               9,
+                               false,
+                               false};
     case COMPANION_MANEUVER_ROUNDABOUT:
         return (route_shape_t){{{160, 128}, {160, 112}}, 2, true, false};
     case COMPANION_MANEUVER_ARRIVE:
@@ -102,8 +111,10 @@ static void draw_head(lv_layer_t *layer, const ui_layout_t *layout, point_t a,
                           b.y + HEAD_LEN * (bx * c + by * c)};
     const point_t arm2 = {b.x + HEAD_LEN * (bx * c + by * c),
                           b.y + HEAD_LEN * (-bx * c + by * c)};
-    amber_draw_line(layer, layout, b.x, b.y, arm1.x, arm1.y, width, color, true);
-    amber_draw_line(layer, layout, b.x, b.y, arm2.x, arm2.y, width, color, true);
+    amber_draw_line(layer, layout, b.x, b.y, arm1.x, arm1.y, width, color,
+                    true);
+    amber_draw_line(layer, layout, b.x, b.y, arm2.x, arm2.y, width, color,
+                    true);
 }
 
 static void draw_route(lv_layer_t *layer, const ui_layout_t *layout,
@@ -132,8 +143,8 @@ static void draw_route(lv_layer_t *layer, const ui_layout_t *layout,
     for (unsigned pass = 0; pass < 2; pass++) {
         const float width = pass == 0 ? ROUTE_ROAD_W : ROUTE_CORE_W;
         const float head_w = pass == 0 ? ARROW_ROAD_W : ARROW_CORE_W;
-        const lv_color_t color = pass == 0 ? ui_theme_amber_dim()
-                                           : ui_theme_amber_bright();
+        const lv_color_t color =
+            pass == 0 ? ui_theme_amber_dim() : ui_theme_amber_bright();
         for (unsigned i = 0; i + 1U < shape.count; i++) {
             amber_draw_line(layer, layout, pts[i].x, pts[i].y, pts[i + 1U].x,
                             pts[i + 1U].y, width, color, true);
@@ -180,7 +191,8 @@ static void refresh(navigation_screen_t *scr) {
         }
         lv_obj_set_style_text_color(scr->instruction,
                                     ui_theme_amber_separator(), 0);
-        if (amber_kit_set_text(scr->street, scr->linked ? "" : "NON CONNECTE")) {
+        if (amber_kit_set_text(scr->street,
+                               scr->linked ? "" : "NON CONNECTE")) {
             amber_kit_place(scr->street, AMBER_KIT_CX, STREET_Y,
                             AMBER_ALIGN_CENTER);
         }
@@ -191,23 +203,24 @@ static void refresh(navigation_screen_t *scr) {
 
     // Distance numérique en héros ; un texte (« MAINTENANT ») reste lisible
     // en consigne plutôt que de déborder en 56 px.
-    const bool numeric = nav->distance_value[0] >= '0' &&
-                         nav->distance_value[0] <= '9';
+    const bool numeric =
+        nav->distance_value[0] >= '0' && nav->distance_value[0] <= '9';
     amber_page_set_hero(&scr->page, numeric ? nav->distance_value : "--",
                         numeric);
     amber_readout_set_unit(&scr->page.hero, numeric ? nav->distance_unit : "");
 
-    const char *instruction = nav->instruction[0] != '\0'
-        ? nav->instruction
-        : (!numeric && nav->distance_value[0] != '\0') ? nav->distance_value
-        : "SUIVRE L'ITINERAIRE";
+    const char *instruction = nav->instruction[0] != '\0' ? nav->instruction
+                              : (!numeric && nav->distance_value[0] != '\0')
+                                  ? nav->distance_value
+                                  : "SUIVRE L'ITINERAIRE";
     if (amber_kit_set_text(scr->instruction, instruction)) {
         amber_kit_place(scr->instruction, AMBER_KIT_CX, INSTRUCTION_Y,
                         AMBER_ALIGN_CENTER);
     }
     lv_obj_set_style_text_color(scr->instruction, ui_theme_amber_bright(), 0);
     if (amber_kit_set_text(scr->street, nav->street)) {
-        amber_kit_place(scr->street, AMBER_KIT_CX, STREET_Y, AMBER_ALIGN_CENTER);
+        amber_kit_place(scr->street, AMBER_KIT_CX, STREET_Y,
+                        AMBER_ALIGN_CENTER);
     }
     amber_page_set_status(&scr->page, nav->eta, true);
     amber_page_invalidate(&scr->page);
@@ -234,8 +247,8 @@ navigation_screen_t *navigation_screen_create(lv_obj_t *parent) {
     amber_readout_layout(&scr->page.hero);
 
     lv_obj_t *root = scr->page.root;
-    const ui_layout_t layout = ui_layout_fit(lv_obj_get_width(root),
-                                             lv_obj_get_height(root));
+    const ui_layout_t layout =
+        ui_layout_fit(lv_obj_get_width(root), lv_obj_get_height(root));
     scr->instruction = amber_kit_label(root, amber_kit_font_label(),
                                        ui_theme_amber_bright(), "");
     scr->street = amber_kit_caption(root, "");

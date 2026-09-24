@@ -12,8 +12,8 @@
 static const char *TAG = "companion";
 
 // 7f3a00NN-9c44-4e6b-8d2a-5b1f00000001, octets en ordre little-endian.
-#define COMPANION_UUID(n)                                                    \
-    BLE_UUID128_INIT(0x01, 0x00, 0x00, 0x00, 0x1f, 0x5b, 0x2a, 0x8d, 0x6b,   \
+#define COMPANION_UUID(n)                                                      \
+    BLE_UUID128_INIT(0x01, 0x00, 0x00, 0x00, 0x1f, 0x5b, 0x2a, 0x8d, 0x6b,     \
                      0x4e, 0x44, 0x9c, (n), 0x00, 0x3a, 0x7f)
 
 static const ble_uuid128_t s_service_uuid = COMPANION_UUID(0x01);
@@ -65,7 +65,8 @@ static int read_payload(struct os_mbuf *om, size_t *length) {
         return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
     }
     uint16_t copied = 0;
-    if (ble_hs_mbuf_to_flat(om, s_payload, COMPANION_PAYLOAD_MAX, &copied) != 0 ||
+    if (ble_hs_mbuf_to_flat(om, s_payload, COMPANION_PAYLOAD_MAX, &copied) !=
+            0 ||
         copied != total) {
         return BLE_ATT_ERR_UNLIKELY;
     }
@@ -122,8 +123,8 @@ static int handle_write(chr_kind_t kind, struct os_mbuf *om) {
     default:
         return 0;
     }
-    ESP_LOGW(TAG, "rejected payload on characteristic %d (%u bytes)",
-             (int)kind, (unsigned)length);
+    ESP_LOGW(TAG, "rejected payload on characteristic %d (%u bytes)", (int)kind,
+             (unsigned)length);
     return BLE_ATT_ERR_UNLIKELY;
 }
 
@@ -140,34 +141,53 @@ static int access_cb(uint16_t conn_handle, uint16_t attr_handle,
     return handle_write((chr_kind_t)(uintptr_t)arg, ctxt->om);
 }
 
-#define WRITE_FLAGS (BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_ENC)
+#define WRITE_FLAGS  (BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_ENC)
 #define STREAM_FLAGS (BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_WRITE_ENC)
 
 static const struct ble_gatt_svc_def s_services[] = {
     {
         .type = BLE_GATT_SVC_TYPE_PRIMARY,
         .uuid = &s_service_uuid.u,
-        .characteristics = (struct ble_gatt_chr_def[]){
-            {.uuid = &s_metadata_uuid.u, .access_cb = access_cb,
-             .arg = (void *)CHR_METADATA, .flags = WRITE_FLAGS},
-            {.uuid = &s_art_control_uuid.u, .access_cb = access_cb,
-             .arg = (void *)CHR_DISCARD, .flags = WRITE_FLAGS},
-            {.uuid = &s_art_data_uuid.u, .access_cb = access_cb,
-             .arg = (void *)CHR_DISCARD, .flags = STREAM_FLAGS},
-            {.uuid = &s_nav_uuid.u, .access_cb = access_cb,
-             .arg = (void *)CHR_NAV, .flags = WRITE_FLAGS},
-            {.uuid = &s_nav_icon_control_uuid.u, .access_cb = access_cb,
-             .arg = (void *)CHR_DISCARD, .flags = WRITE_FLAGS},
-            {.uuid = &s_nav_icon_data_uuid.u, .access_cb = access_cb,
-             .arg = (void *)CHR_DISCARD, .flags = STREAM_FLAGS},
-            {.uuid = &s_alert_uuid.u, .access_cb = access_cb,
-             .arg = (void *)CHR_DISCARD, .flags = WRITE_FLAGS},
-            {.uuid = &s_command_uuid.u, .access_cb = access_cb,
-             .arg = (void *)CHR_COMMAND, .flags = WRITE_FLAGS},
-            {.uuid = &s_time_uuid.u, .access_cb = access_cb,
-             .arg = (void *)CHR_TIME, .flags = WRITE_FLAGS},
-            {0},
-        },
+        .characteristics =
+            (struct ble_gatt_chr_def[]){
+                {.uuid = &s_metadata_uuid.u,
+                 .access_cb = access_cb,
+                 .arg = (void *)CHR_METADATA,
+                 .flags = WRITE_FLAGS},
+                {.uuid = &s_art_control_uuid.u,
+                 .access_cb = access_cb,
+                 .arg = (void *)CHR_DISCARD,
+                 .flags = WRITE_FLAGS},
+                {.uuid = &s_art_data_uuid.u,
+                 .access_cb = access_cb,
+                 .arg = (void *)CHR_DISCARD,
+                 .flags = STREAM_FLAGS},
+                {.uuid = &s_nav_uuid.u,
+                 .access_cb = access_cb,
+                 .arg = (void *)CHR_NAV,
+                 .flags = WRITE_FLAGS},
+                {.uuid = &s_nav_icon_control_uuid.u,
+                 .access_cb = access_cb,
+                 .arg = (void *)CHR_DISCARD,
+                 .flags = WRITE_FLAGS},
+                {.uuid = &s_nav_icon_data_uuid.u,
+                 .access_cb = access_cb,
+                 .arg = (void *)CHR_DISCARD,
+                 .flags = STREAM_FLAGS},
+                {.uuid = &s_alert_uuid.u,
+                 .access_cb = access_cb,
+                 .arg = (void *)CHR_DISCARD,
+                 .flags = WRITE_FLAGS},
+                {.uuid = &s_command_uuid.u,
+                 .access_cb = access_cb,
+                 .arg = (void *)CHR_COMMAND,
+                 .flags = WRITE_FLAGS},
+                {.uuid = &s_time_uuid.u,
+                 .access_cb = access_cb,
+                 .arg = (void *)CHR_TIME,
+                 .flags = WRITE_FLAGS},
+                {0},
+            },
     },
     {0},
 };

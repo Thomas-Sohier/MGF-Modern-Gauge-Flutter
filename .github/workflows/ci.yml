@@ -22,6 +22,11 @@ jobs:
       - name: Host unit tests
         run: bash test/run_tests.sh
 
+      - name: Check formatting
+        run: |
+          pip install clang-format==23.1.1
+          tools/format.sh check
+
       - name: Render the goldens
         run: ./build.sh
 

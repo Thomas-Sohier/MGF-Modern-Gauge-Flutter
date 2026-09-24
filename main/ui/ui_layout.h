@@ -3,8 +3,8 @@
 // Physical target and logical design space. No implicit padding: components
 // share one uniform scale, centered in the largest square that fits the host.
 #define UI_DISPLAY_SIZE_PX 480
-#define UI_REFERENCE_SIZE 320.0f
-#define UI_EDGE_MARGIN 2.0f // 3 physical pixels at 480x480
+#define UI_REFERENCE_SIZE  320.0f
+#define UI_EDGE_MARGIN     2.0f // 3 physical pixels at 480x480
 
 typedef struct {
     float ox;

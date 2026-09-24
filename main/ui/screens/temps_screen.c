@@ -7,8 +7,8 @@
 
 // L'eau est la mesure héros ; les quatre autres sondes occupent la grille
 // commune.
-#define COOLANT_DANGER  105.0f
-#define OIL_DANGER      130.0f
+#define COOLANT_DANGER 105.0f
+#define OIL_DANGER     130.0f
 
 enum { CELL_OIL = 0, CELL_INTAKE, CELL_AMBIENT, CELL_FUEL };
 
@@ -20,8 +20,8 @@ struct temps_screen_s {
 };
 
 static float to_display(float celsius, app_settings_units_t units) {
-    return units == APP_SETTINGS_UNITS_IMPERIAL
-               ? celsius * 9.0f / 5.0f + 32.0f : celsius;
+    return units == APP_SETTINGS_UNITS_IMPERIAL ? celsius * 9.0f / 5.0f + 32.0f
+                                                : celsius;
 }
 
 static const char *unit_text(app_settings_units_t units) {
@@ -51,7 +51,8 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
 }
 
 void temps_screen_set_units(temps_screen_t *scr, app_settings_units_t units) {
-    if (scr == NULL || units >= APP_SETTINGS_UNITS_COUNT || scr->units == units) {
+    if (scr == NULL || units >= APP_SETTINGS_UNITS_COUNT ||
+        scr->units == units) {
         return;
     }
     scr->units = units;
@@ -77,7 +78,9 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
     amber_page_set_hero(&scr->page, text, coolant_ok);
 
     const float cells[AMBER_PAGE_CELLS] = {
-        data->oil_temp, data->intake_air_temp, data->ambient_temp,
+        data->oil_temp,
+        data->intake_air_temp,
+        data->ambient_temp,
         data->fuel_rail_temp,
     };
     for (int i = 0; i < AMBER_PAGE_CELLS; i++) {
@@ -87,9 +90,9 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
         amber_page_set_cell(&scr->page, i, text, ok);
     }
 
-    const bool hot = (coolant_ok && coolant >= COOLANT_DANGER) ||
-                     (connected && isfinite(data->oil_temp) &&
-                      data->oil_temp >= OIL_DANGER);
+    const bool hot =
+        (coolant_ok && coolant >= COOLANT_DANGER) ||
+        (connected && isfinite(data->oil_temp) && data->oil_temp >= OIL_DANGER);
     const bool cold = coolant_ok && coolant < 70.0f;
     if (!connected) {
         amber_page_set_hero_caption(&scr->page, "EAU MOTEUR", false);
@@ -100,8 +103,7 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
     } else {
         amber_page_set_hero_caption(&scr->page, "EAU MOTEUR", false);
         amber_page_set_status(&scr->page,
-                              cold ? "MOTEUR FROID" : "TEMPERATURES OK",
-                              false);
+                              cold ? "MOTEUR FROID" : "TEMPERATURES OK", false);
     }
 }
 

@@ -20,8 +20,8 @@ static esp_err_t ensure_device(shared_i2c_master_context_t *context,
         .device_address = address,
         .scl_speed_hz = context->clock_hz,
     };
-    const esp_err_t error = i2c_master_bus_add_device(
-        context->bus, &config, &context->device);
+    const esp_err_t error =
+        i2c_master_bus_add_device(context->bus, &config, &context->device);
     if (error == ESP_OK) context->address = address;
     return error;
 }
@@ -41,8 +41,9 @@ static esp_err_t master_write_read(void *opaque, uint8_t address,
                                    const uint8_t *write_data, size_t write_size,
                                    uint8_t *read_data, size_t read_size,
                                    uint32_t timeout_ms) {
-    if (write_data == NULL || write_size == 0 ||
-        read_data == NULL || read_size == 0) return ESP_ERR_INVALID_ARG;
+    if (write_data == NULL || write_size == 0 || read_data == NULL ||
+        read_size == 0)
+        return ESP_ERR_INVALID_ARG;
     shared_i2c_master_context_t *context = opaque;
     esp_err_t error = ensure_device(context, address);
     if (error != ESP_OK) return error;

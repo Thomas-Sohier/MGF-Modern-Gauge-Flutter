@@ -40,9 +40,8 @@ static void draw_segmented_frame(lv_layer_t *layer, const ui_layout_t *layout) {
 static void draw_badge(lv_layer_t *layer, const ui_layout_t *layout) {
     const lv_color_t separator = ui_theme_amber_separator();
     const float points[][2] = {
-        {108.0f, 93.0f}, {212.0f, 93.0f}, {228.0f, 109.0f},
-        {228.0f, 163.0f}, {212.0f, 179.0f}, {108.0f, 179.0f},
-        {92.0f, 163.0f}, {92.0f, 109.0f},
+        {108.0f, 93.0f},  {212.0f, 93.0f},  {228.0f, 109.0f}, {228.0f, 163.0f},
+        {212.0f, 179.0f}, {108.0f, 179.0f}, {92.0f, 163.0f},  {92.0f, 109.0f},
     };
 
     for (unsigned i = 0; i < sizeof(points) / sizeof(points[0]); i++) {
@@ -73,8 +72,8 @@ static void draw_mgf_mark(lv_layer_t *layer, const ui_layout_t *layout) {
                     bright, true);
 
     // G : l'ouverture et la traverse restent très lisibles à faible luminosité.
-    amber_draw_arc_wrapped(layer, layout, 157.0f, 135.0f, 16.0f, width,
-                           42.0f, 276.0f, bright, true);
+    amber_draw_arc_wrapped(layer, layout, 157.0f, 135.0f, 16.0f, width, 42.0f,
+                           276.0f, bright, true);
     amber_draw_line(layer, layout, 157.0f, 135.0f, 174.0f, 135.0f, width,
                     bright, true);
 
@@ -112,8 +111,8 @@ boot_screen_t *boot_screen_create(lv_obj_t *parent) {
     screen->root = amber_ui_root_create(parent);
     if (screen->root == NULL) goto fail;
 
-    screen->canvas = amber_ui_canvas_create(screen->root, NULL,
-                                            boot_canvas_draw_cb);
+    screen->canvas =
+        amber_ui_canvas_create(screen->root, NULL, boot_canvas_draw_cb);
     if (screen->canvas == NULL) goto fail;
 
     screen->label = amber_kit_caption(screen->root, "DEMARRAGE");

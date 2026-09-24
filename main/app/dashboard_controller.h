@@ -17,8 +17,8 @@ typedef struct dashboard_controller_s dashboard_controller_t;
 // Construit le contrôleur. La source et le navigateur sont empruntés (ils doivent
 // rester valides jusqu'à dashboard_controller_destroy()). Ils sont utilisés par
 // le callback d'un timer LVGL, donc dans le thread LVGL.
-dashboard_controller_t *dashboard_controller_create(
-    const dashboard_controller_config_t *config);
+dashboard_controller_t *
+dashboard_controller_create(const dashboard_controller_config_t *config);
 
 // Démarre le timer LVGL du contrôleur. À appeler depuis un contexte externe
 // après acquisition du verrou LVGL (ou directement dans le thread LVGL).

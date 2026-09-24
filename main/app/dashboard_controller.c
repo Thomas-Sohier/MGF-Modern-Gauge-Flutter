@@ -28,10 +28,10 @@ static void dashboard_controller_tick(lv_timer_t *timer) {
     dashboard_navigator_update(controller->navigator, &controller->snapshot);
 }
 
-dashboard_controller_t *dashboard_controller_create(
-    const dashboard_controller_config_t *config) {
-    if (config == NULL || config->navigator == NULL || config->ecu_source.read == NULL ||
-        config->period_ms == 0) {
+dashboard_controller_t *
+dashboard_controller_create(const dashboard_controller_config_t *config) {
+    if (config == NULL || config->navigator == NULL ||
+        config->ecu_source.read == NULL || config->period_ms == 0) {
         return NULL;
     }
 

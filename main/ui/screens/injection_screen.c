@@ -9,9 +9,9 @@
 // repère central vers la valeur, ce qui rend le sens de la correction
 // (enrichissement / appauvrissement) lisible d'un coup d'œil.
 #define CORRECTION_MIN     70.0f
-#define CORRECTION_MAX    130.0f
+#define CORRECTION_MAX     130.0f
 #define CORRECTION_NEUTRAL 100.0f
-#define NEUTRAL_BAND        2.0f
+#define NEUTRAL_BAND       2.0f
 
 enum { CELL_SHORT_TRIM = 0, CELL_LONG_TRIM, CELL_INJECTOR_1, CELL_INJECTOR_2 };
 
@@ -51,14 +51,14 @@ void injection_screen_update(injection_screen_t *scr, const ecu_data_t *data) {
 
     amber_kit_format(text, sizeof(text), correction_ok, "%.0f", correction);
     amber_page_set_hero(&scr->page, text, correction_ok);
-    const float neutral = amber_progress(CORRECTION_NEUTRAL, CORRECTION_MIN,
-                                         CORRECTION_MAX);
-    amber_page_set_rim(&scr->page, neutral,
-                       correction_ok ? amber_progress(correction,
-                                                      CORRECTION_MIN,
-                                                      CORRECTION_MAX)
-                                     : neutral,
-                       neutral, correction_ok);
+    const float neutral =
+        amber_progress(CORRECTION_NEUTRAL, CORRECTION_MIN, CORRECTION_MAX);
+    amber_page_set_rim(
+        &scr->page, neutral,
+        correction_ok
+            ? amber_progress(correction, CORRECTION_MIN, CORRECTION_MAX)
+            : neutral,
+        neutral, correction_ok);
 
     const struct {
         float value;

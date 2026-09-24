@@ -49,10 +49,11 @@ static bool apply_update(settings_runtime_t *runtime,
     return true;
 }
 
-settings_runtime_t *settings_runtime_create(
-    const app_settings_t *initial, settings_coordinator_save_cb_t save,
-    void *save_context, settings_runtime_apply_cb_t apply,
-    void *apply_context) {
+settings_runtime_t *settings_runtime_create(const app_settings_t *initial,
+                                            settings_coordinator_save_cb_t save,
+                                            void *save_context,
+                                            settings_runtime_apply_cb_t apply,
+                                            void *apply_context) {
     if (initial == NULL || save == NULL || apply == NULL ||
         !app_settings_is_valid(initial)) {
         return NULL;
@@ -66,8 +67,8 @@ settings_runtime_t *settings_runtime_create(
         return NULL;
     }
 
-    runtime->coordinator = settings_coordinator_create(
-        initial, save, save_context);
+    runtime->coordinator =
+        settings_coordinator_create(initial, save, save_context);
     if (runtime->coordinator == NULL) {
         vSemaphoreDelete(runtime->mutex);
         free(runtime);
@@ -108,7 +109,7 @@ bool settings_runtime_submit(void *context, const app_settings_t *settings) {
 }
 
 bool settings_runtime_set_brightness(settings_runtime_t *runtime,
-                                      uint8_t brightness_percent) {
+                                     uint8_t brightness_percent) {
     if (runtime == NULL || brightness_percent > 100U) return false;
     app_settings_t next = *settings_coordinator_current(runtime->coordinator);
     next.brightness_percent = brightness_percent;
@@ -143,8 +144,8 @@ bool settings_runtime_set_utc_offset(settings_runtime_t *runtime,
 
 bool settings_runtime_update(settings_runtime_t *runtime,
                              const app_settings_t *settings) {
-    if (runtime == NULL || settings == NULL ||
-        !app_settings_is_valid(settings)) return false;
+    if (runtime == NULL || settings == NULL || !app_settings_is_valid(settings))
+        return false;
     return apply_update(runtime, settings);
 }
 

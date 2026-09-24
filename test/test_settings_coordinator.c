@@ -58,7 +58,8 @@ static void test_changes_reset_quiet_period_and_revert(void) {
 
     settings_coordinator_page_changed(coordinator, APP_SETTINGS_PAGE_MUSIC);
     assert(!settings_coordinator_tick(coordinator, 100));
-    settings_coordinator_page_changed(coordinator, APP_SETTINGS_PAGE_NAVIGATION);
+    settings_coordinator_page_changed(coordinator,
+                                      APP_SETTINGS_PAGE_NAVIGATION);
     assert(!settings_coordinator_tick(coordinator, 200));
     assert(!settings_coordinator_tick(coordinator, 3199));
     assert(settings_coordinator_tick(coordinator, 3200));
@@ -67,7 +68,8 @@ static void test_changes_reset_quiet_period_and_revert(void) {
 
     // A change reverted before the deadline is equivalent to no change.
     settings_coordinator_page_changed(coordinator, APP_SETTINGS_PAGE_CLOCK);
-    settings_coordinator_page_changed(coordinator, APP_SETTINGS_PAGE_NAVIGATION);
+    settings_coordinator_page_changed(coordinator,
+                                      APP_SETTINGS_PAGE_NAVIGATION);
     assert(!settings_coordinator_is_dirty(coordinator));
     assert(!settings_coordinator_tick(coordinator, 10000));
     assert(spy.calls == 1U);
@@ -101,9 +103,11 @@ static void test_future_setting_setters(void) {
     assert(coordinator != NULL);
 
     assert(settings_coordinator_set_brightness(coordinator, 42));
-    assert(settings_coordinator_set_units(coordinator, APP_SETTINGS_UNITS_IMPERIAL));
+    assert(settings_coordinator_set_units(coordinator,
+                                          APP_SETTINGS_UNITS_IMPERIAL));
     assert(!settings_coordinator_set_brightness(coordinator, 101));
-    assert(!settings_coordinator_set_theme(coordinator, APP_SETTINGS_THEME_COUNT));
+    assert(
+        !settings_coordinator_set_theme(coordinator, APP_SETTINGS_THEME_COUNT));
     assert(!settings_coordinator_tick(coordinator, 0));
     assert(settings_coordinator_tick(coordinator, 3000));
     assert(spy.calls == 1U);

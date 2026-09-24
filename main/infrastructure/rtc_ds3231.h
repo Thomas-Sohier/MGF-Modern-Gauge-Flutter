@@ -5,7 +5,7 @@
 #include "domain/rtc.h"
 #include "infrastructure/shared_i2c.h"
 
-#define DS3231_I2C_ADDRESS 0x68u
+#define DS3231_I2C_ADDRESS  0x68u
 #define DS3231_I2C_SDA_GPIO 8
 #define DS3231_I2C_SCL_GPIO 48
 

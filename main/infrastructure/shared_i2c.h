@@ -8,13 +8,15 @@
 #include "esp_err.h"
 
 // Vue non propriétaire d'un bus I2C déjà initialisé par le bring-up carte.
-typedef esp_err_t (*shared_i2c_write_fn)(
-    void *context, uint8_t address, const uint8_t *data, size_t data_size,
-    uint32_t timeout_ms);
-typedef esp_err_t (*shared_i2c_write_read_fn)(
-    void *context, uint8_t address, const uint8_t *write_data,
-    size_t write_size, uint8_t *read_data, size_t read_size,
-    uint32_t timeout_ms);
+typedef esp_err_t (*shared_i2c_write_fn)(void *context, uint8_t address,
+                                         const uint8_t *data, size_t data_size,
+                                         uint32_t timeout_ms);
+typedef esp_err_t (*shared_i2c_write_read_fn)(void *context, uint8_t address,
+                                              const uint8_t *write_data,
+                                              size_t write_size,
+                                              uint8_t *read_data,
+                                              size_t read_size,
+                                              uint32_t timeout_ms);
 
 typedef struct {
     void *context;

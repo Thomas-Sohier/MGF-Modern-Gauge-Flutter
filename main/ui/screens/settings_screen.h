@@ -14,8 +14,8 @@ typedef struct settings_screen_s settings_screen_t;
 typedef enum {
     SETTINGS_BLE_UNAVAILABLE = 0, // image sans BLE ou service non démarré
     SETTINGS_BLE_CLOSED,
-    SETTINGS_BLE_OPEN,            // fenêtre d'appairage ouverte
-    SETTINGS_BLE_CONNECTED,       // téléphone appairé lié
+    SETTINGS_BLE_OPEN,      // fenêtre d'appairage ouverte
+    SETTINGS_BLE_CONNECTED, // téléphone appairé lié
 } settings_ble_state_t;
 
 typedef struct {
@@ -30,8 +30,9 @@ typedef struct {
 
 // Créé masqué. `parent` est l'écran actif : la surimpression le couvre
 // entièrement et intercepte tous les appuis tant qu'elle est visible.
-settings_screen_t *settings_screen_create(
-    lv_obj_t *parent, const settings_screen_actions_t *actions);
+settings_screen_t *
+settings_screen_create(lv_obj_t *parent,
+                       const settings_screen_actions_t *actions);
 void settings_screen_show(settings_screen_t *screen,
                           const app_settings_t *settings);
 void settings_screen_hide(settings_screen_t *screen);

@@ -7,8 +7,8 @@
 
 // AFR comparé à la stœchiométrie : hors de la bande, la légende signale un
 // mélange riche ou pauvre.
-#define AFR_STOICH       14.7f
-#define AFR_BAND          0.3f
+#define AFR_STOICH 14.7f
+#define AFR_BAND   0.3f
 
 enum { CELL_O2_LEFT = 0, CELL_O2_RIGHT, CELL_LAMBDA, CELL_HEATER };
 
@@ -66,7 +66,8 @@ void lambda_screen_update(lambda_screen_t *scr, const ecu_data_t *data) {
         amber_page_set_status(&scr->page, "PAS DE LIAISON", false);
         return;
     }
-    if (!afr_ok) amber_page_set_hero_caption(&scr->page, "AIR / CARBURANT", false);
+    if (!afr_ok)
+        amber_page_set_hero_caption(&scr->page, "AIR / CARBURANT", false);
     else if (afr < AFR_STOICH - AFR_BAND) {
         amber_page_set_hero_caption(&scr->page, "MELANGE RICHE", true);
     } else if (afr > AFR_STOICH + AFR_BAND) {
@@ -76,8 +77,9 @@ void lambda_screen_update(lambda_screen_t *scr, const ecu_data_t *data) {
     }
     const bool heating = duty_ok && data->lambda_sensor_duty_cycle > 0.0f;
     amber_page_set_status(&scr->page,
-                          !duty_ok ? "CHAUFFAGE INDISPONIBLE"
-                          : heating ? "CHAUFFAGE ACTIF" : "CHAUFFAGE INACTIF",
+                          !duty_ok  ? "CHAUFFAGE INDISPONIBLE"
+                          : heating ? "CHAUFFAGE ACTIF"
+                                    : "CHAUFFAGE INACTIF",
                           false);
 }
 

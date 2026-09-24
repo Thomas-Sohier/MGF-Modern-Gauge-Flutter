@@ -19,27 +19,27 @@
 // séparateur (lisible), éléments éteints ou indisponibles = ambre sombre.
 
 // ── Géométrie partagée ──────────────────────────────────────────────────────
-#define AMBER_KIT_CX          160.0f
-#define AMBER_KIT_RIM_START   160.0f
-#define AMBER_KIT_RIM_SWEEP   220.0f
-#define AMBER_KIT_RIM_R_OUT   157.0f
-#define AMBER_KIT_RIM_R_IN    145.0f
-#define AMBER_KIT_RIM_GAP_DEG   1.8f
+#define AMBER_KIT_CX           160.0f
+#define AMBER_KIT_RIM_START    160.0f
+#define AMBER_KIT_RIM_SWEEP    220.0f
+#define AMBER_KIT_RIM_R_OUT    157.0f
+#define AMBER_KIT_RIM_R_IN     145.0f
+#define AMBER_KIT_RIM_GAP_DEG  1.8f
 #define AMBER_KIT_RIM_SEGMENTS 36
 
-#define AMBER_KIT_TITLE_Y      47.0f
-#define AMBER_KIT_HERO_Y       91.0f
-#define AMBER_KIT_HERO_CAP_Y  123.0f
-#define AMBER_KIT_GRID_TOP_Y  140.0f
-#define AMBER_KIT_ROW1_Y      163.0f
-#define AMBER_KIT_ROW1_CAP_Y  184.0f
-#define AMBER_KIT_GRID_MID_Y  200.0f
-#define AMBER_KIT_ROW2_Y      219.0f
-#define AMBER_KIT_ROW2_CAP_Y  240.0f
-#define AMBER_KIT_GRID_BOT_Y  252.0f
-#define AMBER_KIT_STATUS_Y    272.0f
-#define AMBER_KIT_COL_L       101.0f
-#define AMBER_KIT_COL_R       219.0f
+#define AMBER_KIT_TITLE_Y    47.0f
+#define AMBER_KIT_HERO_Y     91.0f
+#define AMBER_KIT_HERO_CAP_Y 123.0f
+#define AMBER_KIT_GRID_TOP_Y 140.0f
+#define AMBER_KIT_ROW1_Y     163.0f
+#define AMBER_KIT_ROW1_CAP_Y 184.0f
+#define AMBER_KIT_GRID_MID_Y 200.0f
+#define AMBER_KIT_ROW2_Y     219.0f
+#define AMBER_KIT_ROW2_CAP_Y 240.0f
+#define AMBER_KIT_GRID_BOT_Y 252.0f
+#define AMBER_KIT_STATUS_Y   272.0f
+#define AMBER_KIT_COL_L      101.0f
+#define AMBER_KIT_COL_R      219.0f
 
 // ── Polices ─────────────────────────────────────────────────────────────────
 const lv_font_t *amber_kit_font_hero(void);    // 56 px
@@ -123,8 +123,8 @@ typedef struct {
     const char *cell_caption[AMBER_PAGE_CELLS];
     const char *cell_unit[AMBER_PAGE_CELLS];
     amber_rim_mode_t rim;
-    int rim_segments;          // 0 -> AMBER_KIT_RIM_SEGMENTS
-    bool no_grid;              // pas de cellules
+    int rim_segments;           // 0 -> AMBER_KIT_RIM_SEGMENTS
+    bool no_grid;               // pas de cellules
     const lv_font_t *cell_font; // NULL -> police valeur (30 px)
     amber_page_draw_cb_t draw_extra;
     void *context;
@@ -155,8 +155,8 @@ bool amber_page_create(amber_page_t *page, lv_obj_t *parent,
 // Fractions 0..1 de la couronne : segments allumés entre `from` et `to`
 // (ordre libre), repère facultatif (`marker` < 0 : aucun). N'invalide le
 // canvas que si l'état discret des segments change.
-void amber_page_set_rim(amber_page_t *page, float from, float to,
-                        float marker, bool active);
+void amber_page_set_rim(amber_page_t *page, float from, float to, float marker,
+                        bool active);
 void amber_page_set_hero(amber_page_t *page, const char *text, bool available);
 void amber_page_set_hero_caption(amber_page_t *page, const char *text,
                                  bool emphasized);

@@ -6,10 +6,10 @@
 
 // Défauts remontés par l'ECU (bits de `ecu_data_t.fault_flags`).
 enum {
-    ECU_FAULT_COOLANT_SENSOR = 1u << 0,     // sonde température d'eau
-    ECU_FAULT_INTAKE_AIR_SENSOR = 1u << 1,  // sonde température d'air
-    ECU_FAULT_FUEL_PUMP = 1u << 2,          // circuit pompe à essence
-    ECU_FAULT_THROTTLE_POT = 1u << 3,       // potentiomètre papillon
+    ECU_FAULT_COOLANT_SENSOR = 1u << 0,    // sonde température d'eau
+    ECU_FAULT_INTAKE_AIR_SENSOR = 1u << 1, // sonde température d'air
+    ECU_FAULT_FUEL_PUMP = 1u << 2,         // circuit pompe à essence
+    ECU_FAULT_THROTTLE_POT = 1u << 3,      // potentiomètre papillon
 };
 
 // Instantané normalisé des données ECU consommées par les écrans. Un champ
@@ -65,19 +65,34 @@ static inline ecu_data_t ecu_data_unavailable(void) {
         .connected = false,
         .faults_available = false,
         .fault_flags = 0,
-        .rpm = NAN, .throttle = NAN, .coolant_temp = NAN,
-        .battery_voltage = NAN, .oil_temp = NAN,
-        .ambient_temp = NAN, .intake_air_temp = NAN, .fuel_rail_temp = NAN,
-        .map_sensor_kpa = NAN, .throttle_pot_voltage = NAN,
-        .ignition_advance = NAN, .ignition_advance_offset = NAN,
-        .coil_1_charge_time = NAN, .coil_2_charge_time = NAN,
+        .rpm = NAN,
+        .throttle = NAN,
+        .coolant_temp = NAN,
+        .battery_voltage = NAN,
+        .oil_temp = NAN,
+        .ambient_temp = NAN,
+        .intake_air_temp = NAN,
+        .fuel_rail_temp = NAN,
+        .map_sensor_kpa = NAN,
+        .throttle_pot_voltage = NAN,
+        .ignition_advance = NAN,
+        .ignition_advance_offset = NAN,
+        .coil_1_charge_time = NAN,
+        .coil_2_charge_time = NAN,
         .coil_time_microseconds = NAN,
-        .injector_1_pw = NAN, .injector_2_pw = NAN,
-        .fuelling_feedback_percent = NAN, .short_term_trim_percent = NAN,
+        .injector_1_pw = NAN,
+        .injector_2_pw = NAN,
+        .fuelling_feedback_percent = NAN,
+        .short_term_trim_percent = NAN,
         .long_term_trim = NAN,
-        .lambda_mv = NAN, .o2_mv = NAN, .estimated_air_fuel = NAN,
+        .lambda_mv = NAN,
+        .o2_mv = NAN,
+        .estimated_air_fuel = NAN,
         .lambda_sensor_duty_cycle = NAN,
-        .idle_setpoint = NAN, .idle_adjuster_rpm = NAN, .idle_error = NAN,
-        .idle_valve_position = NAN, .idle_base_position = NAN,
+        .idle_setpoint = NAN,
+        .idle_adjuster_rpm = NAN,
+        .idle_error = NAN,
+        .idle_valve_position = NAN,
+        .idle_base_position = NAN,
     };
 }

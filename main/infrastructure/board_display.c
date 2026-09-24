@@ -26,27 +26,27 @@ static const char *TAG = "board_disp";
 // LILYGO T-RGB 2.1 Full Circle (H597) pinout.  The LCD data GPIO order is
 // deliberately kept as the upstream D0..D15 order, not reconstructed from
 // the colour names in the vendor comments (which disagree between revisions).
-#define LCD_H_RES             480
-#define LCD_V_RES             480
-#define PIN_LCD_BL            GPIO_NUM_46
-#define PIN_LCD_HSYNC         GPIO_NUM_47
-#define PIN_LCD_VSYNC         GPIO_NUM_41
-#define PIN_LCD_DE            GPIO_NUM_45
-#define PIN_LCD_PCLK          GPIO_NUM_42
-#define PIN_I2C_SDA           GPIO_NUM_8
-#define PIN_I2C_SCL           GPIO_NUM_48
-#define PIN_TOUCH_IRQ         GPIO_NUM_1
-#define I2C_PORT              I2C_NUM_0
-#define I2C_HZ                400000
-#define XL9535_ADDRESS        0x20
+#define LCD_H_RES      480
+#define LCD_V_RES      480
+#define PIN_LCD_BL     GPIO_NUM_46
+#define PIN_LCD_HSYNC  GPIO_NUM_47
+#define PIN_LCD_VSYNC  GPIO_NUM_41
+#define PIN_LCD_DE     GPIO_NUM_45
+#define PIN_LCD_PCLK   GPIO_NUM_42
+#define PIN_I2C_SDA    GPIO_NUM_8
+#define PIN_I2C_SCL    GPIO_NUM_48
+#define PIN_TOUCH_IRQ  GPIO_NUM_1
+#define I2C_PORT       I2C_NUM_0
+#define I2C_HZ         400000
+#define XL9535_ADDRESS 0x20
 
 // These are XL9535/XL9555 port numbers.  IO0 is not used by the H597.
-#define EXIO_TOUCH_RST       IO_EXPANDER_PIN_NUM_1
-#define EXIO_PWR_EN          IO_EXPANDER_PIN_NUM_2
-#define EXIO_LCD_CS          IO_EXPANDER_PIN_NUM_3
-#define EXIO_LCD_SDA         IO_EXPANDER_PIN_NUM_4
-#define EXIO_LCD_SCL         IO_EXPANDER_PIN_NUM_5
-#define EXIO_LCD_RST         IO_EXPANDER_PIN_NUM_6
+#define EXIO_TOUCH_RST IO_EXPANDER_PIN_NUM_1
+#define EXIO_PWR_EN    IO_EXPANDER_PIN_NUM_2
+#define EXIO_LCD_CS    IO_EXPANDER_PIN_NUM_3
+#define EXIO_LCD_SDA   IO_EXPANDER_PIN_NUM_4
+#define EXIO_LCD_SCL   IO_EXPANDER_PIN_NUM_5
+#define EXIO_LCD_RST   IO_EXPANDER_PIN_NUM_6
 
 #ifndef MGF_LILYGO_T_RGB_V2
 #define MGF_LILYGO_T_RGB_V2 0
@@ -68,15 +68,11 @@ typedef struct {
 
 #if MGF_LILYGO_T_RGB_V2
 static const int s_rgb_data_v2[] = {
-    43, 7, 6, 5, 3,
-    14, 13, 12, 11, 10, 9,
-    44, 21, 18, 17, 16,
+    43, 7, 6, 5, 3, 14, 13, 12, 11, 10, 9, 44, 21, 18, 17, 16,
 };
 #else
 static const int s_rgb_data_original[] = {
-    7, 6, 5, 3, 2,
-    14, 13, 12, 11, 10, 9,
-    21, 18, 17, 16, 15,
+    7, 6, 5, 3, 2, 14, 13, 12, 11, 10, 9, 21, 18, 17, 16, 15,
 };
 #endif
 
@@ -144,34 +140,36 @@ static esp_err_t i2c_bus_init(void) {
 }
 
 static esp_err_t expander_init(void) {
-    ESP_RETURN_ON_ERROR(
-        esp_io_expander_new_i2c_tca95xx_16bit(s_i2c_bus, XL9535_ADDRESS, &s_expander),
-        TAG, "XL9535-compatible expander at 0x%02x", XL9535_ADDRESS);
+    ESP_RETURN_ON_ERROR(esp_io_expander_new_i2c_tca95xx_16bit(
+                            s_i2c_bus, XL9535_ADDRESS, &s_expander),
+                        TAG, "XL9535-compatible expander at 0x%02x",
+                        XL9535_ADDRESS);
 
     const uint32_t output_pins = EXIO_TOUCH_RST | EXIO_PWR_EN | EXIO_LCD_CS |
                                  EXIO_LCD_SDA | EXIO_LCD_SCL | EXIO_LCD_RST;
-    ESP_RETURN_ON_ERROR(esp_io_expander_set_dir(s_expander, output_pins,
-                                                IO_EXPANDER_OUTPUT),
-                        TAG, "configure XL9535 outputs");
+    ESP_RETURN_ON_ERROR(
+        esp_io_expander_set_dir(s_expander, output_pins, IO_EXPANDER_OUTPUT),
+        TAG, "configure XL9535 outputs");
     ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_expander, EXIO_PWR_EN, 1),
                         TAG, "enable panel power");
     ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_expander, EXIO_LCD_CS, 1),
                         TAG, "idle LCD CS");
-    ESP_RETURN_ON_ERROR(esp_io_expander_set_level(
-                            s_expander, EXIO_LCD_SDA | EXIO_LCD_SCL, 0),
-                        TAG, "idle LCD serial lines");
+    ESP_RETURN_ON_ERROR(
+        esp_io_expander_set_level(s_expander, EXIO_LCD_SDA | EXIO_LCD_SCL, 0),
+        TAG, "idle LCD serial lines");
 
     // The vendor sequence requires PWR_EN before the LCD reset pulse.  Touch
     // reset is released with the LCD, then the CST820 gets its own settle time.
-    ESP_RETURN_ON_ERROR(esp_io_expander_set_level(
-                            s_expander, EXIO_LCD_RST | EXIO_TOUCH_RST, 0),
-                        TAG, "assert panel and touch reset");
+    ESP_RETURN_ON_ERROR(
+        esp_io_expander_set_level(s_expander, EXIO_LCD_RST | EXIO_TOUCH_RST, 0),
+        TAG, "assert panel and touch reset");
     vTaskDelay(pdMS_TO_TICKS(20));
     ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_expander, EXIO_LCD_RST, 1),
                         TAG, "release LCD reset");
     vTaskDelay(pdMS_TO_TICKS(10));
-    ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_expander, EXIO_TOUCH_RST, 1),
-                        TAG, "release touch reset");
+    ESP_RETURN_ON_ERROR(
+        esp_io_expander_set_level(s_expander, EXIO_TOUCH_RST, 1), TAG,
+        "release touch reset");
     vTaskDelay(pdMS_TO_TICKS(50));
     return ESP_OK;
 }
@@ -189,8 +187,8 @@ static esp_err_t panel_init(esp_lcd_panel_io_handle_t *out_io,
     };
     const esp_lcd_panel_io_3wire_spi_config_t io_config =
         ST7701_PANEL_IO_3WIRE_SPI_CONFIG(line_config, 0);
-    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_3wire_spi(&io_config, out_io),
-                        TAG, "create 9-bit ST7701 serial IO");
+    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_3wire_spi(&io_config, out_io), TAG,
+                        "create 9-bit ST7701 serial IO");
 
     esp_lcd_rgb_panel_config_t rgb_config = {
         .clk_src = LCD_CLK_SRC_DEFAULT,
@@ -204,18 +202,19 @@ static esp_err_t panel_init(esp_lcd_panel_io_handle_t *out_io,
         .de_gpio_num = PIN_LCD_DE,
         .pclk_gpio_num = PIN_LCD_PCLK,
         .disp_gpio_num = -1,
-        .timings = {
-            .pclk_hz = s_profile.pclk_hz,
-            .h_res = LCD_H_RES,
-            .v_res = LCD_V_RES,
-            .hsync_pulse_width = s_profile.hsync_pulse_width,
-            .hsync_back_porch = s_profile.hsync_back_porch,
-            .hsync_front_porch = s_profile.hsync_front_porch,
-            .vsync_pulse_width = s_profile.vsync_pulse_width,
-            .vsync_back_porch = s_profile.vsync_back_porch,
-            .vsync_front_porch = s_profile.vsync_front_porch,
-            .flags.pclk_active_neg = true,
-        },
+        .timings =
+            {
+                .pclk_hz = s_profile.pclk_hz,
+                .h_res = LCD_H_RES,
+                .v_res = LCD_V_RES,
+                .hsync_pulse_width = s_profile.hsync_pulse_width,
+                .hsync_back_porch = s_profile.hsync_back_porch,
+                .hsync_front_porch = s_profile.hsync_front_porch,
+                .vsync_pulse_width = s_profile.vsync_pulse_width,
+                .vsync_back_porch = s_profile.vsync_back_porch,
+                .vsync_front_porch = s_profile.vsync_front_porch,
+                .flags.pclk_active_neg = true,
+            },
         .flags.fb_in_psram = true,
     };
     for (size_t i = 0; i < 16; ++i) {
@@ -226,10 +225,11 @@ static esp_err_t panel_init(esp_lcd_panel_io_handle_t *out_io,
         .init_cmds = s_profile.init_cmds,
         .init_cmds_size = s_profile.init_cmds_size,
         .rgb_config = &rgb_config,
-        .flags = {
-            .mirror_by_cmd = 0,
-            .auto_del_panel_io = 0,
-        },
+        .flags =
+            {
+                .mirror_by_cmd = 0,
+                .auto_del_panel_io = 0,
+            },
     };
     const esp_lcd_panel_dev_config_t panel_config = {
         .reset_gpio_num = -1, // reset is on XL9535 IO6
@@ -237,9 +237,9 @@ static esp_err_t panel_init(esp_lcd_panel_io_handle_t *out_io,
         .bits_per_pixel = 16,
         .vendor_config = (void *)&vendor_config,
     };
-    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_st7701(*out_io, &panel_config,
-                                                 out_panel),
-                        TAG, "create ST7701S RGB panel");
+    ESP_RETURN_ON_ERROR(
+        esp_lcd_new_panel_st7701(*out_io, &panel_config, out_panel), TAG,
+        "create ST7701S RGB panel");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_init(*out_panel), TAG,
                         "initialize ST7701S profile %s", s_profile.name);
     ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(*out_panel, true), TAG,
@@ -265,15 +265,17 @@ static lv_display_t *lvgl_bringup(esp_lcd_panel_io_handle_t io,
         .hres = LCD_H_RES,
         .vres = LCD_V_RES,
         .color_format = LV_COLOR_FORMAT_RGB565,
-        .flags = {
-            .buff_spiram = true,
-        },
+        .flags =
+            {
+                .buff_spiram = true,
+            },
     };
     const lvgl_port_display_rgb_cfg_t rgb_config = {
-        .flags = {
-            .bb_mode = true,
-            .avoid_tearing = true,
-        },
+        .flags =
+            {
+                .bb_mode = true,
+                .avoid_tearing = true,
+            },
     };
     return lvgl_port_add_disp_rgb(&display_config, &rgb_config);
 }
@@ -286,12 +288,13 @@ static void touch_bringup(lv_display_t *display) {
         .control_phase_bytes = 1,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 0,
-        .flags = {
-            .disable_control_phase = 1,
-        },
+        .flags =
+            {
+                .disable_control_phase = 1,
+            },
     };
-    esp_err_t err = esp_lcd_new_panel_io_i2c(s_i2c_bus, &touch_io_config,
-                                             &touch_io);
+    esp_err_t err =
+        esp_lcd_new_panel_io_i2c(s_i2c_bus, &touch_io_config, &touch_io);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "optional CST820 I2C IO unavailable: %s",
                  esp_err_to_name(err));
@@ -303,15 +306,17 @@ static void touch_bringup(lv_display_t *display) {
         .y_max = LCD_V_RES,
         .rst_gpio_num = -1, // CST820 reset is XL9535 IO1
         .int_gpio_num = PIN_TOUCH_IRQ,
-        .levels = {
-            .reset = 0,
-            .interrupt = 0,
-        },
-        .flags = {
-            .swap_xy = 0,
-            .mirror_x = 0,
-            .mirror_y = 0,
-        },
+        .levels =
+            {
+                .reset = 0,
+                .interrupt = 0,
+            },
+        .flags =
+            {
+                .swap_xy = 0,
+                .mirror_x = 0,
+                .mirror_y = 0,
+            },
     };
     esp_lcd_touch_handle_t touch = NULL;
     err = esp_lcd_touch_new_i2c_cst816s(touch_io, &touch_config, &touch);
@@ -379,8 +384,7 @@ static void board_display_cleanup(void) {
     // The RTC only borrows this adapter. Its owner is responsible for
     // destroying the RTC before calling board_display_stop().
     if (s_i2c_ready) {
-        shared_i2c_master_bus_deinit(&s_shared_i2c_bus,
-                                     &s_shared_i2c_context);
+        shared_i2c_master_bus_deinit(&s_shared_i2c_bus, &s_shared_i2c_context);
         s_i2c_ready = false;
     }
     if (s_i2c_bus != NULL) {

@@ -42,36 +42,55 @@ static char ascii_upper(char c) {
 static const char *fold_codepoint(uint32_t cp) {
     // Latin-1 (U+00C0..U+00FF), indexé à partir de U+00C0.
     static const char *const latin1[64] = {
-        "A", "A", "A", "A", "A", "A", "AE", "C",   // C0-C7
-        "E", "E", "E", "E", "I", "I", "I", "I",    // C8-CF
-        "D", "N", "O", "O", "O", "O", "O", "X",    // D0-D7
-        "O", "U", "U", "U", "U", "Y", "TH", "SS",  // D8-DF
-        "A", "A", "A", "A", "A", "A", "AE", "C",   // E0-E7
-        "E", "E", "E", "E", "I", "I", "I", "I",    // E8-EF
-        "D", "N", "O", "O", "O", "O", "O", "/",    // F0-F7
-        "O", "U", "U", "U", "U", "Y", "TH", "Y",   // F8-FF
+        "A", "A", "A", "A", "A", "A", "AE", "C",  // C0-C7
+        "E", "E", "E", "E", "I", "I", "I",  "I",  // C8-CF
+        "D", "N", "O", "O", "O", "O", "O",  "X",  // D0-D7
+        "O", "U", "U", "U", "U", "Y", "TH", "SS", // D8-DF
+        "A", "A", "A", "A", "A", "A", "AE", "C",  // E0-E7
+        "E", "E", "E", "E", "I", "I", "I",  "I",  // E8-EF
+        "D", "N", "O", "O", "O", "O", "O",  "/",  // F0-F7
+        "O", "U", "U", "U", "U", "Y", "TH", "Y",  // F8-FF
     };
     if (cp >= 0xC0u && cp <= 0xFFu) return latin1[cp - 0xC0u];
     switch (cp) {
-    case 0x00A0u: return " ";  // espace insécable
-    case 0x202Fu: return " ";  // espace fine insécable (typographie FR)
-    case 0x2009u: return " ";
-    case 0x00B7u: return "-";  // point médian (« 12 min · 5 km »)
-    case 0x2022u: return "-";
-    case 0x2013u: return "-";
-    case 0x2014u: return "-";
-    case 0x2018u: return "'";
-    case 0x2019u: return "'";
-    case 0x201Cu: return "\"";
-    case 0x201Du: return "\"";
-    case 0x00ABu: return "\"";
-    case 0x00BBu: return "\"";
-    case 0x2026u: return "...";
-    case 0x0152u: return "OE";
-    case 0x0153u: return "OE";
-    case 0x0178u: return "Y";
-    case 0x2192u: return "-";  // flèche
-    default: return NULL;
+    case 0x00A0u:
+        return " "; // espace insécable
+    case 0x202Fu:
+        return " "; // espace fine insécable (typographie FR)
+    case 0x2009u:
+        return " ";
+    case 0x00B7u:
+        return "-"; // point médian (« 12 min · 5 km »)
+    case 0x2022u:
+        return "-";
+    case 0x2013u:
+        return "-";
+    case 0x2014u:
+        return "-";
+    case 0x2018u:
+        return "'";
+    case 0x2019u:
+        return "'";
+    case 0x201Cu:
+        return "\"";
+    case 0x201Du:
+        return "\"";
+    case 0x00ABu:
+        return "\"";
+    case 0x00BBu:
+        return "\"";
+    case 0x2026u:
+        return "...";
+    case 0x0152u:
+        return "OE";
+    case 0x0153u:
+        return "OE";
+    case 0x0178u:
+        return "Y";
+    case 0x2192u:
+        return "-"; // flèche
+    default:
+        return NULL;
     }
 }
 
@@ -84,17 +103,28 @@ void companion_display_text(const char *utf8, char *out, size_t out_size) {
     while (*s != '\0') {
         const unsigned char c = *s;
         if (c < 0x80u) {
-            if (c == '\t' || c == '\n' || c == '\r') emit_char(&text, ' ');
-            else if (c >= 0x20u && c < 0x7Fu) emit_char(&text, ascii_upper((char)c));
+            if (c == '\t' || c == '\n' || c == '\r')
+                emit_char(&text, ' ');
+            else if (c >= 0x20u && c < 0x7Fu)
+                emit_char(&text, ascii_upper((char)c));
             s++;
             continue;
         }
         uint32_t cp;
         size_t count;
-        if ((c & 0xE0u) == 0xC0u) { cp = c & 0x1Fu; count = 2; }
-        else if ((c & 0xF0u) == 0xE0u) { cp = c & 0x0Fu; count = 3; }
-        else if ((c & 0xF8u) == 0xF0u) { cp = c & 0x07u; count = 4; }
-        else { s++; continue; } // octet de continuation isolé
+        if ((c & 0xE0u) == 0xC0u) {
+            cp = c & 0x1Fu;
+            count = 2;
+        } else if ((c & 0xF0u) == 0xE0u) {
+            cp = c & 0x0Fu;
+            count = 3;
+        } else if ((c & 0xF8u) == 0xF0u) {
+            cp = c & 0x07u;
+            count = 4;
+        } else {
+            s++;
+            continue;
+        } // octet de continuation isolé
         size_t i = 1;
         for (; i < count && (s[i] & 0xC0u) == 0x80u; i++) {
             cp = (cp << 6) | (s[i] & 0x3Fu);
@@ -174,8 +204,8 @@ static bool media_member(void *context, const char *key,
 bool companion_parse_media(const char *json, size_t length,
                            companion_media_t *out) {
     media_parse_t p = {.media = {.position_ms = -1, .duration_ms = 0}};
-    if (out == NULL || !parse(json, length, media_member, &p) ||
-        !p.has_title || !p.has_state) {
+    if (out == NULL || !parse(json, length, media_member, &p) || !p.has_title ||
+        !p.has_state) {
         return false;
     }
     *out = p.media;
@@ -236,8 +266,8 @@ static void copy_truncated(char *out, size_t size, const char *src,
 // formulent la voie après « VERS », « SUR », « DANS », « ONTO », « TOWARD ».
 static void split_instruction(const char *text, companion_nav_t *nav) {
     static const char *const separators[] = {
-        " VERS ", " SUR ", " DANS ", " EN DIRECTION DE ", " ONTO ",
-        " TOWARD ", " TOWARDS ", " ON ",
+        " VERS ", " SUR ",    " DANS ",    " EN DIRECTION DE ",
+        " ONTO ", " TOWARD ", " TOWARDS ", " ON ",
     };
     const char *cut = NULL;
     size_t cut_len = 0;
@@ -279,8 +309,7 @@ static void split_distance(const char *text, companion_nav_t *nav) {
     static const char *const units[] = {"KM", "MI", "FT", "YD", "M"};
     for (size_t i = 0; i < sizeof(units) / sizeof(units[0]); i++) {
         const size_t n = strlen(units[i]);
-        if (strncmp(p, units[i], n) == 0 &&
-            !(p[n] >= 'A' && p[n] <= 'Z')) {
+        if (strncmp(p, units[i], n) == 0 && !(p[n] >= 'A' && p[n] <= 'Z')) {
             // Unités d'affichage en minuscules, comme le reste du kit.
             for (size_t k = 0; k < n && k + 1U < sizeof(nav->distance_unit);
                  k++) {
@@ -295,8 +324,7 @@ static void split_distance(const char *text, companion_nav_t *nav) {
 bool companion_parse_nav(const char *json, size_t length,
                          companion_nav_t *out) {
     nav_parse_t p = {0};
-    if (out == NULL || !parse(json, length, nav_member, &p) ||
-        !p.has_active) {
+    if (out == NULL || !parse(json, length, nav_member, &p) || !p.has_active) {
         return false;
     }
     companion_nav_t nav = {.active = p.active};
@@ -320,16 +348,20 @@ static bool key_member(void *context, const char *key,
                        const flat_json_value_t *v) {
     key_parse_t *p = context;
     if (strcmp(key, "type") == 0) {
-        p->is_nav_key = v->type == FLAT_JSON_STRING &&
-                        strcmp(v->string, "nav_key") == 0;
+        p->is_nav_key =
+            v->type == FLAT_JSON_STRING && strcmp(v->string, "nav_key") == 0;
         return true;
     }
     if (strcmp(key, "key") == 0) {
         static const char *const names[] = {
-            [COMPANION_KEY_NEXT] = "next",   [COMPANION_KEY_PREVIOUS] = "previous",
-            [COMPANION_KEY_UP] = "up",       [COMPANION_KEY_DOWN] = "down",
-            [COMPANION_KEY_LEFT] = "left",   [COMPANION_KEY_RIGHT] = "right",
-            [COMPANION_KEY_OK] = "ok",       [COMPANION_KEY_BACK] = "back",
+            [COMPANION_KEY_NEXT] = "next",
+            [COMPANION_KEY_PREVIOUS] = "previous",
+            [COMPANION_KEY_UP] = "up",
+            [COMPANION_KEY_DOWN] = "down",
+            [COMPANION_KEY_LEFT] = "left",
+            [COMPANION_KEY_RIGHT] = "right",
+            [COMPANION_KEY_OK] = "ok",
+            [COMPANION_KEY_BACK] = "back",
         };
         if (v->type != FLAT_JSON_STRING) return false;
         for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
@@ -347,8 +379,8 @@ static bool key_member(void *context, const char *key,
 bool companion_parse_key(const char *json, size_t length,
                          companion_key_t *out) {
     key_parse_t p = {0};
-    if (out == NULL || !parse(json, length, key_member, &p) ||
-        !p.is_nav_key || !p.has_key) {
+    if (out == NULL || !parse(json, length, key_member, &p) || !p.is_nav_key ||
+        !p.has_key) {
         return false;
     }
     *out = p.key;
@@ -383,8 +415,8 @@ static bool time_member(void *context, const char *key,
 bool companion_parse_time(const char *json, size_t length,
                           companion_time_t *out) {
     time_parse_t p = {0};
-    if (out == NULL || !parse(json, length, time_member, &p) ||
-        !p.has_epoch || !p.has_offset) {
+    if (out == NULL || !parse(json, length, time_member, &p) || !p.has_epoch ||
+        !p.has_offset) {
         return false;
     }
     *out = p.time;
@@ -411,19 +443,22 @@ companion_maneuver_t companion_maneuver_from_text(const char *text) {
     }
     const bool left = contains(text, "GAUCHE") || contains(text, "LEFT");
     const bool right = contains(text, "DROITE") || contains(text, "RIGHT");
-    const bool slight = contains(text, "LEGEREMENT") || contains(text, "SLIGHT") ||
-                        contains(text, "SERREZ") || contains(text, "KEEP") ||
-                        contains(text, "RESTEZ") || contains(text, "BIFURQU");
-    const bool sharp = contains(text, "FRANCHEMENT") || contains(text, "SHARP") ||
-                       contains(text, "SERRE A");
+    const bool slight = contains(text, "LEGEREMENT") ||
+                        contains(text, "SLIGHT") || contains(text, "SERREZ") ||
+                        contains(text, "KEEP") || contains(text, "RESTEZ") ||
+                        contains(text, "BIFURQU");
+    const bool sharp = contains(text, "FRANCHEMENT") ||
+                       contains(text, "SHARP") || contains(text, "SERRE A");
     // « Tout droit » contient « DROIT » mais pas « DROITE ».
     if (left && !right) {
         if (sharp) return COMPANION_MANEUVER_SHARP_LEFT;
-        return slight ? COMPANION_MANEUVER_SLIGHT_LEFT : COMPANION_MANEUVER_LEFT;
+        return slight ? COMPANION_MANEUVER_SLIGHT_LEFT
+                      : COMPANION_MANEUVER_LEFT;
     }
     if (right && !left) {
         if (sharp) return COMPANION_MANEUVER_SHARP_RIGHT;
-        return slight ? COMPANION_MANEUVER_SLIGHT_RIGHT : COMPANION_MANEUVER_RIGHT;
+        return slight ? COMPANION_MANEUVER_SLIGHT_RIGHT
+                      : COMPANION_MANEUVER_RIGHT;
     }
     if (contains(text, "TOUT DROIT") || contains(text, "STRAIGHT") ||
         contains(text, "CONTINUE") || contains(text, "CONTINUEZ") ||

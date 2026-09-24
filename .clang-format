@@ -1,0 +1,37 @@
+# Style commun du firmware et du simulateur hôte.
+#
+# Aligné sur le style existant : 4 espaces, 80 colonnes, accolade ouvrante sur
+# la ligne, pointeur collé à droite, `if` court sur une ligne, `case` au niveau
+# du `switch`. Les commentaires et l'ordre des #include ne sont pas retouchés.
+#
+# Version de référence : clang-format 23.1.1 (épinglée dans la CI). Un binaire
+# plus ancien peut produire un diff différent : lancer `tools/format.sh check`.
+---
+Language: Cpp
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 80
+
+PointerAlignment: Right
+DerivePointerAlignment: false
+BreakBeforeBraces: Attach
+
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLoopsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortCaseLabelsOnASingleLine: false
+IndentCaseLabels: false
+
+SortIncludes: false
+ReflowComments: false
+AlignEscapedNewlines: Right
+AlignTrailingComments: true
+AlignConsecutiveMacros: Consecutive
+
+SpaceAfterCStyleCast: false
+Cpp11BracedListStyle: true
+BreakStringLiterals: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1

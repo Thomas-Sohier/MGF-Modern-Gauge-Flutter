@@ -60,7 +60,8 @@ static void test_snapshot_copy(void) {
     check(output.connected == expected.connected, "connected field is copied");
     check(output.rpm == expected.rpm, "rpm field is copied");
     check(output.throttle == expected.throttle, "throttle field is copied");
-    check(output.coolant_temp == expected.coolant_temp, "coolant field is copied");
+    check(output.coolant_temp == expected.coolant_temp,
+          "coolant field is copied");
     check(output.battery_voltage == expected.battery_voltage,
           "battery field is copied");
     check(output.oil_temp == expected.oil_temp, "oil field is copied");

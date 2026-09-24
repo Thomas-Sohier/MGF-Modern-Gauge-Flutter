@@ -8,10 +8,10 @@
 #include "lvgl.h"
 
 typedef void (*dashboard_page_update_cb_t)(void *context,
-                                            const ecu_data_t *data);
+                                           const ecu_data_t *data);
 typedef void (*dashboard_page_destroy_cb_t)(void *context);
-typedef void (*dashboard_page_settings_cb_t)(
-    void *context, app_settings_units_t units);
+typedef void (*dashboard_page_settings_cb_t)(void *context,
+                                             app_settings_units_t units);
 typedef void (*dashboard_page_changed_cb_t)(void *context, size_t page_index);
 typedef void (*dashboard_hold_cb_t)(void *context);
 
@@ -44,7 +44,7 @@ void dashboard_navigator_previous(dashboard_navigator_t *navigator);
 // Sélectionne une page déjà enregistrée. Retourne false pour un index hors
 // limites. Une sélection identique ne déclenche pas l'observateur.
 bool dashboard_navigator_select_page(dashboard_navigator_t *navigator,
-                                      size_t page_index);
+                                     size_t page_index);
 // Installe un observateur appelé après chaque changement réel de page.
 void dashboard_navigator_set_page_changed_callback(
     dashboard_navigator_t *navigator, dashboard_page_changed_cb_t callback,
@@ -52,16 +52,16 @@ void dashboard_navigator_set_page_changed_callback(
 // Installe l'action du maintien prolongé (~1 s, doigt immobile, dans le
 // disque visible) : ouverture des réglages. Le relâcher n'est pas un tap.
 void dashboard_navigator_set_hold_callback(dashboard_navigator_t *navigator,
-                                            dashboard_hold_cb_t callback,
-                                            void *context);
+                                           dashboard_hold_cb_t callback,
+                                           void *context);
 // Propagates the unit preference to pages that display physical quantities.
 // Must run in the LVGL task (or under its platform lock).
 void dashboard_navigator_set_units(dashboard_navigator_t *navigator,
                                    app_settings_units_t units);
 size_t dashboard_navigator_current(const dashboard_navigator_t *navigator);
 size_t dashboard_navigator_count(const dashboard_navigator_t *navigator);
-const char *dashboard_navigator_current_name(
-    const dashboard_navigator_t *navigator);
+const char *
+dashboard_navigator_current_name(const dashboard_navigator_t *navigator);
 
 // Mémorise le dernier instantané ECU et actualise uniquement la page visible.
 // Lors d'une navigation, la nouvelle page reçoit immédiatement cet instantané.
