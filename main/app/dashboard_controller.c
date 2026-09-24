@@ -7,8 +7,6 @@ struct dashboard_controller_s {
     ecu_source_t ecu_source;
     uint32_t period_ms;
     ecu_data_t snapshot;
-    dashboard_state_t state;
-    uint32_t error_count;
     lv_timer_t *timer;
 };
 
@@ -21,16 +19,12 @@ static void dashboard_controller_tick(lv_timer_t *timer) {
 
     ecu_data_t next;
     if (!ecu_source_read(&controller->ecu_source, &next)) {
-        controller->state = DASHBOARD_STATE_ERROR;
-        if (controller->error_count < UINT32_MAX) controller->error_count++;
         // Keep the last valid snapshot on transport/source errors. In
         // particular, do not update or destroy the screen in this case.
         return;
     }
 
     controller->snapshot = next;
-    controller->state = next.connected ? DASHBOARD_STATE_CONNECTED
-                                       : DASHBOARD_STATE_DISCONNECTED;
     dashboard_navigator_update(controller->navigator, &controller->snapshot);
 }
 
@@ -48,8 +42,6 @@ dashboard_controller_t *dashboard_controller_create(
     controller->ecu_source = config->ecu_source;
     controller->period_ms = config->period_ms;
     controller->snapshot = (ecu_data_t){0};
-    controller->state = DASHBOARD_STATE_BOOT;
-    controller->error_count = 0;
     controller->timer = NULL;
     return controller;
 }
@@ -61,16 +53,6 @@ bool dashboard_controller_start(dashboard_controller_t *controller) {
     controller->timer = lv_timer_create(dashboard_controller_tick,
                                         controller->period_ms, controller);
     return controller->timer != NULL;
-}
-
-dashboard_state_t dashboard_controller_state(
-    const dashboard_controller_t *controller) {
-    return controller == NULL ? DASHBOARD_STATE_ERROR : controller->state;
-}
-
-uint32_t dashboard_controller_error_count(
-    const dashboard_controller_t *controller) {
-    return controller == NULL ? 0 : controller->error_count;
 }
 
 void dashboard_controller_destroy(dashboard_controller_t *controller) {

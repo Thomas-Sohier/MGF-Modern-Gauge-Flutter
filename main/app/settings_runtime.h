@@ -36,10 +36,6 @@ bool settings_runtime_set_startup_page(settings_runtime_t *runtime,
 // Décalage UTC -> heure légale reçu du téléphone (persisté, anti-rebond).
 bool settings_runtime_set_utc_offset(settings_runtime_t *runtime,
                                      int16_t utc_offset_minutes);
-bool settings_runtime_set_theme(settings_runtime_t *runtime,
-                                app_settings_theme_t theme);
-bool settings_runtime_set_units(settings_runtime_t *runtime,
-                                app_settings_units_t units);
 bool settings_runtime_update(settings_runtime_t *runtime,
                              const app_settings_t *settings);
 

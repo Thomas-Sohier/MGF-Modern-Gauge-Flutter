@@ -141,22 +141,6 @@ bool settings_runtime_set_utc_offset(settings_runtime_t *runtime,
     return apply_update(runtime, &next);
 }
 
-bool settings_runtime_set_theme(settings_runtime_t *runtime,
-                                app_settings_theme_t theme) {
-    if (runtime == NULL || theme >= APP_SETTINGS_THEME_COUNT) return false;
-    app_settings_t next = *settings_coordinator_current(runtime->coordinator);
-    next.theme = theme;
-    return apply_update(runtime, &next);
-}
-
-bool settings_runtime_set_units(settings_runtime_t *runtime,
-                                app_settings_units_t units) {
-    if (runtime == NULL || units >= APP_SETTINGS_UNITS_COUNT) return false;
-    app_settings_t next = *settings_coordinator_current(runtime->coordinator);
-    next.units = units;
-    return apply_update(runtime, &next);
-}
-
 bool settings_runtime_update(settings_runtime_t *runtime,
                              const app_settings_t *settings) {
     if (runtime == NULL || settings == NULL ||

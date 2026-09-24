@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "app/app_state.h"
 #include "domain/ecu_source.h"
 #include "ui/navigation/dashboard_navigator.h"
 
@@ -24,16 +23,6 @@ dashboard_controller_t *dashboard_controller_create(
 // Démarre le timer LVGL du contrôleur. À appeler depuis un contexte externe
 // après acquisition du verrou LVGL (ou directement dans le thread LVGL).
 bool dashboard_controller_start(dashboard_controller_t *controller);
-
-// Retourne le dernier état observé par le contrôleur. Une lecture réussie
-// avec connected=false produit DASHBOARD_STATE_DISCONNECTED.
-dashboard_state_t dashboard_controller_state(
-    const dashboard_controller_t *controller);
-
-// Retourne le nombre de lectures ECU en erreur depuis la création du
-// contrôleur. Une lecture réussie, y compris déconnectée, ne l'incrémente pas.
-uint32_t dashboard_controller_error_count(
-    const dashboard_controller_t *controller);
 
 // Arrête le timer et libère le contrôleur. Le contrôleur ne détruit pas la
 // source ni l'écran empruntés. À appeler depuis le thread LVGL, hors du
