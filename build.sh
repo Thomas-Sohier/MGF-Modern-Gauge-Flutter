@@ -90,7 +90,7 @@ gcc "${CFLAGS[@]}" \
 echo ">> génération des goldens..."
 "$BUILD/gen_golden" boot  "$GDIR/boot_amber.png"
 "$BUILD/gen_golden" amber "$GDIR/rpm_amber.png"
-for style in clock music navigation faults temps injection lambda ignition idle admission settings; do
+for style in dashboard clock music navigation faults temps injection lambda ignition idle admission settings; do
     "$BUILD/gen_golden" "$style" "$GDIR/${style}_amber.png"
 done
 echo ">> OK — goldens régénérés dans test/golden/"

@@ -6,6 +6,7 @@ la même UI LVGL que la cible ESP32-S3.
 | Fichier | Format | Style | Source UI |
 |---|---|---|---|
 | `rpm_amber.png` | **480×480 (rond)** | ambre, 26 barres radiales, séparateurs fins et rangée de 4 indicateurs (cf. `specs/image` photo 1) | `main/ui/screens/style_amber.c` + `main/ui/` |
+| `dashboard_amber.png` | **480×480 (rond)** | navigation entre pages : l'indicateur de position (un point par page, point courant éclairci) sous la page INJECTION | `main/ui/navigation/dashboard_navigator.c` |
 | `boot_amber.png` | **480×480 (rond)** | écran de démarrage ambre | `main/ui/screens/boot_screen.c` |
 | `clock_amber.png` | **480×480 (rond)** | horloge ambre (style propre, hors kit) | `main/ui/screens/clock_screen.c` |
 | `{music,navigation,faults}_amber.png` | **480×480 (rond)** | services et diagnostic ambre, kit commun ; musique et navigation avec des données de l'application compagnon (`offline` = téléphone déconnecté) | `main/ui/screens/*_screen.c` + `main/ui/widgets/amber_kit.c` |

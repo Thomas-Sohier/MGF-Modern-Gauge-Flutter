@@ -18,6 +18,7 @@
 #include "ui/screens/idle_screen.h"
 #include "ui/screens/admission_screen.h"
 #include "ui/screens/settings_screen.h"
+#include "ui/navigation/dashboard_navigator.h"
 #include "ui/fonts/ui_fonts.h"
 #include "domain/ecu_data.h"
 #include "ui/ui_layout.h"
@@ -103,7 +104,8 @@ static void *load_file(const char *path, size_t *out_size) {
 
 int main(int argc, char **argv) {
     // Usage : gen_golden [amber|boot|clock|music|navigation|faults|temps|
-    //                     injection|lambda|ignition|idle|admission|settings]
+    //                     injection|lambda|ignition|idle|admission|dashboard|
+    //                     settings]
     //                    png [offline]
     const char *style = (argc > 1) ? argv[1] : "amber";
     const char *out = (argc > 2) ? argv[2] : "rpm_amber.png";
@@ -186,6 +188,34 @@ int main(int argc, char **argv) {
     else if (strcmp(style, "ignition") == 0) ignition_screen_update(ignition_screen_create(screen), &mock);
     else if (strcmp(style, "idle") == 0) idle_screen_update(idle_screen_create(screen), &mock);
     else if (strcmp(style, "admission") == 0) admission_screen_update(admission_screen_create(screen), &mock);
+    else if (strcmp(style, "dashboard") == 0) {
+        // Navigation : trois pages et l'indicateur de position, deuxième page
+        // sélectionnée pour montrer le point courant au milieu.
+        dashboard_navigator_t *nav = dashboard_navigator_create(screen);
+        lv_obj_t *rpm_page = dashboard_navigator_create_page(nav);
+        amber_screen_t *rpm = amber_screen_create(rpm_page);
+        lv_obj_t *inj_page = dashboard_navigator_create_page(nav);
+        injection_screen_t *inj = injection_screen_create(inj_page);
+        lv_obj_t *tmp_page = dashboard_navigator_create_page(nav);
+        temps_screen_t *tmp = temps_screen_create(tmp_page);
+        const dashboard_page_t pages[] = {
+            { .name = "RPM", .context = rpm },
+            { .name = "INJECTION", .context = inj },
+            { .name = "TEMPERATURES", .context = tmp },
+        };
+        if (nav == NULL || rpm_page == NULL || rpm == NULL ||
+            inj_page == NULL || inj == NULL || tmp_page == NULL || tmp == NULL) {
+            fprintf(stderr, "dashboard: allocation echouee\n");
+            return 1;
+        }
+        dashboard_navigator_register_page(nav, rpm_page, &pages[0]);
+        dashboard_navigator_register_page(nav, inj_page, &pages[1]);
+        dashboard_navigator_register_page(nav, tmp_page, &pages[2]);
+        amber_screen_update(rpm, &mock);
+        injection_screen_update(inj, &mock);
+        temps_screen_update(tmp, &mock);
+        dashboard_navigator_select_page(nav, 1);
+    }
     else if (strcmp(style, "settings") == 0) {
         // Réglages ouverts : luminosité ~60 %, démarrage sur le compte-tours,
         // fenêtre BLE ouverte (ou image sans BLE en mode « offline »).

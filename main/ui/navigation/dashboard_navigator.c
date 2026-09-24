@@ -1,12 +1,22 @@
 #include "ui/navigation/dashboard_navigator.h"
 #include "ui/navigation/dashboard_timing.h"
 #include "ui/navigation/ui_instrumentation.h"
+#include "ui/themes/ui_theme.h"
+#include "ui/widgets/amber_draw.h"
 
 #define DASHBOARD_MAX_PAGES 12
 #define GESTURE_CLICK_SUPPRESSION_MS 300U
 // Maintien volontairement plus long que l'appui long LVGL (400 ms) : un
 // effleurement en roulant ne doit pas ouvrir les réglages.
 #define HOLD_ACTION_MS 1000U
+
+// Indicateur de position : un point par page dans l'ouverture basse du cadran,
+// point courant éclairci. Visible dès qu'il y a plus d'une page à parcourir.
+#define INDICATOR_CX       160.0f
+#define INDICATOR_Y        298.0f
+#define INDICATOR_SPACING  11.0f
+#define INDICATOR_R          2.6f
+#define INDICATOR_R_CURRENT  3.6f
 
 typedef struct {
     lv_obj_t *object;
@@ -17,6 +27,7 @@ typedef struct {
 
 struct dashboard_navigator_s {
     lv_obj_t *root;
+    lv_obj_t *indicator;
     page_entry_t pages[DASHBOARD_MAX_PAGES];
     size_t count;
     size_t current;
@@ -58,6 +69,33 @@ static void show_current(dashboard_navigator_t *navigator) {
     for (size_t i = 0; i < navigator->count; i++) {
         if (i == navigator->current) lv_obj_remove_flag(navigator->pages[i].object, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(navigator->pages[i].object, LV_OBJ_FLAG_HIDDEN);
+    }
+    // La pile de pages est au-dessus de l'indicateur : le remettre au premier
+    // plan après toute bascule, puis redessiner le point courant.
+    if (navigator->indicator != NULL) {
+        lv_obj_move_foreground(navigator->indicator);
+        lv_obj_invalidate(navigator->indicator);
+    }
+}
+
+static void indicator_draw_cb(lv_event_t *event) {
+    lv_obj_t *object = lv_event_get_target(event);
+    lv_layer_t *layer = lv_event_get_layer(event);
+    dashboard_navigator_t *navigator = lv_obj_get_user_data(object);
+    if (navigator == NULL || navigator->count < 2) return;
+
+    lv_area_t area;
+    lv_obj_get_coords(object, &area);
+    const ui_layout_t layout = amber_draw_layout(&area);
+    const float span = INDICATOR_SPACING * (float)(navigator->count - 1);
+    const float x0 = INDICATOR_CX - span * 0.5f;
+    for (size_t i = 0; i < navigator->count; i++) {
+        const bool current = i == navigator->current;
+        amber_draw_dot(layer, &layout, x0 + INDICATOR_SPACING * (float)i,
+                       INDICATOR_Y, current ? INDICATOR_R_CURRENT
+                                            : INDICATOR_R,
+                       current ? ui_theme_amber_bright()
+                               : ui_theme_amber_dim());
     }
 }
 
@@ -199,6 +237,24 @@ dashboard_navigator_t *dashboard_navigator_create(lv_obj_t *parent) {
     lv_obj_center(navigator->root);
     lv_obj_clear_flag(navigator->root, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(navigator->root, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+
+    // Superposition transparente et non cliquable : elle n'intercepte aucun
+    // appui (les gestes continuent d'atteindre la racine).
+    navigator->indicator = lv_obj_create(navigator->root);
+    if (navigator->indicator == NULL) {
+        lv_obj_delete(navigator->root);
+        lv_free(navigator);
+        return NULL;
+    }
+    lv_obj_remove_style_all(navigator->indicator);
+    lv_obj_set_size(navigator->indicator, LV_PCT(100), LV_PCT(100));
+    lv_obj_center(navigator->indicator);
+    lv_obj_clear_flag(navigator->indicator,
+                      LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_user_data(navigator->indicator, navigator);
+    lv_obj_add_event_cb(navigator->indicator, indicator_draw_cb,
+                        LV_EVENT_DRAW_MAIN, NULL);
+    lv_obj_add_flag(navigator->indicator, LV_OBJ_FLAG_HIDDEN);
     navigator->last_gesture_ms = lv_tick_get() - GESTURE_CLICK_SUPPRESSION_MS;
     lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_GESTURE, navigator);
     lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_CLICKED, navigator);
@@ -233,6 +289,11 @@ bool dashboard_navigator_register_page(dashboard_navigator_t *navigator,
     };
     if (navigator->count != 0) lv_obj_add_flag(page, LV_OBJ_FLAG_HIDDEN);
     navigator->count++;
+    if (navigator->indicator != NULL) {
+        lv_obj_move_foreground(navigator->indicator);
+        if (navigator->count >= 2)
+            lv_obj_remove_flag(navigator->indicator, LV_OBJ_FLAG_HIDDEN);
+    }
     return true;
 }
 
