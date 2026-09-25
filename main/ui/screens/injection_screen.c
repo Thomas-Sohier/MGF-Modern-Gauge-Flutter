@@ -29,7 +29,7 @@ injection_screen_t *injection_screen_create(lv_obj_t *parent) {
         .title = "INJECTION",
         .hero_unit = "%",
         .hero_caption = "CORRECTION",
-        .cell_caption = {"TRIM COURT", "TRIM LONG", "INJECT. 1", "INJECT. 2"},
+        .cell_caption = {"TRIM CT", "TRIM LG", "INJECT. 1", "INJECT. 2"},
         .cell_unit = {"%", "%", "ms", "ms"},
         .rim = AMBER_RIM_SEGMENTS,
     };

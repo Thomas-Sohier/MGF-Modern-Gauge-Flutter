@@ -30,7 +30,9 @@
 #include "infrastructure/fake_ecu.h"
 #include "infrastructure/kline_board_config.h"
 #include "infrastructure/settings_store.h"
+#include "infrastructure/settings_persistence.h"
 #include "infrastructure/rtc_ds3231.h"
+#include "infrastructure/rtc_worker.h"
 #include "domain/app_settings.h"
 #include "domain/ble_window.h"
 #include "domain/companion_protocol.h"
@@ -81,9 +83,35 @@ static rtc_result_t ble_datetime_set(void *context,
     // The DS3231 stores UTC only. Accepting a local civil time here without a
     // configured offset/DST policy would silently shift the clock, so keep the
     // wire-level LOCAL value parseable but reject it at the hardware boundary.
-    if (context == NULL || date_time == NULL) return RTC_ERR_INVALID_ARGUMENT;
-    if (basis != BLE_CONFIG_TIME_UTC) return RTC_ERR_INVALID_ARGUMENT;
-    return rtc_set(context, date_time);
+    if (date_time == NULL || basis != BLE_CONFIG_TIME_UTC ||
+        !rtc_datetime_is_valid(date_time)) {
+        return RTC_ERR_INVALID_ARGUMENT;
+    }
+
+    // `context` est le worker RTC (rtc_worker_t*). On publie d'abord la
+    // commande : rtc_worker_submit marque phone_seen (priorité téléphone pour
+    // toute la session) sous le même verrou que la mise en file. Tant que ce
+    // n'est pas acquis (context NULL ou submit refusé), on ne touche PAS à
+    // l'horloge système : aucune mise à l'heure orpheline, RTC_ERR_IO seul.
+    if (!rtc_worker_submit(context, date_time)) {
+        ESP_LOGW(TAG, "heure BLE refusée (RTC absente) : système intact");
+        return RTC_ERR_IO;
+    }
+
+    // phone_seen est désormais publié : le recalage périodique RTC ne peut plus
+    // écraser cette heure. Mise à l'heure système APRÈS l'acquittement en file.
+    int64_t seconds = 0;
+    if (rtc_datetime_to_unix(date_time, &seconds)) {
+        const struct timeval now = {
+            .tv_sec = (time_t)seconds,
+            .tv_usec = 0,
+        };
+        settimeofday(&now, NULL);
+    }
+
+    // RTC_OK signifie que la commande est ACCEPTÉE et mise en file ; l'écriture
+    // I2C n'est pas encore garantie.
+    return RTC_OK;
 }
 #endif
 
@@ -99,16 +127,6 @@ static ecu_source_t disconnected_ecu_source(void) {
         .read = disconnected_ecu_read,
         .context = NULL,
     };
-}
-
-static bool save_settings(void *context, const app_settings_t *settings) {
-    (void)context;
-    const esp_err_t error = settings_store_save(settings);
-    if (error != ESP_OK) {
-        ESP_LOGW(TAG, "preferences not saved: %s", esp_err_to_name(error));
-        return false;
-    }
-    return true;
 }
 
 typedef struct {
@@ -251,7 +269,7 @@ typedef struct {
     music_screen_t *music;
     navigation_screen_t *navigation;
     settings_ui_t *settings;
-    rtc_t *rtc;
+    rtc_worker_t *rtc_worker;
     bool linked;
 } companion_ui_t;
 
@@ -270,14 +288,15 @@ static void apply_phone_time(companion_ui_t *ui, const companion_time_t *time) {
         .tv_sec = (time_t)seconds,
         .tv_usec = (suseconds_t)((time->epoch_ms % 1000) * 1000),
     };
-    settimeofday(&now, NULL);
-    if (ui->rtc != NULL) {
-        const rtc_result_t result = rtc_set(ui->rtc, &utc);
-        if (result != RTC_OK) {
-            ESP_LOGW(TAG, "RTC not updated from phone: %s",
-                     rtc_result_name(result));
-        }
+    // Publier la priorité téléphone AVANT de toucher l'horloge système : le
+    // worker marque phone_seen (sous verrou, avec la mise en file) puis le
+    // recalage périodique RTC n'écrase plus jamais le système. Le worker reste
+    // facultatif (NULL) : `false` = commande refusée (RTC absente), pas une
+    // écriture échouée ; l'horloge système est quand même appliquée ci-dessous.
+    if (!rtc_worker_submit(ui->rtc_worker, &utc)) {
+        ESP_LOGW(TAG, "RTC not queued from phone (unavailable)");
     }
+    settimeofday(&now, NULL);
     // Persisté (anti-rebond) et appliqué à l'horloge via apply_settings.
     settings_runtime_set_utc_offset(ui->settings->runtime,
                                     time->utc_offset_min);
@@ -470,6 +489,8 @@ void app_main(void) {
     lv_display_t *display = NULL;
     bool lvgl_locked = false;
     rtc_t *rtc = NULL;
+    rtc_worker_t *rtc_worker = NULL;
+    settings_persistence_t *settings_persistence = NULL;
     boot_screen_t *boot = NULL;
     dashboard_navigator_t *navigator = NULL;
     dashboard_controller_t *controller = NULL;
@@ -502,6 +523,11 @@ void app_main(void) {
     // bus view and must be destroyed before board_display_stop().
     rtc = optional_rtc_start();
 
+    // Hors boucle LVGL : le worker lit la RTC au démarrage puis la relit
+    // périodiquement, et applique les commandes d'heure du téléphone. NULL si
+    // la RTC est absente : l'horloge système reste la seule source.
+    rtc_worker = rtc_worker_start(rtc);
+
     if (!board_display_lock(0)) {
         ESP_LOGE(TAG, "could not acquire LVGL lock");
         goto cleanup;
@@ -533,7 +559,9 @@ void app_main(void) {
     {
         lv_obj_t *page = dashboard_navigator_create_page(navigator);
         clock_screen_t *view = clock_screen_create(page);
-        clock_screen_set_rtc(view, rtc);
+        // L'écran lit uniquement l'horloge système (UTC + décalage), jamais la
+        // RTC depuis l'UI : le worker maintient le système à l'heure.
+        clock_screen_set_rtc(view, NULL);
         clock_view = view;
         const dashboard_page_t descriptor = {
             .name = "HEURE",
@@ -623,9 +651,16 @@ void app_main(void) {
     };
     // Page fixe choisie dans les réglages, sinon la dernière page vue.
     settings.selected_page = app_settings_boot_page(&settings);
-    settings_runtime =
-        settings_runtime_create(&settings, save_settings, NULL, apply_settings,
-                                &s_settings_apply_context);
+    // Écritures NVS hors tâche LVGL : le coordinateur n'est acquitté qu'après
+    // une sauvegarde réellement terminée.
+    settings_persistence = settings_persistence_create();
+    if (settings_persistence == NULL) {
+        ESP_LOGE(TAG, "could not start settings persistence");
+        goto cleanup;
+    }
+    settings_runtime = settings_runtime_create(
+        &settings, settings_persistence_save, settings_persistence,
+        apply_settings, &s_settings_apply_context);
     if (settings_runtime == NULL ||
         !settings_runtime_apply_current(settings_runtime)) {
         ESP_LOGE(TAG, "could not create/apply settings runtime");
@@ -663,7 +698,7 @@ void app_main(void) {
         .music = music_view,
         .navigation = navigation_view,
         .settings = &s_settings_ui,
-        .rtc = rtc,
+        .rtc_worker = rtc_worker,
     };
     companion_timer =
         lv_timer_create(companion_timer_tick, 200, &s_companion_ui);
@@ -748,7 +783,7 @@ void app_main(void) {
             .settings_context = settings_runtime,
             .settings_read = settings_runtime_read,
             .settings_update = ble_settings_accept,
-            .rtc_context = rtc,
+            .rtc_context = rtc_worker,
             .datetime_set = ble_datetime_set,
             .pairing_open_on_start = MGF_BLE_CONFIG_OPEN_ON_BOOT != 0,
         };
@@ -782,6 +817,7 @@ cleanup:
     if (settings_runtime != NULL) {
         settings_runtime_destroy(settings_runtime);
     }
+    settings_persistence_destroy(settings_persistence);
 #if MGF_USE_MEMS_KLINE
     if (mems_ecu != NULL) mems_ecu_destroy(mems_ecu);
 #else
@@ -790,6 +826,8 @@ cleanup:
     if (settings_screen != NULL) settings_screen_destroy(settings_screen);
     if (navigator != NULL) dashboard_navigator_destroy(navigator);
     if (boot != NULL) boot_screen_destroy(boot);
+    // Arrêter le worker avant de détruire la RTC et le bus I2C de l'écran.
+    rtc_worker_stop(rtc_worker);
     rtc_destroy(rtc);
     if (lvgl_locked) board_display_unlock();
     if (display != NULL) {

@@ -16,4 +16,13 @@ clock_screen_t *clock_screen_create(lv_obj_t *parent);
 void clock_screen_set_rtc(clock_screen_t *screen, rtc_t *rtc);
 void clock_screen_set_utc_offset(clock_screen_t *screen, int16_t minutes);
 void clock_screen_update(clock_screen_t *screen, const ecu_data_t *data);
+
+// Applique une heure légale déjà résolue sans relire le RTC ni l'horloge
+// système, pour le simulateur et les tests. `valid` est forcé à faux si
+// `hour`/`minute` sortent des bornes 0..23 / 0..59. Un résultat invalide
+// masque les aiguilles et le pivot et affiche le message central
+// « HEURE / NON SYNCHRONISEE » ; le cadran reste dessiné. Le passage
+// valide -> invalide efface l'heure même si hour/minute sont identiques.
+void clock_screen_set_time(clock_screen_t *screen, int hour, int minute,
+                           bool valid);
 void clock_screen_destroy(clock_screen_t *screen);

@@ -11,8 +11,8 @@
 // Lecture en cours sur le téléphone (application compagnon). Un anneau
 // continu fait le tour du cadran et porte la progression du morceau (départ
 // à 12 h, sens horaire) ; le centre porte titre, artiste, temps et l'état de
-// lecture. Le lien BLE est à sens unique (téléphone -> jauge) : la pastille
-// centrale est un indicateur, pas une commande.
+// lecture. Le lien BLE est à sens unique (téléphone -> jauge) : le
+// pictogramme central est un indicateur, pas une commande.
 #define RING_R_OUT   157.0f
 #define RING_WIDTH   8.0f
 #define TRACK_Y      92.0f
@@ -20,7 +20,6 @@
 #define RULE_Y       137.0f
 #define TIME_Y       156.0f
 #define STATE_Y      212.0f
-#define STATE_RADIUS 27.0f
 #define TRACK_WIDTH  250.0f
 #define ARTIST_WIDTH 230.0f
 
@@ -46,7 +45,6 @@ static void draw_state(lv_layer_t *layer, const ui_layout_t *layout,
     const lv_color_t bright = ui_theme_amber_bright();
     const lv_color_t dim = ui_theme_amber_dim();
     const lv_color_t sep = ui_theme_amber_separator();
-    const lv_color_t bg = ui_theme_amber_bg();
 
     amber_draw_circle(layer, layout, AMBER_KIT_CX, AMBER_KIT_CX, RING_R_OUT,
                       RING_WIDTH, dim);
@@ -62,27 +60,24 @@ static void draw_state(lv_layer_t *layer, const ui_layout_t *layout,
     const bool active = scr->has_media && scr->linked;
     const companion_playback_t state =
         active ? scr->media.state : COMPANION_PLAYBACK_STOPPED;
-    amber_draw_circle(layer, layout, AMBER_KIT_CX, STATE_Y, STATE_RADIUS + 5.0f,
-                      1.0f, sep);
-    amber_draw_dot(layer, layout, AMBER_KIT_CX, STATE_Y, STATE_RADIUS,
-                   active ? bright : dim);
+    const lv_color_t glyph = active ? bright : dim;
     if (state == COMPANION_PLAYBACK_PLAYING) {
         // Lecture : triangle.
         for (float y = -10.0f; y <= 10.0f; y += 1.0f) {
             const float x_end = 156.0f + 16.0f * (1.0f - fabsf(y) / 10.0f);
             amber_draw_line(layer, layout, 155.0f, STATE_Y + y, x_end,
-                            STATE_Y + y, 1.2f, bg, false);
+                            STATE_Y + y, 1.2f, glyph, false);
         }
     } else if (state == COMPANION_PLAYBACK_PAUSED) {
         amber_draw_line(layer, layout, 154.0f, STATE_Y - 9.0f, 154.0f,
-                        STATE_Y + 9.0f, 4.0f, bg, false);
+                        STATE_Y + 9.0f, 4.0f, glyph, false);
         amber_draw_line(layer, layout, 166.0f, STATE_Y - 9.0f, 166.0f,
-                        STATE_Y + 9.0f, 4.0f, bg, false);
+                        STATE_Y + 9.0f, 4.0f, glyph, false);
     } else {
         // Arrêt ou aucun média : carré.
         for (float y = -8.0f; y <= 8.0f; y += 1.0f) {
             amber_draw_line(layer, layout, 152.0f, STATE_Y + y, 168.0f,
-                            STATE_Y + y, 1.2f, bg, false);
+                            STATE_Y + y, 1.2f, glyph, false);
         }
     }
 }

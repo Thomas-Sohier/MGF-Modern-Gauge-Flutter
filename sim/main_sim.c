@@ -2,7 +2,15 @@
 // rend une frame offscreen avec des données ECU mock et exporte le rendu en PNG
 // (golden test).
 //
-// Usage : gen_golden <chemin_png>
+// Usage : gen_golden <style> <chemin_png> [scenario]
+//
+//   style    : boot | amber | clock | music | navigation | faults | temps |
+//              injection | lambda | ignition | idle | admission | dashboard |
+//              settings
+//   scenario : standard (défaut) | offline | missing | hot | sensor_fault |
+//              imperial | long | paused | unsynced | reconnected
+//
+// Un scénario inconnu est refusé avec un code de retour 2.
 
 #include "lvgl.h"
 #include "ui/screens/boot_screen.h"
@@ -20,13 +28,16 @@
 #include "ui/screens/settings_screen.h"
 #include "ui/navigation/dashboard_navigator.h"
 #include "ui/fonts/ui_fonts.h"
+#include "domain/app_settings.h"
 #include "domain/ecu_data.h"
+#include "domain/companion_protocol.h"
 #include "ui/ui_layout.h"
 
 #ifndef TTF_PATH
 #define TTF_PATH "../main/fonts/Michroma-Regular.ttf"
 #endif
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +48,323 @@
 
 // Buffer partiel dimensionné pour la plus grande largeur possible.
 #define BUF_W 1024
+
+// ── Scénarios ────────────────────────────────────────────────────────────────
+typedef enum {
+    SCENARIO_STANDARD = 0,
+    SCENARIO_OFFLINE,      // ECU déconnectée : toutes les mesures à NAN
+    SCENARIO_MISSING,      // connectée mais eau/huile indisponibles
+    SCENARIO_HOT,          // surchauffe : eau 110 °C, huile 135 °C
+    SCENARIO_SENSOR_FAULT, // sonde d'eau en défaut (drapeau + mesure NAN)
+    SCENARIO_IMPERIAL,     // unités impériales sur les vues qui les gèrent
+    SCENARIO_LONG,         // textes compagnon longs (ellipsis)
+    SCENARIO_PAUSED,       // lecture média en pause
+    SCENARIO_UNSYNCED,     // horloge sans source de temps fiable
+    SCENARIO_RECONNECTED,  // valid -> invalid -> valid (dernier état nominal)
+} scenario_t;
+
+static bool scenario_parse(const char *name, scenario_t *out) {
+    if (name == NULL || out == NULL) return false;
+    static const struct {
+        const char *name;
+        scenario_t scenario;
+    } k_scenarios[] = {
+        {"standard", SCENARIO_STANDARD},
+        {"offline", SCENARIO_OFFLINE},
+        {"missing", SCENARIO_MISSING},
+        {"hot", SCENARIO_HOT},
+        {"sensor_fault", SCENARIO_SENSOR_FAULT},
+        {"imperial", SCENARIO_IMPERIAL},
+        {"long", SCENARIO_LONG},
+        {"paused", SCENARIO_PAUSED},
+        {"unsynced", SCENARIO_UNSYNCED},
+        {"reconnected", SCENARIO_RECONNECTED},
+    };
+    for (size_t i = 0; i < sizeof(k_scenarios) / sizeof(k_scenarios[0]); i++) {
+        if (strcmp(k_scenarios[i].name, name) == 0) {
+            *out = k_scenarios[i].scenario;
+            return true;
+        }
+    }
+    return false;
+}
+
+// ── Instantanés ECU mock ─────────────────────────────────────────────────────
+// Vue nominale : moteur chaud au ralenti, tous les capteurs présents.
+static ecu_data_t online_snapshot(void) {
+    return (ecu_data_t){
+        .connected = true,
+        .faults_available = true,
+        .fault_flags = ECU_FAULT_INTAKE_AIR_SENSOR,
+        .rpm = 875,
+        .throttle = 7,
+        .coolant_temp = 89,
+        .battery_voltage = 14.2f,
+        .oil_temp = 96,
+        .ambient_temp = 22,
+        .intake_air_temp = 31,
+        .fuel_rail_temp = 38,
+        .map_sensor_kpa = 34,
+        .throttle_pot_voltage = 0.72f,
+        .ignition_advance = 14.5f,
+        .ignition_advance_offset = -1.2f,
+        .coil_1_charge_time = 2.45f,
+        .coil_2_charge_time = 2.52f,
+        .coil_time_microseconds = 2480,
+        .injector_1_pw = 2.18f,
+        .injector_2_pw = 2.24f,
+        .fuelling_feedback_percent = 101,
+        .short_term_trim_percent = 2.8f,
+        .long_term_trim = -1.7f,
+        .lambda_mv = 680,
+        .o2_mv = 665,
+        .estimated_air_fuel = 14.65f,
+        .lambda_sensor_duty_cycle = 53,
+        .idle_setpoint = 850,
+        .idle_adjuster_rpm = 18,
+        .idle_error = 25,
+        .idle_valve_position = 34,
+        .idle_base_position = 30,
+    };
+}
+
+// Instantané dérivé du scénario demandé (l'unité reste portée par la vue via
+// set_units ; le scénario imperial ne change donc pas les valeurs Celsius).
+static ecu_data_t scenario_mock(scenario_t scenario) {
+    switch (scenario) {
+    case SCENARIO_OFFLINE:
+        return ecu_data_unavailable();
+    case SCENARIO_MISSING: {
+        ecu_data_t data = online_snapshot();
+        data.coolant_temp = NAN;
+        data.oil_temp = NAN;
+        return data;
+    }
+    case SCENARIO_HOT: {
+        ecu_data_t data = online_snapshot();
+        data.coolant_temp = 110.0f;
+        data.oil_temp = 135.0f;
+        return data;
+    }
+    case SCENARIO_SENSOR_FAULT: {
+        ecu_data_t data = online_snapshot();
+        data.coolant_temp = NAN;
+        data.faults_available = true;
+        data.fault_flags = ECU_FAULT_COOLANT_SENSOR;
+        return data;
+    }
+    default:
+        return online_snapshot();
+    }
+}
+
+// ── Charges utiles de l'application compagnon ────────────────────────────────
+static const char *k_navigation_json =
+    "{\"active\":true,\"instruction\":\"Tournez à droite sur Rue des Lilas\","
+    "\"distance\":\"300 m\",\"eta\":\"Arrivée 14:32\"}";
+
+// Consigne volontairement > 80 caractères, avec accents français : la voie
+// dépasse la largeur du libellé et exerce l'ellipsis (LV_LABEL_LONG_DOT).
+static const char *k_navigation_long_json =
+    "{\"active\":true,\"instruction\":\"Tournez à droite sur Avenue des "
+    "Champs-Élysées puis continuez tout droit jusqu'au rond-point de la "
+    "Concorde\",\"distance\":\"1,2 km\",\"eta\":\"Arrivée 14:32\"}";
+
+static const char *music_json_for(scenario_t scenario) {
+    switch (scenario) {
+    case SCENARIO_LONG:
+        // Titre et artiste > 80 caractères, accentués : ellipsis du libellé.
+        return "{\"title\":\"Balade nocturne sur les routes de montagne entre "
+               "amis et paysages étoilés magnifiques\",\"artist\":\"Compilation "
+               "française des années quatre-vingt et quatre-vingt-dix\","
+               "\"state\":\"playing\",\"position_ms\":142000,"
+               "\"duration_ms\":228000}";
+    case SCENARIO_PAUSED:
+        return "{\"title\":\"Midnight Drive\",\"artist\":\"MGF / Synthwave\","
+               "\"state\":\"paused\",\"position_ms\":142000,"
+               "\"duration_ms\":228000}";
+    default:
+        return "{\"title\":\"Midnight Drive\",\"artist\":\"MGF / Synthwave\","
+               "\"state\":\"playing\",\"position_ms\":142000,"
+               "\"duration_ms\":228000}";
+    }
+}
+
+// ── Adaptateurs de pages du tableau de bord ──────────────────────────────────
+// Mêmes signatures que la table de production (app_main.c) : création,
+// actualisation ECU, destruction.
+#define DEFINE_PAGE_ADAPTER(prefix)                                            \
+    static void *prefix##_page_create(lv_obj_t *parent) {                      \
+        return prefix##_screen_create(parent);                                 \
+    }                                                                          \
+    static void prefix##_page_update(void *context, const ecu_data_t *data) {  \
+        prefix##_screen_update(context, data);                                 \
+    }                                                                          \
+    static void prefix##_page_destroy(void *context) {                         \
+        prefix##_screen_destroy(context);                                      \
+    }
+
+DEFINE_PAGE_ADAPTER(clock)
+DEFINE_PAGE_ADAPTER(amber)
+DEFINE_PAGE_ADAPTER(faults)
+DEFINE_PAGE_ADAPTER(temps)
+DEFINE_PAGE_ADAPTER(injection)
+DEFINE_PAGE_ADAPTER(lambda)
+DEFINE_PAGE_ADAPTER(ignition)
+DEFINE_PAGE_ADAPTER(idle)
+DEFINE_PAGE_ADAPTER(admission)
+
+// Musique et navigation sont événementielles : pas de mise à jour ECU.
+static void *music_page_create(lv_obj_t *parent) {
+    return music_screen_create(parent);
+}
+
+static void music_page_destroy(void *context) {
+    music_screen_destroy(context);
+}
+
+static void *navigation_page_create(lv_obj_t *parent) {
+    return navigation_screen_create(parent);
+}
+
+static void navigation_page_destroy(void *context) {
+    navigation_screen_destroy(context);
+}
+
+static void amber_page_settings(void *context, app_settings_units_t units) {
+    amber_screen_set_units(context, units);
+}
+
+static void temps_page_settings(void *context, app_settings_units_t units) {
+    temps_screen_set_units(context, units);
+}
+
+static void admission_page_settings(void *context, app_settings_units_t units) {
+    admission_screen_set_units(context, units);
+}
+
+typedef void *(*sim_page_create_t)(lv_obj_t *parent);
+
+// Crée une page, sa vue puis l'enregistre ; toute allocation manquante est
+// signalée et la vue déjà créée est détruite.
+static bool dashboard_add_page(dashboard_navigator_t *navigator,
+                               const char *name, sim_page_create_t create,
+                               dashboard_page_update_cb_t update,
+                               dashboard_page_destroy_cb_t destroy,
+                               dashboard_page_settings_cb_t settings_changed,
+                               uint32_t update_period_ms, void **out_context) {
+    lv_obj_t *page = dashboard_navigator_create_page(navigator);
+    void *view = page != NULL ? create(page) : NULL;
+    const dashboard_page_t descriptor = {
+        .name = name,
+        .context = view,
+        .update = update,
+        .destroy = destroy,
+        .settings_changed = settings_changed,
+        .update_period_ms = update_period_ms,
+    };
+    if (page == NULL || view == NULL ||
+        !dashboard_navigator_register_page(navigator, page, &descriptor)) {
+        fprintf(stderr, "dashboard: page %s indisponible\n", name);
+        if (view != NULL && destroy != NULL) destroy(view);
+        return false;
+    }
+    if (out_context != NULL) *out_context = view;
+    return true;
+}
+
+// Construit les 11 pages dans l'ordre de production, actualise chacune puis
+// sélectionne la page attendue par le scénario. Le tableau de bord est laissé
+// en place sur `screen` (pas de destruction : le processus s'arrête après le
+// rendu, comme les autres styles).
+static int dashboard_build(lv_obj_t *screen, scenario_t scenario) {
+    dashboard_navigator_t *navigator = dashboard_navigator_create(screen);
+    if (navigator == NULL) {
+        fprintf(stderr, "dashboard: allocation du navigateur echouee\n");
+        return 1;
+    }
+
+    void *contexts[11] = {0};
+    const bool built =
+        dashboard_add_page(navigator, "HEURE", clock_page_create,
+                           clock_page_update, clock_page_destroy, NULL, 1000,
+                           &contexts[0]) &&
+        dashboard_add_page(navigator, "MUSIQUE", music_page_create, NULL,
+                           music_page_destroy, NULL, 0, &contexts[1]) &&
+        dashboard_add_page(navigator, "NAVIGATION", navigation_page_create,
+                           NULL, navigation_page_destroy, NULL, 0,
+                           &contexts[2]) &&
+        dashboard_add_page(navigator, "RPM", amber_page_create,
+                           amber_page_update, amber_page_destroy,
+                           amber_page_settings, 40, &contexts[3]) &&
+        dashboard_add_page(navigator, "DEFAUTS", faults_page_create,
+                           faults_page_update, faults_page_destroy, NULL, 1000,
+                           &contexts[4]) &&
+        dashboard_add_page(navigator, "TEMPERATURES", temps_page_create,
+                           temps_page_update, temps_page_destroy,
+                           temps_page_settings, 150, &contexts[5]) &&
+        dashboard_add_page(navigator, "INJECTION", injection_page_create,
+                           injection_page_update, injection_page_destroy, NULL,
+                           80, &contexts[6]) &&
+        dashboard_add_page(navigator, "LAMBDA", lambda_page_create,
+                           lambda_page_update, lambda_page_destroy, NULL, 80,
+                           &contexts[7]) &&
+        dashboard_add_page(navigator, "ALLUMAGE", ignition_page_create,
+                           ignition_page_update, ignition_page_destroy, NULL,
+                           80, &contexts[8]) &&
+        dashboard_add_page(navigator, "RALENTI", idle_page_create,
+                           idle_page_update, idle_page_destroy, NULL, 150,
+                           &contexts[9]) &&
+        dashboard_add_page(navigator, "ADMISSION", admission_page_create,
+                           admission_page_update, admission_page_destroy,
+                           admission_page_settings, 150, &contexts[10]);
+    if (!built || dashboard_navigator_count(navigator) != 11) {
+        fprintf(stderr, "dashboard: pages incompletes (%zu/11)\n",
+                dashboard_navigator_count(navigator));
+        dashboard_navigator_destroy(navigator);
+        return 1;
+    }
+
+    const ecu_data_t mock = scenario_mock(scenario);
+    // Amorce l'instantané puis force la mise à jour de chaque page (couverture
+    // des 11 callbacks, pas seulement la page visible).
+    dashboard_navigator_update(navigator, &mock);
+    for (size_t i = 0; i < dashboard_navigator_count(navigator); i++) {
+        if (!dashboard_navigator_select_page(navigator, i)) {
+            fprintf(stderr, "dashboard: selection page %zu refusee\n", i);
+            dashboard_navigator_destroy(navigator);
+            return 1;
+        }
+    }
+
+    if (scenario == SCENARIO_HOT) {
+        // NAVIGATION (index 2) est événementielle : aucun callback ECU. Le
+        // bandeau thermique est posé par le navigateur lui-même ; l'itinéraire
+        // réel vérifie qu'il ne masque pas la manœuvre.
+        if (!dashboard_navigator_select_page(navigator, 2)) {
+            fprintf(stderr, "dashboard: selection NAVIGATION refusee\n");
+            dashboard_navigator_destroy(navigator);
+            return 1;
+        }
+        companion_nav_t route;
+        if (!companion_parse_nav(k_navigation_json, strlen(k_navigation_json),
+                                 &route)) {
+            fprintf(stderr,
+                    "dashboard: itineraire de demonstration invalide\n");
+            dashboard_navigator_destroy(navigator);
+            return 1;
+        }
+        navigation_screen_set_link(contexts[2], true);
+        navigation_screen_set_route(contexts[2], &route);
+        dashboard_navigator_update(navigator, &mock);
+    } else if (!dashboard_navigator_select_page(navigator, 6)) {
+        // Page par défaut du golden : INJECTION.
+        fprintf(stderr, "dashboard: selection INJECTION refusee\n");
+        dashboard_navigator_destroy(navigator);
+        return 1;
+    }
+    return 0;
+}
 
 // ── Tick LVGL basé sur l'horloge monotone ────────────────────────────────────
 static uint32_t tick_cb(void) {
@@ -108,12 +436,15 @@ static void *load_file(const char *path, size_t *out_size) {
 }
 
 int main(int argc, char **argv) {
-    // Usage : gen_golden [amber|boot|clock|music|navigation|faults|temps|
-    //                     injection|lambda|ignition|idle|admission|dashboard|
-    //                     settings]
-    //                    png [offline]
+    // Usage : gen_golden <style> <png> [scenario] (scénario inconnu -> exit 2).
     const char *style = (argc > 1) ? argv[1] : "amber";
     const char *out = (argc > 2) ? argv[2] : "rpm_amber.png";
+
+    scenario_t scenario = SCENARIO_STANDARD;
+    if (argc > 3 && !scenario_parse(argv[3], &scenario)) {
+        fprintf(stderr, "scenario inconnu : %s\n", argv[3]);
+        return 2;
+    }
 
     // Cible LILYGO T-RGB H597 : écran IPS ROND 480x480 (driver ST7701S,
     // interface RGB). On rend à la résolution réelle, avec masque circulaire.
@@ -141,130 +472,155 @@ int main(int argc, char **argv) {
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
 
-    // 3e argument « offline » : ECU déconnectée (vérification des états « -- »).
-    const bool offline = argc > 3 && strcmp(argv[3], "offline") == 0;
-    const ecu_data_t online = {
-        .connected = true,
-        .faults_available = true,
-        .fault_flags = ECU_FAULT_INTAKE_AIR_SENSOR,
-        .rpm = 875,
-        .throttle = 7,
-        .coolant_temp = 89,
-        .battery_voltage = 14.2f,
-        .oil_temp = 96,
-        .ambient_temp = 22,
-        .intake_air_temp = 31,
-        .fuel_rail_temp = 38,
-        .map_sensor_kpa = 34,
-        .throttle_pot_voltage = 0.72f,
-        .ignition_advance = 14.5f,
-        .ignition_advance_offset = -1.2f,
-        .coil_1_charge_time = 2.45f,
-        .coil_2_charge_time = 2.52f,
-        .coil_time_microseconds = 2480,
-        .injector_1_pw = 2.18f,
-        .injector_2_pw = 2.24f,
-        .fuelling_feedback_percent = 101,
-        .short_term_trim_percent = 2.8f,
-        .long_term_trim = -1.7f,
-        .lambda_mv = 680,
-        .o2_mv = 665,
-        .estimated_air_fuel = 14.65f,
-        .lambda_sensor_duty_cycle = 53,
-        .idle_setpoint = 850,
-        .idle_adjuster_rpm = 18,
-        .idle_error = 25,
-        .idle_valve_position = 34,
-        .idle_base_position = 30,
-    };
-    const ecu_data_t mock = offline ? ecu_data_unavailable() : online;
+    const ecu_data_t mock = scenario_mock(scenario);
+    const ecu_data_t offline = ecu_data_unavailable();
 
-    if (strcmp(style, "boot") == 0)
-        boot_screen_create(screen);
-    else if (strcmp(style, "amber") == 0)
-        amber_screen_update(amber_screen_create(screen), &mock);
-    else if (strcmp(style, "clock") == 0)
-        clock_screen_update(clock_screen_create(screen), &mock);
-    else if (strcmp(style, "music") == 0) {
-        // Morceau de démonstration tel que l'application compagnon l'envoie ;
-        // « offline » : téléphone non connecté.
-        music_screen_t *music = music_screen_create(screen);
-        if (!offline) {
-            companion_media_t media;
-            const char *json = "{\"title\":\"Midnight Drive\",\"artist\":"
-                               "\"MGF / Synthwave\",\"state\":\"playing\","
-                               "\"position_ms\":142000,\"duration_ms\":228000}";
-            companion_parse_media(json, strlen(json), &media);
-            music_screen_set_link(music, true, 0);
-            music_screen_set_media(music, &media, 0);
-        }
-    } else if (strcmp(style, "navigation") == 0) {
-        navigation_screen_t *navigation = navigation_screen_create(screen);
-        if (!offline) {
-            companion_nav_t nav;
-            const char *json =
-                "{\"active\":true,\"instruction\":\"Tournez à "
-                "droite sur Rue des Lilas\",\"distance\":\"300 m\","
-                "\"eta\":\"Arrivée 14:32\"}";
-            companion_parse_nav(json, strlen(json), &nav);
-            navigation_screen_set_link(navigation, true);
-            navigation_screen_set_route(navigation, &nav);
-        }
-    } else if (strcmp(style, "faults") == 0)
-        faults_screen_update(faults_screen_create(screen), &mock);
-    else if (strcmp(style, "temps") == 0)
-        temps_screen_update(temps_screen_create(screen), &mock);
-    else if (strcmp(style, "injection") == 0)
-        injection_screen_update(injection_screen_create(screen), &mock);
-    else if (strcmp(style, "lambda") == 0)
-        lambda_screen_update(lambda_screen_create(screen), &mock);
-    else if (strcmp(style, "ignition") == 0)
-        ignition_screen_update(ignition_screen_create(screen), &mock);
-    else if (strcmp(style, "idle") == 0)
-        idle_screen_update(idle_screen_create(screen), &mock);
-    else if (strcmp(style, "admission") == 0)
-        admission_screen_update(admission_screen_create(screen), &mock);
-    else if (strcmp(style, "dashboard") == 0) {
-        // Navigation : trois pages et l'indicateur de position, deuxième page
-        // sélectionnée pour montrer le point courant au milieu.
-        dashboard_navigator_t *nav = dashboard_navigator_create(screen);
-        lv_obj_t *rpm_page = dashboard_navigator_create_page(nav);
-        amber_screen_t *rpm = amber_screen_create(rpm_page);
-        lv_obj_t *inj_page = dashboard_navigator_create_page(nav);
-        injection_screen_t *inj = injection_screen_create(inj_page);
-        lv_obj_t *tmp_page = dashboard_navigator_create_page(nav);
-        temps_screen_t *tmp = temps_screen_create(tmp_page);
-        const dashboard_page_t pages[] = {
-            {.name = "RPM", .context = rpm},
-            {.name = "INJECTION", .context = inj},
-            {.name = "TEMPERATURES", .context = tmp},
-        };
-        if (nav == NULL || rpm_page == NULL || rpm == NULL ||
-            inj_page == NULL || inj == NULL || tmp_page == NULL ||
-            tmp == NULL) {
-            fprintf(stderr, "dashboard: allocation echouee\n");
+    if (strcmp(style, "boot") == 0) {
+        if (boot_screen_create(screen) == NULL) {
+            fprintf(stderr, "boot: allocation echouee\n");
             return 1;
         }
-        dashboard_navigator_register_page(nav, rpm_page, &pages[0]);
-        dashboard_navigator_register_page(nav, inj_page, &pages[1]);
-        dashboard_navigator_register_page(nav, tmp_page, &pages[2]);
-        amber_screen_update(rpm, &mock);
-        injection_screen_update(inj, &mock);
-        temps_screen_update(tmp, &mock);
-        dashboard_navigator_select_page(nav, 1);
+    } else if (strcmp(style, "amber") == 0) {
+        amber_screen_t *view = amber_screen_create(screen);
+        if (view == NULL) {
+            fprintf(stderr, "amber: allocation echouee\n");
+            return 1;
+        }
+        if (scenario == SCENARIO_IMPERIAL)
+            amber_screen_set_units(view, APP_SETTINGS_UNITS_IMPERIAL);
+        if (scenario == SCENARIO_RECONNECTED) {
+            // ECU connectée -> déconnectée -> connectée : la transition est
+            // exercée, le rendu reste l'état nominal.
+            amber_screen_update(view, &mock);
+            amber_screen_update(view, &offline);
+            amber_screen_update(view, &mock);
+        } else {
+            amber_screen_update(view, &mock);
+        }
+    } else if (strcmp(style, "clock") == 0) {
+        clock_screen_t *view = clock_screen_create(screen);
+        if (view == NULL) {
+            fprintf(stderr, "clock: allocation echouee\n");
+            return 1;
+        }
+        clock_screen_update(view, &mock);
+        if (scenario == SCENARIO_OFFLINE || scenario == SCENARIO_UNSYNCED) {
+            // Forcé APRÈS la mise à jour : aucune source de temps fiable.
+            clock_screen_set_time(view, 0, 0, false);
+        } else if (scenario == SCENARIO_RECONNECTED) {
+            // valid -> invalid -> valid via l'API, dernier état nominal.
+            clock_screen_set_time(view, 10, 10, true);
+            clock_screen_set_time(view, 0, 0, false);
+            clock_screen_set_time(view, 10, 10, true);
+        }
+    } else if (strcmp(style, "music") == 0) {
+        music_screen_t *view = music_screen_create(screen);
+        if (view == NULL) {
+            fprintf(stderr, "music: allocation echouee\n");
+            return 1;
+        }
+        if (scenario != SCENARIO_OFFLINE) {
+            companion_media_t media;
+            const char *json = music_json_for(scenario);
+            if (!companion_parse_media(json, strlen(json), &media)) {
+                fprintf(stderr, "music: media de demonstration invalide\n");
+                return 1;
+            }
+            music_screen_set_link(view, true, 0);
+            music_screen_set_media(view, &media, 0);
+        }
+    } else if (strcmp(style, "navigation") == 0) {
+        navigation_screen_t *view = navigation_screen_create(screen);
+        if (view == NULL) {
+            fprintf(stderr, "navigation: allocation echouee\n");
+            return 1;
+        }
+        if (scenario != SCENARIO_OFFLINE) {
+            const char *json = scenario == SCENARIO_LONG
+                                   ? k_navigation_long_json
+                                   : k_navigation_json;
+            companion_nav_t nav;
+            if (!companion_parse_nav(json, strlen(json), &nav)) {
+                fprintf(stderr, "navigation: itineraire invalide\n");
+                return 1;
+            }
+            navigation_screen_set_link(view, true);
+            navigation_screen_set_route(view, &nav);
+        }
+    } else if (strcmp(style, "faults") == 0) {
+        faults_screen_t *view = faults_screen_create(screen);
+        if (view == NULL) {
+            fprintf(stderr, "faults: allocation echouee\n");
+            return 1;
+        }
+        faults_screen_update(view, &mock);
+    } else if (strcmp(style, "temps") == 0) {
+        temps_screen_t *view = temps_screen_create(screen);
+        if (view == NULL) {
+            fprintf(stderr, "temps: allocation echouee\n");
+            return 1;
+        }
+        if (scenario == SCENARIO_IMPERIAL)
+            temps_screen_set_units(view, APP_SETTINGS_UNITS_IMPERIAL);
+        temps_screen_update(view, &mock);
+    } else if (strcmp(style, "injection") == 0) {
+        injection_screen_t *view = injection_screen_create(screen);
+        if (view == NULL) {
+            fprintf(stderr, "injection: allocation echouee\n");
+            return 1;
+        }
+        injection_screen_update(view, &mock);
+    } else if (strcmp(style, "lambda") == 0) {
+        lambda_screen_t *view = lambda_screen_create(screen);
+        if (view == NULL) {
+            fprintf(stderr, "lambda: allocation echouee\n");
+            return 1;
+        }
+        lambda_screen_update(view, &mock);
+    } else if (strcmp(style, "ignition") == 0) {
+        ignition_screen_t *view = ignition_screen_create(screen);
+        if (view == NULL) {
+            fprintf(stderr, "ignition: allocation echouee\n");
+            return 1;
+        }
+        ignition_screen_update(view, &mock);
+    } else if (strcmp(style, "idle") == 0) {
+        idle_screen_t *view = idle_screen_create(screen);
+        if (view == NULL) {
+            fprintf(stderr, "idle: allocation echouee\n");
+            return 1;
+        }
+        idle_screen_update(view, &mock);
+    } else if (strcmp(style, "admission") == 0) {
+        admission_screen_t *view = admission_screen_create(screen);
+        if (view == NULL) {
+            fprintf(stderr, "admission: allocation echouee\n");
+            return 1;
+        }
+        if (scenario == SCENARIO_IMPERIAL)
+            admission_screen_set_units(view, APP_SETTINGS_UNITS_IMPERIAL);
+        admission_screen_update(view, &mock);
+    } else if (strcmp(style, "dashboard") == 0) {
+        if (dashboard_build(screen, scenario) != 0) return 1;
     } else if (strcmp(style, "settings") == 0) {
         // Réglages ouverts : luminosité ~60 %, démarrage sur le compte-tours,
         // fenêtre BLE ouverte (ou image sans BLE en mode « offline »).
         const settings_screen_actions_t actions = {0};
         settings_screen_t *settings = settings_screen_create(screen, &actions);
+        if (settings == NULL) {
+            fprintf(stderr, "settings: allocation echouee\n");
+            return 1;
+        }
         app_settings_t values;
         app_settings_defaults(&values);
         values.brightness_percent = 60;
         values.startup_page = APP_SETTINGS_PAGE_RPM;
         settings_screen_show(settings, &values);
-        settings_screen_set_bluetooth(
-            settings, offline ? SETTINGS_BLE_UNAVAILABLE : SETTINGS_BLE_OPEN,
-            272);
+        settings_screen_set_bluetooth(settings,
+                                      scenario == SCENARIO_OFFLINE
+                                          ? SETTINGS_BLE_UNAVAILABLE
+                                          : SETTINGS_BLE_OPEN,
+                                      272);
     } else {
         fprintf(stderr, "style inconnu : %s\n", style);
         return 2;

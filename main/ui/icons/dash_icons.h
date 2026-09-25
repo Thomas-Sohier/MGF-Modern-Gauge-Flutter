@@ -12,7 +12,8 @@ typedef enum {
     DASH_ICON_BATTERY,
     DASH_ICON_OIL,
     DASH_ICON_ENGINE,
-    DASH_ICON_OBD_LINK
+    DASH_ICON_OBD_LINK,
+    DASH_ICON_OBD_DISCONNECTED
 } dash_icon_type_t;
 
 /**
@@ -30,6 +31,11 @@ lv_obj_t *dash_icon_create(lv_obj_t *parent, dash_icon_type_t type,
  * Modifie la couleur d'une icône existante.
  */
 void dash_icon_set_color(lv_obj_t *obj, lv_color_t color);
+
+/**
+ * Modifie le type (dessin) d'une icône existante.
+ */
+void dash_icon_set_type(lv_obj_t *obj, dash_icon_type_t type);
 
 /**
  * Modifie la taille carrée du widget.

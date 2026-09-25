@@ -29,7 +29,7 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
         .title = "ADMISSION",
         .hero_unit = "kPa",
         .hero_caption = "PRESSION MAP",
-        .cell_caption = {"PAPILLON", "CAPTEUR TPS", "AIR ADMIS", "REGIME"},
+        .cell_caption = {"PAPILLON", "TPS", "AIR ADMIS", "REGIME"},
         .cell_unit = {"%", "V", "°C", "RPM"},
         .rim = AMBER_RIM_HAIRLINE,
     };

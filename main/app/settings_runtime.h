@@ -8,7 +8,8 @@
 
 // Bridges the NimBLE task and the LVGL task. BLE callbacks only copy a
 // validated snapshot into the pending slot; settings_runtime_process() applies
-// it, updates widgets, and performs the debounced NVS write in the LVGL task.
+// it and updates widgets in the LVGL task. The debounced save callback must
+// stay non-blocking; target persistence is delegated to a worker.
 typedef struct settings_runtime_s settings_runtime_t;
 
 typedef bool (*settings_runtime_apply_cb_t)(void *context,

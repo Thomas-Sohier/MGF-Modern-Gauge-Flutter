@@ -21,6 +21,12 @@
 #define LABEL_RADIUS   (CLOCK_RADIUS * 0.61f)
 #define TICK_RADIUS    (CLOCK_RADIUS * 0.87f)
 #define CARDINAL_COUNT 4
+// Largeur du message d'absence de source de temps : deux lignes centrées,
+// bornée pour rester à l'intérieur du disque (diamètre 2 * CLOCK_RADIUS).
+// Message « non synchronisé » sous le centre, entre les chiffres 9/3 et 6 :
+// il ne doit chevaucher aucun repère cardinal.
+#define MESSAGE_WIDTH (CLOCK_RADIUS * 1.6f)
+#define MESSAGE_Y     (CLOCK_CY + 45.0f)
 
 static const char *const k_cardinal_text[CARDINAL_COUNT] = {"12", "3", "6",
                                                             "9"};
@@ -32,8 +38,10 @@ struct clock_screen_s {
     lv_obj_t *face;
     lv_obj_t *hands;
     lv_obj_t *labels[CARDINAL_COUNT];
+    lv_obj_t *message;
     int hour;
     int minute;
+    bool valid;
     rtc_t *rtc;
     int16_t utc_offset_minutes;
 };
@@ -141,6 +149,10 @@ static void draw_hand(lv_layer_t *layer, float cx, float cy, float angle,
 
 static void draw_hands(lv_layer_t *layer, const ui_layout_t *layout,
                        const clock_screen_t *screen) {
+    // Aucune source de temps fiable : ni aiguilles ni pivot, le message central
+    // porte l'information. Le cadran (face + cardinaux) reste visible.
+    if (!screen->valid) return;
+
     const float cx = ui_layout_x(layout, CLOCK_CX);
     const float cy = ui_layout_y(layout, CLOCK_CY);
     const float scale = layout->scale;
@@ -208,7 +220,9 @@ static void hands_draw_cb(lv_event_t *event) {
 
 // The RTC contract is UTC. The page displays legal time: UTC plus the offset
 // (timezone + DST) last received from the phone. The no-RTC fallback uses
-// the same UTC basis (system time, set by the same phone sync).
+// the same UTC basis (system time, set by the same phone sync). Returns false
+// when neither source is trustworthy; hour/minute are then left untouched so
+// the caller can never display an invented time.
 static bool read_clock_time(const clock_screen_t *screen, int *hour,
                             int *minute) {
 #ifdef MGF_SIMULATOR
@@ -243,12 +257,39 @@ static bool read_clock_time(const clock_screen_t *screen, int *hour,
         return true;
     }
 
-    // L'horloge système peut ne pas être synchronisée au démarrage. Une valeur
-    // fixe garantit un cadran cohérent jusqu'à la prochaine lecture valide.
-    *hour = 12;
-    *minute = 0;
+    // L'horloge système peut ne pas être synchronisée au démarrage : aucune
+    // heure n'est inventée, l'affichage signalera l'absence de synchronisation.
     return false;
 #endif
+}
+
+// Application commune d'un résultat de lecture (création, mise à jour
+// périodique, changement de RTC). Une bascule de validité invalide les
+// aiguilles même lorsque heure et minute sont inchangées : passer de valide à
+// invalide doit les effacer, pas figer silencieusement l'ancienne heure.
+static void apply_time(clock_screen_t *screen, bool valid, int hour,
+                       int minute) {
+    if (screen == NULL) return;
+    // Une heure hors bornes n'est jamais une heure valide, quelle que soit la
+    // source (RTC, horloge système ou simulateur).
+    const bool in_range = hour >= 0 && hour < 24 && minute >= 0 && minute < 60;
+    valid = valid && in_range;
+    const bool changed =
+        screen->valid != valid ||
+        (valid && (screen->hour != hour || screen->minute != minute));
+    screen->valid = valid;
+    if (valid) {
+        screen->hour = hour;
+        screen->minute = minute;
+    }
+    if (screen->message != NULL) {
+        if (valid) {
+            lv_obj_add_flag(screen->message, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_remove_flag(screen->message, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+    if (changed && screen->hands != NULL) lv_obj_invalidate(screen->hands);
 }
 
 clock_screen_t *clock_screen_create(lv_obj_t *parent) {
@@ -281,7 +322,17 @@ clock_screen_t *clock_screen_create(lv_obj_t *parent) {
                                 0.0f);
     }
 
-    read_clock_time(screen, &screen->hour, &screen->minute);
+    screen->message = amber_ui_label_create(
+        screen->root, amber_ui_font_caption(), ui_theme_amber_bright(),
+        "HEURE\nNON SYNCHRONISEE", MESSAGE_WIDTH);
+    if (screen->message == NULL) goto fail;
+    amber_ui_place_centered(screen->message, screen->root, CLOCK_CX, MESSAGE_Y,
+                            0.0f, 0.0f);
+
+    int hour = 0;
+    int minute = 0;
+    const bool valid = read_clock_time(screen, &hour, &minute);
+    apply_time(screen, valid, hour, minute);
     return screen;
 
 fail:
@@ -292,15 +343,11 @@ fail:
 void clock_screen_set_rtc(clock_screen_t *screen, rtc_t *rtc) {
     if (screen == NULL) return;
     screen->rtc = rtc;
-    if (screen->hands == NULL) return;
 
-    int hour;
-    int minute;
-    if (!read_clock_time(screen, &hour, &minute)) return;
-    if (hour == screen->hour && minute == screen->minute) return;
-    screen->hour = hour;
-    screen->minute = minute;
-    lv_obj_invalidate(screen->hands);
+    int hour = 0;
+    int minute = 0;
+    const bool valid = read_clock_time(screen, &hour, &minute);
+    apply_time(screen, valid, hour, minute);
 }
 
 void clock_screen_set_utc_offset(clock_screen_t *screen, int16_t minutes) {
@@ -311,16 +358,18 @@ void clock_screen_set_utc_offset(clock_screen_t *screen, int16_t minutes) {
 
 void clock_screen_update(clock_screen_t *screen, const ecu_data_t *data) {
     (void)data;
-    if (screen == NULL || screen->hands == NULL) return;
+    if (screen == NULL) return;
 
-    int hour;
-    int minute;
-    read_clock_time(screen, &hour, &minute);
-    if (hour == screen->hour && minute == screen->minute) return;
+    int hour = 0;
+    int minute = 0;
+    const bool valid = read_clock_time(screen, &hour, &minute);
+    apply_time(screen, valid, hour, minute);
+}
 
-    screen->hour = hour;
-    screen->minute = minute;
-    lv_obj_invalidate(screen->hands);
+void clock_screen_set_time(clock_screen_t *screen, int hour, int minute,
+                           bool valid) {
+    // apply_time borne et normalise déjà hour/minute.
+    apply_time(screen, valid, hour, minute);
 }
 
 void clock_screen_destroy(clock_screen_t *screen) {

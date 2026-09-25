@@ -44,8 +44,8 @@
 // ── Polices ─────────────────────────────────────────────────────────────────
 const lv_font_t *amber_kit_font_hero(void);    // 56 px
 const lv_font_t *amber_kit_font_value(void);   // 30 px
-const lv_font_t *amber_kit_font_label(void);   // 20 px
-const lv_font_t *amber_kit_font_caption(void); // 16 px
+const lv_font_t *amber_kit_font_label(void);   // 22 px
+const lv_font_t *amber_kit_font_caption(void); // 20 px
 
 // ── Texte ───────────────────────────────────────────────────────────────────
 typedef enum {

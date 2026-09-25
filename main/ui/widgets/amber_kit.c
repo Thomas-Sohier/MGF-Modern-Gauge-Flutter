@@ -10,10 +10,17 @@
 #include <string.h>
 
 #define DEGREE_UTF8          "\xC2\xB0"
-#define CAPTION_LETTER_SPACE 1
+#define CAPTION_LETTER_SPACE 0
 #define UNIT_GAP             3.0f   // logique, entre valeur et unité
 #define SEP_W                1.333f // même trait que les séparateurs du RPM
 #define SEP_GAP              5.0f   // marge aux intersections de la grille
+
+// Plafonds de largeur (repère 320) des légendes du gabarit. La cellule
+// s'arrête au séparateur central (gap compris) et la couronne borne le titre
+// et la ligne d'état. Les valeurs/unités physiques ne sont jamais tronquées.
+#define CELL_CAPTION_MAX_W 108.0f
+#define TITLE_MAX_W        250.0f
+#define STATUS_MAX_W       240.0f
 
 // ── Polices ─────────────────────────────────────────────────────────────────
 const lv_font_t *amber_kit_font_hero(void) {
@@ -55,6 +62,38 @@ static const lv_font_t *label_font(const lv_obj_t *label) {
     return lv_obj_get_style_text_font(label, LV_PART_MAIN);
 }
 
+// Plafonne une légende à `max_width` (repère 320) et remplace la fin par des
+// points (LV_LABEL_LONG_DOT) si le texte dépasse. La hauteur est bornée à une
+// ligne pour que l'ellipse reste sur la ligne visible ; l'alignement optique
+// de amber_kit_place() n'est pas affecté (il repose sur les métriques de fonte).
+// Largeur maximale d'une légende, stockée en style : `fit_width` l'applique
+// à chaque placement pour que le texte ne soit tronqué que s'il dépasse.
+static void caption_limit(lv_obj_t *label, float max_width) {
+    if (label == NULL) return;
+    const ui_layout_t layout = parent_layout(label);
+    lv_obj_set_style_max_width(label,
+                               (int32_t)lroundf(max_width * layout.scale), 0);
+}
+
+// LVGL tronque tout texte d'un label LONG_DOT à largeur automatique : on ne
+// fixe la largeur (avec points de suspension) que si le texte dépasse.
+static void fit_width(lv_obj_t *label) {
+    const int32_t max = lv_obj_get_style_max_width(label, LV_PART_MAIN);
+    if (max >= LV_COORD_MAX) return;
+    const lv_font_t *font = label_font(label);
+    lv_point_t size;
+    lv_text_get_size(&size, lv_label_get_text(label), font,
+                     lv_obj_get_style_text_letter_space(label, LV_PART_MAIN), 0,
+                     LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    if (size.x <= max) {
+        lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+        lv_obj_set_size(label, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    } else {
+        lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+        lv_obj_set_size(label, max, font->line_height);
+    }
+}
+
 // ── Texte ───────────────────────────────────────────────────────────────────
 lv_obj_t *amber_kit_label(lv_obj_t *parent, const lv_font_t *font,
                           lv_color_t color, const char *text) {
@@ -82,6 +121,7 @@ void amber_kit_place(lv_obj_t *label, float x, float y, amber_align_t align) {
     if (label == NULL) return;
     const ui_layout_t layout = parent_layout(label);
     const lv_font_t *font = label_font(label);
+    fit_width(label);
     lv_obj_update_layout(label);
     const int32_t width = lv_obj_get_width(label);
     const float px = ui_layout_x(&layout, x);
@@ -366,7 +406,7 @@ bool amber_page_create(amber_page_t *page, lv_obj_t *parent,
 
     page->title = amber_kit_caption(page->root, spec->title);
     if (page->title == NULL) return false;
-    lv_obj_set_style_text_letter_space(page->title, 2, 0);
+    caption_limit(page->title, TITLE_MAX_W);
     amber_kit_place(page->title, AMBER_KIT_CX, AMBER_KIT_TITLE_Y,
                     AMBER_ALIGN_CENTER);
 
@@ -401,6 +441,7 @@ bool amber_page_create(amber_page_t *page, lv_obj_t *parent,
             page->cell_caption[i] =
                 amber_kit_caption(page->root, spec->cell_caption[i]);
             if (page->cell_caption[i] == NULL) return false;
+            caption_limit(page->cell_caption[i], CELL_CAPTION_MAX_W);
             amber_kit_place(page->cell_caption[i], xs[i], cap_ys[i],
                             AMBER_ALIGN_CENTER);
         }
@@ -408,6 +449,7 @@ bool amber_page_create(amber_page_t *page, lv_obj_t *parent,
 
     page->status = amber_kit_caption(page->root, "");
     if (page->status == NULL) return false;
+    caption_limit(page->status, STATUS_MAX_W);
     amber_kit_place(page->status, AMBER_KIT_CX, AMBER_KIT_STATUS_Y,
                     AMBER_ALIGN_CENTER);
     return true;

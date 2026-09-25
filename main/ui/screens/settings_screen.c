@@ -334,7 +334,6 @@ static lv_obj_t *create_caption(settings_screen_t *scr, const char *text,
                                 float y) {
     lv_obj_t *label = amber_kit_caption(scr->root, text);
     if (label != NULL) {
-        lv_obj_set_style_text_letter_space(label, 2, 0);
         amber_kit_place(label, CX, y, AMBER_ALIGN_CENTER);
     }
     return label;
@@ -375,7 +374,6 @@ settings_screen_create(lv_obj_t *parent,
 
     scr->title = amber_kit_caption(scr->root, "REGLAGES");
     if (scr->title == NULL) goto fail;
-    lv_obj_set_style_text_letter_space(scr->title, 2, 0);
     amber_kit_place(scr->title, CX, AMBER_KIT_TITLE_Y, AMBER_ALIGN_CENTER);
 
     if (create_caption(scr, "LUMINOSITE", BRIGHT_CAP_Y) == NULL ||
@@ -394,8 +392,6 @@ settings_screen_create(lv_obj_t *parent,
         scr->ok_text == NULL) {
         goto fail;
     }
-    lv_obj_set_style_text_letter_space(scr->page_name, 2, 0);
-    lv_obj_set_style_text_letter_space(scr->ble_text, 2, 0);
     amber_kit_place(scr->ok_text, CX, OK_Y, AMBER_ALIGN_CENTER);
     refresh_page_name(scr);
     refresh_bluetooth_text(scr);

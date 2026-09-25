@@ -60,6 +60,12 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_dashboard_timing.c" -o "$BUILD_DIR/test_dashboard_timing"
 "$BUILD_DIR/test_dashboard_timing"
 
+for test_name in temperature_status dashboard_hold ecu_freshness; do
+    gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+        "$ROOT/test/test_${test_name}.c" -lm -o "$BUILD_DIR/test_${test_name}"
+    "$BUILD_DIR/test_${test_name}"
+done
+
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_value_smoothing.c" -lm -o "$BUILD_DIR/test_value_smoothing"
 "$BUILD_DIR/test_value_smoothing"

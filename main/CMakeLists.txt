@@ -49,11 +49,13 @@ idf_component_register(
         "infrastructure/board_display.c"
         "infrastructure/shared_i2c.c"
         "infrastructure/rtc_ds3231.c"
+        "infrastructure/rtc_worker.c"
         "infrastructure/fake_ecu.c"
         "infrastructure/kline_uart_esp32.c"
         "infrastructure/mems_ecu.c"
         "infrastructure/runtime_diagnostics.c"
         "infrastructure/settings_store.c"
+        "infrastructure/settings_persistence.c"
         ${MGF_BLE_CONFIG_SRCS}
         "ui/icons/dash_icons.c"
         "ui/navigation/dashboard_navigator.c"
@@ -86,6 +88,7 @@ idf_component_register(
         # conditional. With CONFIG_BT_ENABLED=n it builds next to nothing.
         bt
         esp_lcd
+        esp_timer                     # monotonic snapshot / worker timestamps
         esp_lcd_st7701                 # ST7701S vendor init + RGB panel
         esp_lcd_panel_io_additions    # série 9 bits ST7701S via XL9535
         esp_io_expander_tca95xx_16bit # XL9535-compatible 16-bit expander

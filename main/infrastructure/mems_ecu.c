@@ -4,10 +4,12 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 
+#include "domain/ecu_freshness.h"
 #include "domain/mems19_reader.h"
 #include "domain/mems_reader.h"
 #include "domain/mems_session.h"
@@ -28,9 +30,11 @@ struct mems_ecu_s {
     uint32_t poll_period_ms;
     uint32_t reconnect_delay_ms;
 
-    SemaphoreHandle_t lock;    // protège `snapshot`
+    SemaphoreHandle_t lock; // protège `snapshot`, `snapshot_us`, `has_snapshot`
     SemaphoreHandle_t stopped; // signal de fin de la tâche avant libération
     ecu_data_t snapshot;       // dernier instantané publié
+    int64_t snapshot_us;       // horodatage monotone de la publication (µs)
+    bool has_snapshot;         // au moins un instantané publié depuis le boot
 
     TaskHandle_t task;
     volatile bool running;
@@ -39,6 +43,8 @@ struct mems_ecu_s {
 static void publish(mems_ecu_t *ecu, const ecu_data_t *data) {
     if (xSemaphoreTake(ecu->lock, portMAX_DELAY) == pdTRUE) {
         ecu->snapshot = *data;
+        ecu->snapshot_us = esp_timer_get_time();
+        ecu->has_snapshot = true;
         xSemaphoreGive(ecu->lock);
     }
 }
@@ -164,8 +170,22 @@ void mems_ecu_destroy(mems_ecu_t *ecu) {
 bool mems_ecu_read(mems_ecu_t *ecu, ecu_data_t *out) {
     if (ecu == NULL || out == NULL) return false;
     if (xSemaphoreTake(ecu->lock, portMAX_DELAY) != pdTRUE) return false;
-    *out = ecu->snapshot;
+    const ecu_data_t snapshot = ecu->snapshot;
+    const int64_t stamp_us = ecu->snapshot_us;
+    const bool has_snapshot = ecu->has_snapshot;
     xSemaphoreGive(ecu->lock);
+
+    // La fraîcheur ne concerne que les instantanés marqués connectés : une
+    // publication déconnectée reste déconnectée, et l'absence de publication
+    // (`has_snapshot == false`) n'est pas une mesure actuelle.
+    const uint64_t now_us = (uint64_t)esp_timer_get_time();
+    if (snapshot.connected &&
+        !ecu_snapshot_is_fresh(has_snapshot, (uint64_t)stamp_us, now_us)) {
+        *out = ecu_data_unavailable();
+        return true;
+    }
+
+    *out = snapshot;
     return true;
 }
 

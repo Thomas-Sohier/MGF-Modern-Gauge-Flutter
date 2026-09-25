@@ -111,8 +111,15 @@ Les octets sont little-endian et chaque payload commence par la version `1`.
 
 Le parseur est indépendant d'ESP-IDF et testé sur l'hôte. Les valeurs
 inconnues, versions inattendues, longueurs incorrectes et dates invalides sont
-refusées avant tout callback ou écriture. Une écriture acceptée est appliquée
-et persistée par le timer LVGL (NVS avec anti-rebond de 3 s).
+refusées avant tout callback ou écriture. Les réglages acceptés sont appliqués
+par le timer LVGL ; après l'anti-rebond de 3 s, un worker effectue la persistance
+NVS hors de la tâche UI. Le coordinateur ne considère le snapshot sauvegardé
+qu'après confirmation de l'écriture effective.
+
+Pour `datetime`, un succès signifie que la commande UTC a été acceptée dans
+la file du worker RTC, pas que le DS3231 a déjà été écrit. L'heure système est
+mise à jour immédiatement ; les erreurs et reprises I²C sont journalisées par
+le worker. Le protocole ne fournit pas d'accusé de persistance RTC différé.
 
 Le lien n'a pas encore été validé sur carte réelle : pairage, reconnexion d'un
 bond après coupure, écritures longues (JSON > MTU) et comportement avec

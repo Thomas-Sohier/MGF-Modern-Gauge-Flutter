@@ -1,5 +1,7 @@
 #include "ui/icons/dash_icons.h"
 
+#include "ui/themes/ui_theme.h"
+
 typedef struct {
     dash_icon_type_t type;
     lv_color_t color;
@@ -199,6 +201,16 @@ static void draw_obd_link(lv_layer_t *layer, const lv_area_t *a,
     draw_line(layer, color, lw, sx(a, 340), sy(a, 500), sx(a, 660), sy(a, 500));
 }
 
+/* Maillons barres : meme chaine (attenuee) + barre diagonale ambre vif. */
+static void draw_obd_disconnected(lv_layer_t *layer, const lv_area_t *a,
+                                  lv_color_t color) {
+    draw_obd_link(layer, a, color);
+
+    const lv_coord_t lw = sw(a, 85);
+    draw_line(layer, ui_theme_amber_bright(), lw, sx(a, 130), sy(a, 840),
+              sx(a, 870), sy(a, 160));
+}
+
 /* -------------------- 5. ENGINE (Check engine optionnel) ------------------- */
 
 static void draw_engine(lv_layer_t *layer, const lv_area_t *a,
@@ -264,6 +276,9 @@ static void dash_icon_draw_event(lv_event_t *e) {
     case DASH_ICON_OBD_LINK:
         draw_obd_link(layer, &a, data->color);
         break;
+    case DASH_ICON_OBD_DISCONNECTED:
+        draw_obd_disconnected(layer, &a, data->color);
+        break;
     default:
         break;
     }
@@ -310,9 +325,19 @@ void dash_icon_set_color(lv_obj_t *obj, lv_color_t color) {
     if (!obj) return;
 
     dash_icon_data_t *data = lv_obj_get_user_data(obj);
-    if (!data) return;
+    if (!data || lv_color_eq(data->color, color)) return;
 
     data->color = color;
+    lv_obj_invalidate(obj);
+}
+
+void dash_icon_set_type(lv_obj_t *obj, dash_icon_type_t type) {
+    if (!obj) return;
+
+    dash_icon_data_t *data = lv_obj_get_user_data(obj);
+    if (!data || data->type == type) return;
+
+    data->type = type;
     lv_obj_invalidate(obj);
 }
 

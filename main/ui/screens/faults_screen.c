@@ -13,9 +13,9 @@ static const struct {
     uint8_t flag;
     const char *label;
 } kFaults[AMBER_PAGE_CELLS] = {
-    {ECU_FAULT_COOLANT_SENSOR, "SONDE EAU"},
-    {ECU_FAULT_INTAKE_AIR_SENSOR, "SONDE AIR"},
-    {ECU_FAULT_FUEL_PUMP, "POMPE ESS."},
+    {ECU_FAULT_COOLANT_SENSOR, "CAPT. EAU"},
+    {ECU_FAULT_INTAKE_AIR_SENSOR, "CAPT. AIR"},
+    {ECU_FAULT_FUEL_PUMP, "POMPE"},
     {ECU_FAULT_THROTTLE_POT, "PAPILLON"},
 };
 

@@ -98,6 +98,9 @@ struct amber_screen_s {
     int32_t coolant_display;
     int32_t battery_display;
     int32_t oil_display;
+    bool coolant_ok;
+    bool battery_ok;
+    bool oil_ok;
     bool connected_display;
     app_settings_units_t units;
     ecu_data_t latest_data;
@@ -320,70 +323,99 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     // Le compte-tours suit la cible avec un léger retard plutôt que par
     // paliers de 200 ms ; le premier échantillon (NAN initial) saute direct.
     const uint32_t now = lv_tick_get();
-    scr->rpm_smoothed = value_smoothing_step(scr->rpm_smoothed, d->rpm,
-                                             now - scr->last_update_tick,
-                                             RPM_SMOOTHING_TAU_MS, 1.0f);
+    scr->rpm_smoothed = value_smoothing_step(
+        scr->rpm_smoothed, d->connected ? d->rpm : NAN,
+        now - scr->last_update_tick, RPM_SMOOTHING_TAU_MS, 1.0f);
     scr->last_update_tick = now;
     const float rpm = scr->rpm_smoothed;
 
     const float coolant = temperature_display(d->coolant_temp, scr->units);
     const float oil = temperature_display(d->oil_temp, scr->units);
-    const int32_t rpm_display =
-        isfinite(rpm) ? (int32_t)lroundf(rpm) : INT32_MIN;
+    // Une mesure n'est valable que si l'ECU est connectee et la valeur finie :
+    // connecte=false avec des valeurs residuelles ne doit jamais afficher des
+    // chiffres perimes (readouts comme compte-tours).
+    const bool coolant_ok = d->connected && isfinite(coolant);
+    const bool battery_ok = d->connected && isfinite(d->battery_voltage);
+    const bool oil_ok = d->connected && isfinite(oil);
+    const bool rpm_ok = d->connected && isfinite(rpm);
+    const int32_t rpm_display = rpm_ok ? (int32_t)lroundf(rpm) : INT32_MIN;
     const int32_t coolant_display =
-        isfinite(coolant) ? (int32_t)lroundf(coolant) : INT32_MIN;
+        coolant_ok ? (int32_t)lroundf(coolant) : INT32_MIN;
     const int32_t battery_display =
-        isfinite(d->battery_voltage)
-            ? (int32_t)lroundf(d->battery_voltage * 10.0f)
-            : INT32_MIN;
-    const int32_t oil_display =
-        isfinite(oil) ? (int32_t)lroundf(oil) : INT32_MIN;
+        battery_ok ? (int32_t)lroundf(d->battery_voltage * 10.0f) : INT32_MIN;
+    const int32_t oil_display = oil_ok ? (int32_t)lroundf(oil) : INT32_MIN;
     const float progress =
-        LV_CLAMP(0.0f, (rpm - RPM_MIN) / (RPM_MAX - RPM_MIN), 1.0f);
+        rpm_ok ? LV_CLAMP(0.0f, (rpm - RPM_MIN) / (RPM_MAX - RPM_MIN), 1.0f)
+               : 0.0f;
     const int32_t rpm_segment =
-        isfinite(rpm) ? (int32_t)lroundf(progress * SEG_COUNT) : 0;
-    const bool text_changed = !scr->has_snapshot ||
-                              rpm_display != scr->rpm_display ||
-                              coolant_display != scr->coolant_display ||
-                              battery_display != scr->battery_display ||
-                              oil_display != scr->oil_display ||
-                              d->connected != scr->connected_display;
+        rpm_ok ? (int32_t)lroundf(progress * SEG_COUNT) : 0;
+    const bool text_changed =
+        !scr->has_snapshot || rpm_display != scr->rpm_display ||
+        coolant_display != scr->coolant_display ||
+        battery_display != scr->battery_display ||
+        oil_display != scr->oil_display ||
+        d->connected != scr->connected_display ||
+        coolant_ok != scr->coolant_ok || battery_ok != scr->battery_ok ||
+        oil_ok != scr->oil_ok;
     const bool dial_changed =
         !scr->has_snapshot || rpm_segment != scr->rpm_segment;
     if (!text_changed && !dial_changed) return;
 
     char buf[24];
     if (rpm_display != scr->rpm_display || !scr->has_snapshot) {
-        if (isfinite(rpm))
+        if (rpm_ok)
             snprintf(buf, sizeof(buf), "%.0f", rpm);
         else
             snprintf(buf, sizeof(buf), "--");
         amber_value_widget_set(scr->value, buf);
     }
     if (coolant_display != scr->coolant_display || !scr->has_snapshot) {
-        format_temperature(buf, sizeof(buf), coolant);
-        amber_readout_set(&scr->readout[M_COOLANT], buf, isfinite(coolant));
+        format_temperature(buf, sizeof(buf), coolant_ok ? coolant : NAN);
+        amber_readout_set(&scr->readout[M_COOLANT], buf, coolant_ok);
     }
     if (battery_display != scr->battery_display || !scr->has_snapshot) {
-        if (isfinite(d->battery_voltage)) {
+        if (battery_ok) {
             snprintf(buf, sizeof(buf), "%.1f", d->battery_voltage);
         } else {
             snprintf(buf, sizeof(buf), "--");
         }
-        amber_readout_set(&scr->readout[M_BATTERY], buf,
-                          isfinite(d->battery_voltage));
+        amber_readout_set(&scr->readout[M_BATTERY], buf, battery_ok);
     }
     if (oil_display != scr->oil_display || !scr->has_snapshot) {
-        format_temperature(buf, sizeof(buf), oil);
-        amber_readout_set(&scr->readout[M_OIL], buf, isfinite(oil));
+        format_temperature(buf, sizeof(buf), oil_ok ? oil : NAN);
+        amber_readout_set(&scr->readout[M_OIL], buf, oil_ok);
+    }
+    // Icones eau/batterie/huile : vives si la mesure est valable, attenuees
+    // sinon. Setters idempotents (aucune invalidation si rien ne change).
+    if (!scr->has_snapshot || coolant_ok != scr->coolant_ok) {
+        dash_icon_set_color(scr->icons[M_COOLANT], coolant_ok
+                                                       ? ui_theme_amber_bright()
+                                                       : ui_theme_amber_dim());
+    }
+    if (!scr->has_snapshot || battery_ok != scr->battery_ok) {
+        dash_icon_set_color(scr->icons[M_BATTERY], battery_ok
+                                                       ? ui_theme_amber_bright()
+                                                       : ui_theme_amber_dim());
+    }
+    if (!scr->has_snapshot || oil_ok != scr->oil_ok) {
+        dash_icon_set_color(scr->icons[M_OIL], oil_ok ? ui_theme_amber_bright()
+                                                      : ui_theme_amber_dim());
     }
     if (d->connected != scr->connected_display || !scr->has_snapshot) {
+        // Connecte : chaine normale + « OBD ». Deconnecte : chaine barree +
+        // « OFF » (jamais le « -- » ambigu d'une mesure absente).
         amber_value_widget_set(scr->ind_value[M_OBD],
-                               d->connected ? "OBD" : "--");
+                               d->connected ? "OBD" : "OFF");
+        dash_icon_set_type(scr->icons[M_OBD], d->connected
+                                                  ? DASH_ICON_OBD_LINK
+                                                  : DASH_ICON_OBD_DISCONNECTED);
+        dash_icon_set_color(scr->icons[M_OBD], d->connected
+                                                   ? ui_theme_amber_bright()
+                                                   : ui_theme_amber_dim());
     }
 
     if (dial_changed) {
-        scr->rpm = rpm;
+        scr->rpm = rpm_ok ? rpm : NAN;
         scr->rpm_segment = rpm_segment;
         lv_obj_invalidate(scr->canvas);
     }
@@ -391,6 +423,9 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     scr->coolant_display = coolant_display;
     scr->battery_display = battery_display;
     scr->oil_display = oil_display;
+    scr->coolant_ok = coolant_ok;
+    scr->battery_ok = battery_ok;
+    scr->oil_ok = oil_ok;
     scr->connected_display = d->connected;
     scr->has_snapshot = true;
 }

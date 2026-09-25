@@ -110,7 +110,12 @@ docs/                 # K-line MEMS, NVS, BLE, RTC, roadmap LILYGO
   `ecu_data_unavailable()` pour un instantané vide.
 - Défauts : `fault_flags` (`ECU_FAULT_*`) valable seulement si `faults_available`.
 - La session MEMS tolère `MEMS_SESSION_MAX_POLL_FAILURES` trames perdues
-  consécutives avant de se déclarer déconnectée.
+  consécutives avant de se déclarer déconnectée. Un snapshot connecté âgé de
+  **1,5 s ou plus** est néanmoins présenté comme indisponible (borne UX à
+  valider sur la K-line réelle).
+- `domain/temperature_status.h` centralise les états thermiques : aucune
+  mesure d'eau disponible ne doit produire « TEMPERATURES OK ». Une alerte
+  thermique est affichée par le navigateur sur toutes ses pages.
 
 ## Écran ambre — système de conception (`main/ui/screens/style_amber.c`)
 
@@ -126,8 +131,9 @@ docs/                 # K-line MEMS, NVS, BLE, RTC, roadmap LILYGO
 - **Séparateurs fins** avec marge à chaque intersection (grille jamais fermée) ;
   cellules d'extrémité (eau/OBD) relevées pour suivre la courbe du cadran.
 - **Texte** : police **Michroma** (OFL, esprit Microgramma — substitut libre à la
-  police propriétaire). Une seule graisse -> **faux-gras** par calque dupliqué
-  décalé (`amber_value_widget`, écart `BOLD_XL`/`BOLD_SM` selon la taille).
+  police propriétaire). Le calque de faux-gras de `amber_value_widget` reste
+  masqué pour éviter un texte doublé. Légendes du kit à **20 px**, petits
+  libellés à **22 px** ; grandes valeurs à 30/56/72 px.
 - **Lissage** : le RPM affiché suit la valeur ECU (~5 Hz) via
   `value_smoothing_step` (τ 100 ms) pour éviter un bargraph en escalier.
 - **API** : `amber_screen_create(parent)` / `amber_screen_update(scr, ecu_data_t*)` /
@@ -158,12 +164,16 @@ Tous les écrans hors RPM partagent une même grammaire, fournie par le kit :
 ### Réglages (`main/ui/screens/settings_screen.c`)
 
 - Surimpression opaque ouverte par un **maintien ~1 s** (doigt immobile) sur
-  n'importe quelle page ; fermée par **OK**. Luminosité (16 crans AW9364,
+  n'importe quelle page ; fermée par **OK**. Le maintien est **annulé si le
+  doigt bouge de plus de 18 px** (échelle 480) et le tap qui suit un maintien
+  est ignoré (`ui/navigation/dashboard_hold.h`). Luminosité (16 crans AW9364,
   jamais 0), **page de démarrage** (fixe ou « dernière vue », défaut) et
   fenêtre d'**appairage** Bluetooth de 5 min (`domain/ble_window`, refermée
   dès qu'un téléphone est lié ; « INDISPONIBLE » si le BLE est absent).
 - L'écran ne fait que remonter des actions : `app_main.c` les applique via
   `settings_runtime_*` et resynchronise l'affichage dans le timer réglages.
+- La persistance NVS est exécutée par `settings_persistence` hors LVGL après
+  l'anti-rebond de 3 s ; le coordinateur attend l'acquittement réel du snapshot.
 - `startup_page` et `utc_offset_minutes` (schéma NVS **v2**, migration depuis
   v1) ne sont **pas** dans le protocole BLE de réglages v1 : les valeurs
   locales sont conservées lors d'une écriture BLE (`app_settings_merge_ble_v1`).
@@ -177,7 +187,11 @@ Tous les écrans hors RPM partagent une même grammaire, fournie par le kit :
   `navigation_screen_set_route`, `*_set_link`. Flèche de manœuvre déduite du
   texte ; pochette, icône PNG et alertes ignorées. Lien à sens unique.
 - `sim/build/gen_golden music|navigation out.png offline` rend l'état
-  « téléphone déconnecté ».
+  « téléphone déconnecté ». La musique affiche un pictogramme d'état sans
+  pastille de bouton : aucune commande tactile de lecture n'est proposée.
+- `rtc_worker` effectue les lectures/écritures DS3231 hors LVGL ; l'horloge UI
+  lit l'heure système UTC synchronisée. Sans heure valide, elle masque les
+  aiguilles et affiche « HEURE / NON SYNCHRONISEE ».
 
 ### Gotchas
 

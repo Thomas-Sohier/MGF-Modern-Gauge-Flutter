@@ -86,11 +86,46 @@ gcc "${CFLAGS[@]}" \
     "${UI_SRCS[@]}" "${LVGL_OBJS[@]}" \
     -lm -o "$BUILD/gen_golden"
 
-# 4. Régénération des références visuelles.
-echo ">> génération des goldens..."
+# 4. Régénération des références visuelles (états nominaux).
+echo ">> génération des goldens standard..."
 "$BUILD/gen_golden" boot  "$GDIR/boot_amber.png"
 "$BUILD/gen_golden" amber "$GDIR/rpm_amber.png"
 for style in dashboard clock music navigation faults temps injection lambda ignition idle admission settings; do
     "$BUILD/gen_golden" "$style" "$GDIR/${style}_amber.png"
 done
+
+# 5. États réels et régressions : convention <écran>_<scénario>_amber.png
+#    (une entrée par PNG, scénario passé en 3e argument).
+echo ">> génération des goldens scénarios..."
+# ECU déconnectée : toutes les vues télémétrie et services affichent « -- ».
+"$BUILD/gen_golden" amber      "$GDIR/rpm_offline_amber.png"             offline
+"$BUILD/gen_golden" faults     "$GDIR/faults_offline_amber.png"          offline
+"$BUILD/gen_golden" temps      "$GDIR/temps_offline_amber.png"           offline
+"$BUILD/gen_golden" injection  "$GDIR/injection_offline_amber.png"       offline
+"$BUILD/gen_golden" lambda     "$GDIR/lambda_offline_amber.png"          offline
+"$BUILD/gen_golden" ignition   "$GDIR/ignition_offline_amber.png"        offline
+"$BUILD/gen_golden" idle       "$GDIR/idle_offline_amber.png"            offline
+"$BUILD/gen_golden" admission  "$GDIR/admission_offline_amber.png"       offline
+"$BUILD/gen_golden" music      "$GDIR/music_offline_amber.png"           offline
+"$BUILD/gen_golden" navigation "$GDIR/navigation_offline_amber.png"      offline
+"$BUILD/gen_golden" settings   "$GDIR/settings_offline_amber.png"        offline
+# États capteurs : mesure absente, surchauffe, sonde d'eau en défaut.
+"$BUILD/gen_golden" temps      "$GDIR/temps_missing_amber.png"           missing
+"$BUILD/gen_golden" temps      "$GDIR/temps_hot_amber.png"               hot
+"$BUILD/gen_golden" temps      "$GDIR/temps_sensor_fault_amber.png"      sensor_fault
+# Unités impériales (vues qui gèrent set_units).
+"$BUILD/gen_golden" amber      "$GDIR/rpm_imperial_amber.png"            imperial
+"$BUILD/gen_golden" temps      "$GDIR/temps_imperial_amber.png"          imperial
+"$BUILD/gen_golden" admission  "$GDIR/admission_imperial_amber.png"      imperial
+# Reconnexions : transitions valid -> invalid -> valid / online -> offline -> online.
+"$BUILD/gen_golden" amber      "$GDIR/rpm_reconnected_amber.png"         reconnected
+"$BUILD/gen_golden" clock      "$GDIR/clock_reconnected_amber.png"       reconnected
+# Horloge sans source de temps fiable.
+"$BUILD/gen_golden" clock      "$GDIR/clock_unsynced_amber.png"          unsynced
+# Textes longs (ellipsis) et lecture en pause.
+"$BUILD/gen_golden" music      "$GDIR/music_long_amber.png"              long
+"$BUILD/gen_golden" music      "$GDIR/music_paused_amber.png"            paused
+"$BUILD/gen_golden" navigation "$GDIR/navigation_long_amber.png"         long
+# Tableau de bord : alerte thermique globale posée sur la page NAVIGATION.
+"$BUILD/gen_golden" dashboard  "$GDIR/dashboard_hot_amber.png"           hot
 echo ">> OK — goldens régénérés dans test/golden/"

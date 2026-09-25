@@ -1,14 +1,26 @@
 #include "ui/navigation/dashboard_navigator.h"
+#include "domain/temperature_status.h"
+#include "ui/navigation/dashboard_hold.h"
 #include "ui/navigation/dashboard_timing.h"
 #include "ui/navigation/ui_instrumentation.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/widgets/amber_draw.h"
+#include "ui/widgets/amber_kit.h"
+
+#include <math.h>
 
 #define DASHBOARD_MAX_PAGES          12
 #define GESTURE_CLICK_SUPPRESSION_MS 300U
-// Maintien volontairement plus long que l'appui long LVGL (400 ms) : un
-// effleurement en roulant ne doit pas ouvrir les réglages.
-#define HOLD_ACTION_MS 1000U
+
+// Bandeau d'alerte thermique : bandeau opaque posé sur la ligne d'état basse,
+// dans le repère logique 320 (largeur 192, hauteur 22, centre (160, 272)).
+// Aucun padding : le texte est centré sur toute la surface.
+#define THERMAL_ALERT_W      192.0f
+#define THERMAL_ALERT_H      22.0f
+#define THERMAL_ALERT_CX     160.0f
+#define THERMAL_ALERT_CY     272.0f
+#define THERMAL_ALERT_RADIUS 4.0f
+#define THERMAL_ALERT_TEXT   "ALERTE THERMIQUE"
 
 // Indicateur de position : un point par page dans l'ouverture basse du cadran,
 // point courant éclairci. Visible dès qu'il y a plus d'une page à parcourir.
@@ -28,6 +40,7 @@ typedef struct {
 struct dashboard_navigator_s {
     lv_obj_t *root;
     lv_obj_t *indicator;
+    lv_obj_t *thermal_alert;
     page_entry_t pages[DASHBOARD_MAX_PAGES];
     size_t count;
     size_t current;
@@ -38,9 +51,7 @@ struct dashboard_navigator_s {
     void *page_changed_context;
     dashboard_hold_cb_t hold;
     void *hold_context;
-    uint32_t press_started_ms;
-    bool press_is_gesture;
-    bool press_held;
+    dashboard_hold_t press_hold;
 };
 
 static void update_current(dashboard_navigator_t *navigator, bool force) {
@@ -72,12 +83,61 @@ static void show_current(dashboard_navigator_t *navigator) {
         else
             lv_obj_add_flag(navigator->pages[i].object, LV_OBJ_FLAG_HIDDEN);
     }
-    // La pile de pages est au-dessus de l'indicateur : le remettre au premier
-    // plan après toute bascule, puis redessiner le point courant.
+    // La pile de pages est au-dessus de l'indicateur : remettre le bandeau
+    // d'alerte puis l'indicateur au premier plan après toute bascule, afin que
+    // l'alerte reste visible sur toutes les pages (musique/navigation/horloge
+    // comprises) sans masquer le point de position.
+    if (navigator->thermal_alert != NULL) {
+        lv_obj_move_foreground(navigator->thermal_alert);
+    }
     if (navigator->indicator != NULL) {
         lv_obj_move_foreground(navigator->indicator);
         lv_obj_invalidate(navigator->indicator);
     }
+}
+
+// Bandeau créé caché : seule la ligne d'état est recouverte, jamais la valeur
+// héros ni la zone de geste. Non cliquable pour ne pas capter les appuis.
+static lv_obj_t *thermal_alert_create(lv_obj_t *root) {
+    if (root == NULL) return NULL;
+    lv_obj_t *alert = lv_obj_create(root);
+    if (alert == NULL) return NULL;
+    lv_obj_remove_style_all(alert);
+    lv_obj_clear_flag(alert, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_bg_color(alert, ui_theme_amber_bright(), 0);
+    lv_obj_set_style_bg_opa(alert, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(alert, 0, 0);
+    lv_obj_set_style_pad_all(alert, 0, 0);
+
+    lv_obj_update_layout(root);
+    const ui_layout_t layout =
+        ui_layout_fit(lv_obj_get_width(root), lv_obj_get_height(root));
+    const int32_t width = (int32_t)lroundf(THERMAL_ALERT_W * layout.scale);
+    const int32_t height = (int32_t)lroundf(THERMAL_ALERT_H * layout.scale);
+    const int32_t cx = (int32_t)lroundf(ui_layout_x(&layout, THERMAL_ALERT_CX));
+    const int32_t cy = (int32_t)lroundf(ui_layout_y(&layout, THERMAL_ALERT_CY));
+    lv_obj_set_size(alert, width, height);
+    lv_obj_set_pos(alert, cx - width / 2, cy - height / 2);
+    lv_obj_set_style_radius(
+        alert, (int32_t)lroundf(THERMAL_ALERT_RADIUS * layout.scale), 0);
+
+    lv_obj_t *label = amber_kit_label(alert, amber_kit_font_caption(),
+                                      ui_theme_amber_bg(), THERMAL_ALERT_TEXT);
+    if (label == NULL) {
+        lv_obj_delete(alert);
+        return NULL;
+    }
+    lv_obj_center(label);
+    lv_obj_add_flag(alert, LV_OBJ_FLAG_HIDDEN);
+    return alert;
+}
+
+static void thermal_alert_apply(dashboard_navigator_t *navigator, bool hot) {
+    if (navigator->thermal_alert == NULL) return;
+    if (hot)
+        lv_obj_remove_flag(navigator->thermal_alert, LV_OBJ_FLAG_HIDDEN);
+    else
+        lv_obj_add_flag(navigator->thermal_alert, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void indicator_draw_cb(lv_event_t *event) {
@@ -147,30 +207,44 @@ static void navigation_event_cb(lv_event_t *event) {
 
     const lv_event_code_t code = lv_event_get_code(event);
     if (code == LV_EVENT_PRESSED) {
-        navigator->press_started_ms = lv_tick_get();
-        navigator->press_is_gesture = false;
-        navigator->press_held = false;
+        // Mémorise le point de départ : c'est lui qui servira de repère pour
+        // distinguer un maintien immobile d'un glissement lent.
+        lv_indev_t *indev = lv_event_get_indev(event);
+        if (indev == NULL) {
+            dashboard_hold_reset(&navigator->press_hold);
+            return;
+        }
+        lv_point_t point;
+        lv_indev_get_point(indev, &point);
+        dashboard_hold_begin(&navigator->press_hold, lv_tick_get(), point.x,
+                             point.y);
         return;
     }
 
     if (code == LV_EVENT_PRESSING) {
-        if (navigator->hold == NULL || navigator->press_held ||
-            navigator->press_is_gesture ||
-            !dashboard_period_elapsed(
-                lv_tick_get(), navigator->press_started_ms, HOLD_ACTION_MS)) {
-            return;
-        }
-        lv_point_t point;
         lv_indev_t *indev = lv_event_get_indev(event);
         if (indev == NULL) return;
+        lv_point_t point;
         lv_indev_get_point(indev, &point);
-        if (!point_in_visible_disc(navigator, &point)) return;
-        navigator->press_held = true;
+        const int32_t min_dimension =
+            LV_MIN(lv_obj_get_width(navigator->root),
+                   lv_obj_get_height(navigator->root));
+        // Un glissement au-delà du seuil annule le maintien pour toute la
+        // pression : revenir au point de départ ne le réarme pas.
+        dashboard_hold_move_cancelled(&navigator->press_hold, point.x, point.y,
+                                      min_dimension);
+        if (navigator->hold == NULL ||
+            !dashboard_hold_should_fire(
+                &navigator->press_hold, lv_tick_get(),
+                point_in_visible_disc(navigator, &point)))
+            return;
         navigator->hold(navigator->hold_context);
         return;
     }
 
     if (code == LV_EVENT_GESTURE) {
+        // Un geste LVGL annule aussi le maintien de cette pression.
+        dashboard_hold_cancel(&navigator->press_hold);
         lv_indev_t *indev = lv_event_get_indev(event);
         lv_point_t point;
         if (indev == NULL) return;
@@ -178,7 +252,6 @@ static void navigation_event_cb(lv_event_t *event) {
         if (!point_in_visible_disc(navigator, &point)) return;
         const lv_dir_t direction = lv_indev_get_gesture_dir(indev);
         const uint32_t now = lv_tick_get();
-        navigator->press_is_gesture = true;
         if (direction == LV_DIR_LEFT) {
             dashboard_navigator_next(navigator);
             navigator->last_gesture_ms = now;
@@ -194,8 +267,10 @@ static void navigation_event_cb(lv_event_t *event) {
         // événement et leur bubbling de geste sans devenir une navigation.
         if (lv_event_get_target(event) != navigator->root) return;
         // LVGL émet CLICKED au relâcher même après un maintien : ce n'est
-        // pas un tap de navigation.
-        if (navigator->press_held) return;
+        // pas un tap de navigation. Un glissement lent qui a annulé le
+        // maintien ne doit pas non plus déclencher de tap en dérivant.
+        if (navigator->press_hold.fired || navigator->press_hold.cancelled)
+            return;
 
         // LVGL peut ne pas émettre CLICKED après un geste. Le délai borné
         // expire tout de même, et la soustraction reste sûre au wrap du tick.
@@ -256,6 +331,14 @@ dashboard_navigator_t *dashboard_navigator_create(lv_obj_t *parent) {
     lv_obj_add_event_cb(navigator->indicator, indicator_draw_cb,
                         LV_EVENT_DRAW_MAIN, NULL);
     lv_obj_add_flag(navigator->indicator, LV_OBJ_FLAG_HIDDEN);
+
+    navigator->thermal_alert = thermal_alert_create(navigator->root);
+    if (navigator->thermal_alert == NULL) {
+        lv_obj_delete(navigator->root);
+        lv_free(navigator);
+        return NULL;
+    }
+
     navigator->last_gesture_ms = lv_tick_get() - GESTURE_CLICK_SUPPRESSION_MS;
     lv_obj_add_event_cb(navigator->root, navigation_event_cb, LV_EVENT_GESTURE,
                         navigator);
@@ -296,6 +379,9 @@ bool dashboard_navigator_register_page(dashboard_navigator_t *navigator,
     };
     if (navigator->count != 0) lv_obj_add_flag(page, LV_OBJ_FLAG_HIDDEN);
     navigator->count++;
+    if (navigator->thermal_alert != NULL) {
+        lv_obj_move_foreground(navigator->thermal_alert);
+    }
     if (navigator->indicator != NULL) {
         lv_obj_move_foreground(navigator->indicator);
         if (navigator->count >= 2)
@@ -351,6 +437,12 @@ void dashboard_navigator_update(dashboard_navigator_t *navigator,
 
     navigator->latest_data = *data;
     navigator->has_latest_data = true;
+    // Statut calculé sur le seul instantané ECU, indépendamment de la page
+    // visible et de son éventuel callback de mise à jour : le bandeau couvre
+    // aussi les pages événementielles (musique, navigation, horloge).
+    thermal_alert_apply(navigator,
+                        temperature_status_of(&navigator->latest_data) ==
+                            TEMPERATURE_STATUS_THERMAL_ALERT);
     update_current(navigator, false);
 }
 

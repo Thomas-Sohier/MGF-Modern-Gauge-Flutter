@@ -1,68 +1,67 @@
-# RTC DS3231 optionnelle (architecture LILYGO)
+# RTC DS3231 optionnelle (LILYGO)
 
-Le support DS3231 est ajouté comme une fonction optionnelle pour la LILYGO
-T-RGB H597 : adresse I²C `0x68`, SDA GPIO8 et SCL GPIO48. `INT/SQW` n'est pas
-utilisée.
+Le DS3231 utilise l'adresse I²C `0x68`, SDA GPIO8 et SCL GPIO48, sur le bus
+partagé avec le tactile et l'expander de la LILYGO T-RGB H597. `INT/SQW` n'est
+pas utilisée. Son absence ne bloque pas le démarrage.
 
 ## Contrat logiciel
 
-- `main/domain/rtc.h` expose `rtc_probe`, `rtc_read`, `rtc_set` et les dates
-  validées (`2000..2099`, calendrier grégorien). Une `rtc_datetime_t` est
-  toujours en UTC ; le DS3231 ne stocke pas de fuseau.
-- `main/domain/rtc_time.c` contient le codec BCD et la validation sans
-  dépendance ESP-IDF ; `test/test_rtc.c` l'exerce sur l'hôte.
-- `main/infrastructure/rtc_ds3231.c` traduit ce contrat vers les registres
-  DS3231.
-- Le bit OSF (`STATUS 0x0F`, bit 7), les bits réservés et les champs BCD/date
-  invalides refusent une lecture. `rtc_set` écrit l'heure puis efface OSF.
-  Une écriture valide est donc la seule opération qui acquitte explicitement
-  une perte d'oscillation.
+- `main/domain/rtc.h` expose le contrat synchrone `rtc_probe`, `rtc_read` et
+  `rtc_set`. Les dates valides couvrent 2000–2099 et sont toujours en **UTC**.
+- `main/domain/rtc_time.c` valide les dates et réalise les conversions sans
+  dépendance ESP-IDF ; les tests hôte couvrent ce contrat.
+- `main/infrastructure/rtc_ds3231.c` traduit ce contrat en transactions de
+  registres. Le bit OSF, des bits réservés incorrects ou une date invalide
+  rendent la lecture indisponible. Une écriture valide efface OSF.
+- `main/infrastructure/rtc_worker.c` possède les accès RTC après le démarrage :
+  lectures et écritures I²C s'exécutent dans sa tâche, **jamais dans LVGL**.
+  La RTC est empruntée ; le worker doit être arrêté avant `rtc_destroy` et
+  avant la destruction du bus écran.
 
-Une RTC absente, inaccessible, arrêtée ou non réglée ne fait pas échouer le
-firmware. L'écran horloge utilise l'heure système UTC en repli et conserve une
-valeur cohérente si aucune source n'est valide. La conversion vers l'heure
-locale et l'heure été/hiver reste volontairement hors contrat tant qu'aucun
-fuseau n'est configuré.
+## Affichage et synchronisation
 
-## Bus I²C partagé
+Le worker initialise l'heure système à partir d'une RTC valide, puis la
+resynchronise périodiquement. Les erreurs de lecture n'arrêtent pas une
+horloge système déjà synchronisée. L'écran horloge lit uniquement cette
+heure système ; sans heure valide, les aiguilles sont masquées et le message
+« HEURE / NON SYNCHRONISEE » apparaît. Aucune heure arbitraire n'est affichée.
 
-Le driver RTC ne fait jamais `i2c_driver_install()` et ne détruit jamais le
-bus. `board_display_i2c_bus()` fournit une vue du bus déjà initialisé par le
-bring-up écran via `shared_i2c_bus_t`. Les transactions passent par le driver
-ESP-IDF existant, qui sérialise les transactions legacy ; aucun second
-propriétaire du port n'est créé.
+Le DS3231 et l'heure système restent en UTC. L'affichage applique le décalage
+`utc_offset_minutes` persisté, reçu du téléphone (fuseau et heure d'été).
+Sans nouveau décalage fourni par le téléphone, la jauge ne calcule pas
+elle-même les transitions saisonnières.
 
-Cette branche contient encore le bring-up **Waveshare** (SDA/SCL GPIO15/7).
-L'application refuse donc explicitement ce bus pour le DS3231 et journalise que
-la RTC attend le bus LILYGO GPIO8/48. La branche `feat/lilygo-display` doit :
+Les commandes téléphone mettent l'heure système à jour immédiatement et
+soumettent une copie de la date UTC au worker. La file est bornée et la
+commande la plus récente remplace celle en attente. Une erreur d'écriture
+RTC est journalisée et retentée hors de la tâche UI.
 
-1. initialiser une seule fois le bus GPIO8/48 pour tactile, expander et
-   connecteur externe ;
-2. implémenter `board_display_i2c_bus()` avec le même contrat, ou fournir son
-   adaptateur de transaction équivalent ;
-3. conserver l'adresse tactile `0x15` et expander `0x20`, puis laisser
-   l'application sonder `0x68` sans considérer son absence comme fatale.
+Pour la caractéristique BLE `datetime`, seules les dates `UTC` sont acceptées ;
+`LOCAL` est refusé. Un succès signifie **commande acceptée dans la file**,
+pas écriture matérielle déjà terminée. Aucun accusé de persistance différé
+n'est défini par ce protocole. Sans worker RTC disponible, cette caractéristique
+refuse l'écriture ; la synchronisation système par l'application compagnon
+reste utilisable sans DS3231.
 
-Le support RTC dépend donc de cette adaptation du display branch ; il ne doit
-pas être activé en reliant directement un second pilote I²C aux GPIO.
+## Bus partagé
 
-## Matériel
+`board_display_i2c_bus()` fournit une vue du bus initialisé par le bring-up
+LILYGO. Le driver RTC ne crée ni ne détruit ce bus. Le driver I²C maître ESP-IDF
+sérialise les transactions ; aucun deuxième propriétaire des GPIO n'est créé.
+Le tactile conserve l'adresse `0x15`, l'expander `0x20`.
 
-Vérifier que le module DS3231 est compatible avec son élément de sauvegarde :
-les modules prévus pour LIR2032 ne doivent pas recevoir une CR2032 non
-rechargeable. Vérifier aussi que les pull-ups sont vers 3,3 V.
+## Matériel et validation
 
-Commandes hôte :
+Vérifier que le module est compatible avec sa pile : un circuit de charge
+prévu pour LIR2032 ne doit pas charger une CR2032 non rechargeable. Les
+pull-ups doivent être reliées au 3,3 V.
 
 ```sh
-./test/run_tests.sh
+bash test/run_tests.sh
 ./build.sh
+tools/format.sh check
 ```
 
-La synchronisation BLE utilise la caractéristique `datetime` existante : les
-payloads `UTC` sont validés puis écrits dans le DS3231 ; les payloads `LOCAL`
-sont refusés par l'intégration, car aucun décalage ni règle d'heure d'été n'est
-encore configuré. Sans RTC, cette synchronisation échoue sans modifier l'écran.
-
-La compilation ESP-IDF et la validation sur LILYGO restent à faire avec la
-révision matérielle et le profil d'écran confirmés.
+La validation sur carte reste nécessaire : démarrage sans RTC, OSF actif,
+perte du périphérique après synchronisation, commandes téléphone successives,
+contention avec le tactile et comportement sous coupure d'alimentation.

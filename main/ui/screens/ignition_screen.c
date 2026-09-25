@@ -27,7 +27,7 @@ ignition_screen_t *ignition_screen_create(lv_obj_t *parent) {
         .title = "ALLUMAGE",
         .hero_unit = "°",
         .hero_caption = "AVANCE AV. PMH",
-        .cell_caption = {"CORRECTION", "CHARGE", "BOBINE 1", "BOBINE 2"},
+        .cell_caption = {"CORR.", "CHARGE", "BOBINE 1", "BOBINE 2"},
         .cell_unit = {"°", "ms", "ms", "ms"},
         .rim = AMBER_RIM_SEGMENTS,
     };

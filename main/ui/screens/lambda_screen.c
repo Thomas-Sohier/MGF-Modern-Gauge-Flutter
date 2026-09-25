@@ -26,7 +26,7 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
         .title = "RICHESSE",
         .hero_unit = "AFR",
         .hero_caption = "AIR / CARBURANT",
-        .cell_caption = {"O2 GAUCHE", "O2 DROITE", "LAMBDA", "CHAUFFAGE"},
+        .cell_caption = {"O2 G.", "O2 D.", "LAMBDA", "CHAUFF."},
         .cell_unit = {"mV", "mV", "", "%"},
         .rim = AMBER_RIM_HAIRLINE,
     };
