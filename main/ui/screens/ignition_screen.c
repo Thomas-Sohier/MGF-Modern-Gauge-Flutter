@@ -37,7 +37,7 @@ ignition_screen_t *ignition_screen_create(lv_obj_t *parent) {
     }
     const float tdc = amber_progress(0.0f, ADVANCE_MIN, ADVANCE_MAX);
     amber_page_set_rim(&scr->page, tdc, tdc, tdc, false);
-    amber_page_set_status(&scr->page, "PAS DE LIAISON", false);
+    amber_page_set_status(&scr->page, "ECU NON CONNECTEE", false);
     return scr;
 }
 
@@ -74,7 +74,7 @@ void ignition_screen_update(ignition_screen_t *scr, const ecu_data_t *data) {
 
     // Le régime donne le contexte de lecture de l'avance.
     if (!connected) {
-        amber_page_set_status(&scr->page, "PAS DE LIAISON", false);
+        amber_page_set_status(&scr->page, "ECU NON CONNECTEE", false);
     } else if (isfinite(data->rpm)) {
         snprintf(text, sizeof(text), "A %.0f TR/MIN", data->rpm);
         amber_page_set_status(&scr->page, text, false);

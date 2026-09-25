@@ -45,7 +45,7 @@ temps_screen_t *temps_screen_create(lv_obj_t *parent) {
         temps_screen_destroy(scr);
         return NULL;
     }
-    amber_page_set_status(&scr->page, "PAS DE LIAISON", false);
+    amber_page_set_status(&scr->page, "ECU NON CONNECTEE", false);
     return scr;
 }
 
@@ -94,7 +94,7 @@ void temps_screen_update(temps_screen_t *scr, const ecu_data_t *data) {
     bool status_alert = false;
     switch (status) {
     case TEMPERATURE_STATUS_NO_LINK:
-        status_text = "PAS DE LIAISON";
+        status_text = "ECU NON CONNECTEE";
         break;
     case TEMPERATURE_STATUS_THERMAL_ALERT:
         status_text = "ALERTE THERMIQUE";

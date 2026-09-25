@@ -33,7 +33,7 @@ idle_screen_t *idle_screen_create(lv_obj_t *parent) {
         idle_screen_destroy(scr);
         return NULL;
     }
-    amber_page_set_status(&scr->page, "PAS DE LIAISON", false);
+    amber_page_set_status(&scr->page, "ECU NON CONNECTEE", false);
     return scr;
 }
 
@@ -72,7 +72,7 @@ void idle_screen_update(idle_screen_t *scr, const ecu_data_t *data) {
                                 error_ok &&
                                     fabsf(data->idle_error) >= ERROR_WARN_RPM);
     amber_page_set_status(
-        &scr->page, connected ? "BOUCLE ACTIVE" : "PAS DE LIAISON", false);
+        &scr->page, connected ? "BOUCLE ACTIVE" : "ECU NON CONNECTEE", false);
 }
 
 void idle_screen_destroy(idle_screen_t *scr) {

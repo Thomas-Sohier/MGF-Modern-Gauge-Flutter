@@ -34,7 +34,7 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
         lambda_screen_destroy(scr);
         return NULL;
     }
-    amber_page_set_status(&scr->page, "PAS DE LIAISON", false);
+    amber_page_set_status(&scr->page, "ECU NON CONNECTEE", false);
     return scr;
 }
 
@@ -63,7 +63,7 @@ void lambda_screen_update(lambda_screen_t *scr, const ecu_data_t *data) {
 
     if (!connected) {
         amber_page_set_hero_caption(&scr->page, "AIR / CARBURANT", false);
-        amber_page_set_status(&scr->page, "PAS DE LIAISON", false);
+        amber_page_set_status(&scr->page, "ECU NON CONNECTEE", false);
         return;
     }
     if (!afr_ok)

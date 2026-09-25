@@ -188,8 +188,8 @@ static void rtc_worker_task(void *arg) {
             if (has_applied && datetime_equal(&last_applied, &command.utc)) {
                 // Déjà écrite avec succès (même UTC brut) : acquittée sans I2C.
                 has_pending = false;
-            } else if (rtc_worker_apply_command(worker, &command,
-                                                &last_applied, &has_applied)) {
+            } else if (rtc_worker_apply_command(worker, &command, &last_applied,
+                                                &has_applied)) {
                 has_pending = false;
             } else {
                 pending = command;
@@ -280,8 +280,7 @@ bool rtc_worker_submit(rtc_worker_t *worker, const rtc_datetime_t *utc) {
     // (dernier-gagne), jamais d'accumulation.
     xSemaphoreTake(worker->state_lock, portMAX_DELAY);
     worker->phone_seen = true;
-    const bool queued =
-        xQueueOverwrite(worker->commands, &command) == pdPASS;
+    const bool queued = xQueueOverwrite(worker->commands, &command) == pdPASS;
     xSemaphoreGive(worker->state_lock);
     return queued;
 }

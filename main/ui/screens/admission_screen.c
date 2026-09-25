@@ -6,6 +6,10 @@
 
 // Pression collecteur (MAP) en héros, organes d'admission dans la grille.
 
+// Seuils d'ouverture papillon pour l'état de charge affiché en ligne d'état.
+#define THROTTLE_IDLE_MAX_PCT 3
+#define THROTTLE_FULL_MIN_PCT 90
+
 enum { CELL_THROTTLE = 0, CELL_TPS, CELL_INTAKE, CELL_RPM };
 
 struct admission_screen_s {
@@ -37,7 +41,7 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
         admission_screen_destroy(scr);
         return NULL;
     }
-    amber_page_set_status(&scr->page, "PAS DE LIAISON", false);
+    amber_page_set_status(&scr->page, "ECU NON CONNECTEE", false);
     return scr;
 }
 
@@ -86,8 +90,20 @@ void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
         amber_page_set_cell(&scr->page, i, text, ok);
     }
 
-    amber_page_set_status(
-        &scr->page, connected ? "MOTEUR EN LIGNE" : "PAS DE LIAISON", false);
+    // L'état de charge se déduit de l'ouverture papillon déjà affichée.
+    const char *status_text;
+    if (!connected) {
+        status_text = "ECU NON CONNECTEE";
+    } else if (isnan(data->throttle)) {
+        status_text = "PAPILLON --";
+    } else if (data->throttle < THROTTLE_IDLE_MAX_PCT) {
+        status_text = "PIED LEVE";
+    } else if (data->throttle >= THROTTLE_FULL_MIN_PCT) {
+        status_text = "PLEINE CHARGE";
+    } else {
+        status_text = "CHARGE PARTIELLE";
+    }
+    amber_page_set_status(&scr->page, status_text, false);
 }
 
 void admission_screen_destroy(admission_screen_t *scr) {

@@ -119,8 +119,9 @@ void faults_screen_update(faults_screen_t *scr, const ecu_data_t *data) {
                                 available && count > 0);
     amber_page_set_status(&scr->page,
                           !data->connected ? "ECU NON CONNECTEE"
-                          : available      ? "LIAISON ACTIVE"
-                                           : "CODES NON FOURNIS",
+                          : !available     ? "CODES NON FOURNIS"
+                          : count == 0     ? "SYSTEMES OK"
+                                           : "CONTROLE REQUIS",
                           false);
     amber_page_invalidate(&scr->page);
 }

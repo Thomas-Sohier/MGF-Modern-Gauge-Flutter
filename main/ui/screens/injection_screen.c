@@ -38,7 +38,7 @@ injection_screen_t *injection_screen_create(lv_obj_t *parent) {
         return NULL;
     }
     amber_page_set_rim(&scr->page, 0.5f, 0.5f, 0.5f, false);
-    amber_page_set_status(&scr->page, "PAS DE LIAISON", false);
+    amber_page_set_status(&scr->page, "ECU NON CONNECTEE", false);
     return scr;
 }
 
@@ -77,7 +77,7 @@ void injection_screen_update(injection_screen_t *scr, const ecu_data_t *data) {
     }
 
     if (!connected) {
-        amber_page_set_status(&scr->page, "PAS DE LIAISON", false);
+        amber_page_set_status(&scr->page, "ECU NON CONNECTEE", false);
     } else if (!correction_ok) {
         amber_page_set_status(&scr->page, "CORRECTION INCONNUE", false);
     } else if (correction > CORRECTION_NEUTRAL + NEUTRAL_BAND) {

@@ -4,7 +4,6 @@
 #include "ui/navigation/dashboard_timing.h"
 #include "ui/navigation/ui_instrumentation.h"
 #include "ui/themes/ui_theme.h"
-#include "ui/widgets/amber_draw.h"
 #include "ui/widgets/amber_kit.h"
 
 #include <math.h>
@@ -22,14 +21,6 @@
 #define THERMAL_ALERT_RADIUS 4.0f
 #define THERMAL_ALERT_TEXT   "ALERTE THERMIQUE"
 
-// Indicateur de position : un point par page dans l'ouverture basse du cadran,
-// point courant éclairci. Visible dès qu'il y a plus d'une page à parcourir.
-#define INDICATOR_CX        160.0f
-#define INDICATOR_Y         298.0f
-#define INDICATOR_SPACING   11.0f
-#define INDICATOR_R         2.6f
-#define INDICATOR_R_CURRENT 3.6f
-
 typedef struct {
     lv_obj_t *object;
     dashboard_page_t descriptor;
@@ -39,7 +30,6 @@ typedef struct {
 
 struct dashboard_navigator_s {
     lv_obj_t *root;
-    lv_obj_t *indicator;
     lv_obj_t *thermal_alert;
     page_entry_t pages[DASHBOARD_MAX_PAGES];
     size_t count;
@@ -83,16 +73,11 @@ static void show_current(dashboard_navigator_t *navigator) {
         else
             lv_obj_add_flag(navigator->pages[i].object, LV_OBJ_FLAG_HIDDEN);
     }
-    // La pile de pages est au-dessus de l'indicateur : remettre le bandeau
-    // d'alerte puis l'indicateur au premier plan après toute bascule, afin que
-    // l'alerte reste visible sur toutes les pages (musique/navigation/horloge
-    // comprises) sans masquer le point de position.
+    // La pile de pages recouvre le bandeau : remettre l'alerte au premier plan
+    // après toute bascule, afin qu'elle reste visible sur toutes les pages
+    // (musique/navigation/horloge comprises).
     if (navigator->thermal_alert != NULL) {
         lv_obj_move_foreground(navigator->thermal_alert);
-    }
-    if (navigator->indicator != NULL) {
-        lv_obj_move_foreground(navigator->indicator);
-        lv_obj_invalidate(navigator->indicator);
     }
 }
 
@@ -138,26 +123,6 @@ static void thermal_alert_apply(dashboard_navigator_t *navigator, bool hot) {
         lv_obj_remove_flag(navigator->thermal_alert, LV_OBJ_FLAG_HIDDEN);
     else
         lv_obj_add_flag(navigator->thermal_alert, LV_OBJ_FLAG_HIDDEN);
-}
-
-static void indicator_draw_cb(lv_event_t *event) {
-    lv_obj_t *object = lv_event_get_target(event);
-    lv_layer_t *layer = lv_event_get_layer(event);
-    dashboard_navigator_t *navigator = lv_obj_get_user_data(object);
-    if (navigator == NULL || navigator->count < 2) return;
-
-    lv_area_t area;
-    lv_obj_get_coords(object, &area);
-    const ui_layout_t layout = amber_draw_layout(&area);
-    const float span = INDICATOR_SPACING * (float)(navigator->count - 1);
-    const float x0 = INDICATOR_CX - span * 0.5f;
-    for (size_t i = 0; i < navigator->count; i++) {
-        const bool current = i == navigator->current;
-        amber_draw_dot(layer, &layout, x0 + INDICATOR_SPACING * (float)i,
-                       INDICATOR_Y, current ? INDICATOR_R_CURRENT : INDICATOR_R,
-                       current ? ui_theme_amber_bright()
-                               : ui_theme_amber_dim());
-    }
 }
 
 bool dashboard_navigator_select_page(dashboard_navigator_t *navigator,
@@ -314,24 +279,6 @@ dashboard_navigator_t *dashboard_navigator_create(lv_obj_t *parent) {
     lv_obj_add_flag(navigator->root,
                     LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
 
-    // Superposition transparente et non cliquable : elle n'intercepte aucun
-    // appui (les gestes continuent d'atteindre la racine).
-    navigator->indicator = lv_obj_create(navigator->root);
-    if (navigator->indicator == NULL) {
-        lv_obj_delete(navigator->root);
-        lv_free(navigator);
-        return NULL;
-    }
-    lv_obj_remove_style_all(navigator->indicator);
-    lv_obj_set_size(navigator->indicator, LV_PCT(100), LV_PCT(100));
-    lv_obj_center(navigator->indicator);
-    lv_obj_clear_flag(navigator->indicator,
-                      LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_user_data(navigator->indicator, navigator);
-    lv_obj_add_event_cb(navigator->indicator, indicator_draw_cb,
-                        LV_EVENT_DRAW_MAIN, NULL);
-    lv_obj_add_flag(navigator->indicator, LV_OBJ_FLAG_HIDDEN);
-
     navigator->thermal_alert = thermal_alert_create(navigator->root);
     if (navigator->thermal_alert == NULL) {
         lv_obj_delete(navigator->root);
@@ -381,11 +328,6 @@ bool dashboard_navigator_register_page(dashboard_navigator_t *navigator,
     navigator->count++;
     if (navigator->thermal_alert != NULL) {
         lv_obj_move_foreground(navigator->thermal_alert);
-    }
-    if (navigator->indicator != NULL) {
-        lv_obj_move_foreground(navigator->indicator);
-        if (navigator->count >= 2)
-            lv_obj_remove_flag(navigator->indicator, LV_OBJ_FLAG_HIDDEN);
     }
     return true;
 }
