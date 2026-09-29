@@ -19,6 +19,11 @@ music_screen_t *music_screen_create(lv_obj_t *parent);
 // extrapolée ensuite pendant la lecture.
 void music_screen_set_media(music_screen_t *scr, const companion_media_t *media,
                             uint32_t now_ms);
+// Pochette décodée (RGB565 ambre, `width` x `height`). Prend possession du
+// tampon (PSRAM cible / tas hôte) et le libère au remplacement ou à la
+// destruction ; NULL efface l'image et réaffiche le motif de repli.
+void music_screen_set_cover(music_screen_t *scr, uint16_t *pixels, int width,
+                            int height);
 // Téléphone appairé connecté ou non.
 void music_screen_set_link(music_screen_t *scr, bool linked, uint32_t now_ms);
 // Avance position et anneau ; à appeler périodiquement (page visible).

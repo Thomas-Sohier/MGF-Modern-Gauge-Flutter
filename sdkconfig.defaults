@@ -25,7 +25,16 @@ CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
 # ── Panneau RGB : ISR en IRAM (stabilité du rafraîchissement avec la PSRAM) ───
 # Profil LCD : original par défaut (8 MHz). Construire avec
 # -DMGF_LILYGO_T_RGB_V2=1 pour la révision V2 (10 MHz + autre ordre RGB).
-CONFIG_LCD_RGB_ISR_IRAM_SAFE=y
+# CONFIG_LCD_RGB_ISR_IRAM_SAFE is not set
+
+# La composition initiale de tous les écrans LVGL dépasse la pile IDF par défaut.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# ── Tactile CST820 (H597, pilote compatible CST816S) ────────────────────────
+# board_display.c réveille le CST820 (reset XL9535 IO1), désactive sa veille
+# automatique (sinon NACK I²C jusqu'au prochain appui) puis journalise l'ID
+# lui-même : la lecture d'ID du pilote serait redondante.
+CONFIG_ESP_LCD_TOUCH_CST816S_DISABLE_READ_ID=y
 
 # ── LVGL ──────────────────────────────────────────────────────────────────────
 CONFIG_LV_COLOR_DEPTH_16=y            # RGB565, cohérent avec le panneau
@@ -35,6 +44,7 @@ CONFIG_LV_COLOR_DEPTH_16=y            # RGB565, cohérent avec le panneau
 # PSRAM (CONFIG_SPIRAM_USE_MALLOC). Même allocateur que le simulateur hôte.
 CONFIG_LV_USE_CLIB_MALLOC=y
 CONFIG_LV_USE_TINY_TTF=y              # rendu Michroma à la volée (style ambre)
+CONFIG_LV_USE_TJPGD=y                 # décodeur JPEG (pochette compagnon)
 CONFIG_LV_USE_VECTOR_GRAPHIC=y         # logo vectoriel de l'écran de boot
 CONFIG_LV_USE_MATRIX=y                 # dépendance du rendu vectoriel
 CONFIG_LV_USE_FLOAT=y                  # dépendance du rendu vectoriel

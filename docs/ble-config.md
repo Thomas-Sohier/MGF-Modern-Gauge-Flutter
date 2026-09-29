@@ -65,6 +65,35 @@ en C pur et testé sur hôte (`test/test_companion.c`).
 - `ble_config_service_forget_bonds()` supprime tous les bonds (fenêtre fermée,
   aucune connexion) ; chaque téléphone devra se ré-appairer.
 
+### Diagnostic d'un plantage à la connexion sur carte réelle
+
+Le lien n'ayant pas encore été validé sur matériel, un plantage au moment où
+l'application appuie sur « connecter » doit d'abord être **localisé**. Depuis
+le moniteur série (`idf.py monitor`), relever la trace `ble_config` /
+`companion` au moment de la connexion et la lire dans cet ordre :
+
+| Trace attendue | Si elle s'arrête avant… | Conclusion |
+|---|---|---|
+| `host synced (addr type N)` | rien | pile démarrée, annonce prête |
+| `connect: handle=N` puis `security initiated` | si `status≠0` → `connect failed (status=N), resuming advertising` | la connexion n'a jamais abouti (radio/transport) → c'est le côté téléphone, pas un crash ESP32 |
+| `pairing opened` ou `encryption established (bonded phone)` | si `onEncryption failed` → `link security failed (status=…), closing link` | l'appairage/chiffrement échoue (clé perdue des deux côtés ou fenêtre fermée) → sur un appareil vu comme non-bondé, les écritures sont rejetées avec une erreur GATT `0x05`/`0x06`, sans plantage du firmware mais avec un abandon côté Android |
+| `characteristic read` / `write accepted` (service compagnon/réglages) | rien | flux nominal |
+| `disconnect reason=…` | — | la table des codes se trouve dans `components/bt/host/nimble/nimble/nimble/host/docs` (installation IDF) ; `0x13` = coupure initiée depuis le téléphone (appairage annulé, típique), `0x08`/`0x3E` ferme le lien sans crash |
+
+Deux cas n'étant pas un crash firmware sont déjà couverts côté Android
+(`HeadUnitGattClient`) : le cache GATT rafraîchi par réflexion quand une
+caractéristique manque après une mise à jour du firmware, et le
+`createBond()` quand Android n'a pas initié l'appairage. Un « plantage »
+ressenti peut donc être un simple abandon de connexion (l'app trouve la
+jauge, la découvre, mais le lien saute avant la première écriture) : la
+trace distingue immédiatement les deux cas.
+
+En revanche, si **aucun log ESP32 n'apparaît du tout** au moment du
+« plantage », il est côté application Android (remonter le `AppLogHub` de
+l'app). Un `Guru Meditation` sur `nimble_host_task` ou un dépassement de pile
+de la tâche `bt` du contrôleur pointent plutôt la pile hôte que la logique
+applicative — d'où la marge volontaire sur les tailles de tâches BT.
+
 ## Service compagnon (`infrastructure/companion_gatt.c`)
 
 Contrat repris de l'ancien boîtier Linux/Go (cf. README et ADR 0007 de
@@ -76,7 +105,7 @@ la tâche NimBLE.
 | Car. | Contenu | Usage sur la jauge |
 |---|---|---|
 | `…0002` | `{title, artist, album, state, position_ms, duration_ms, art_id}` | écran Musique ; position extrapolée localement pendant la lecture |
-| `…0003`/`…0004` | pochette (contrôle JSON / morceaux binaires) | acceptée, ignorée |
+| `…0003`/`…0004` | pochette (contrôle JSON / morceaux binaires) | réassemblée en PSRAM puis décodée (tjpgd) en image ambre monochrome par `companion_art_worker`, hors LVGL |
 | `…0005` | `{active, instruction, distance, eta, maneuver_icon_id}` | écran Navigation ; flèche déduite du texte (FR/EN), consigne découpée en manœuvre + voie, distance en valeur + unité |
 | `…0006`/`…0007` | icône de manœuvre PNG | acceptée, ignorée |
 | `…0008` | alerte `{app, title, text, posted_at}` | acceptée, ignorée |
@@ -87,8 +116,17 @@ Les textes sont normalisés pour Michroma : capitales ASCII, accents repliés
 (« Arrivée » → « ARRIVEE »), ponctuation typographique simplifiée, emoji
 retirés. Un JSON invalide est refusé avec une erreur ATT (l'application
 réessaie au plus trois fois). Le lien est à sens unique : la jauge n'envoie
-rien au téléphone, la pastille de l'écran Musique indique l'état de lecture
-sans le commander.
+rien au téléphone.
+
+Pochette : `…0003` valide `art_id`, `total_bytes` (≤ 256 Kio) et
+`chunk_count` (≤ 2048) avant d'allouer un tampon PSRAM. Les chunks `…0004`
+(index big-endian 2 octets + données) sont assemblés séquentiellement ;
+index hors bornes, doublon, chunk manquant/avant le 0, longueur incohérente
+ou dépassement abandonnent le transfert. Une pochette complète est publiée
+puis décodée hors LVGL (`companion_art_worker`, tjpgd via `LV_USE_TJPGD`) en
+image ambre monochrome ; l'ancienne image est remplacée proprement et le
+cadrage « cover » remplit un large rectangle rogné par la racine ronde. Une
+nouvelle connexion purge tout transfert en cours.
 
 Perte du lien : l'écran Musique affiche « TELEPHONE / NON CONNECTE » et le
 guidage est effacé.

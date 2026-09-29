@@ -31,6 +31,9 @@
 #include "domain/app_settings.h"
 #include "domain/ecu_data.h"
 #include "domain/companion_protocol.h"
+#include "domain/music_cover.h"
+#include "infrastructure/jpeg_cover.h"
+#include "music_cover_fixture.h"
 #include "ui/ui_layout.h"
 
 #ifndef TTF_PATH
@@ -180,13 +183,13 @@ static const char *music_json_for(scenario_t scenario) {
                "\"state\":\"playing\",\"position_ms\":142000,"
                "\"duration_ms\":228000}";
     case SCENARIO_PAUSED:
-        return "{\"title\":\"Midnight Drive\",\"artist\":\"MGF / Synthwave\","
+        return "{\"title\":\"Let It Happen\",\"artist\":\"Tame Impala\","
                "\"state\":\"paused\",\"position_ms\":142000,"
-               "\"duration_ms\":228000}";
+               "\"duration_ms\":466000}";
     default:
-        return "{\"title\":\"Midnight Drive\",\"artist\":\"MGF / Synthwave\","
+        return "{\"title\":\"Let It Happen\",\"artist\":\"Tame Impala\","
                "\"state\":\"playing\",\"position_ms\":142000,"
-               "\"duration_ms\":228000}";
+               "\"duration_ms\":466000}";
     }
 }
 
@@ -528,6 +531,22 @@ int main(int argc, char **argv) {
             }
             music_screen_set_link(view, true, 0);
             music_screen_set_media(view, &media, 0);
+        }
+        // Le simulateur n'a pas de BLE : la pochette de test est décodée ici
+        // (même décodeur tjpgd que la cible, hors boucle LVGL) pour que le
+        // golden vérifie la vraie image monochrome et son cadrage « cover ».
+        if (scenario != SCENARIO_OFFLINE) {
+            uint16_t *cover = malloc((size_t)MUSIC_COVER_WIDTH *
+                                     MUSIC_COVER_HEIGHT * sizeof(uint16_t));
+            if (cover != NULL &&
+                jpeg_cover_decode_amber(
+                    k_music_cover_jpeg, k_music_cover_jpeg_len,
+                    MUSIC_COVER_WIDTH, MUSIC_COVER_HEIGHT, cover)) {
+                music_screen_set_cover(view, cover, MUSIC_COVER_WIDTH,
+                                       MUSIC_COVER_HEIGHT);
+            } else {
+                free(cover);
+            }
         }
     } else if (strcmp(style, "navigation") == 0) {
         navigation_screen_t *view = navigation_screen_create(screen);

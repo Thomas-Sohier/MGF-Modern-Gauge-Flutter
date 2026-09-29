@@ -175,6 +175,11 @@ C’est la solution la plus complexe et la plus fragile face aux mises à jour E
 
 - tester avec un téléphone réel (appairage, reconnexion auto au démarrage,
   écritures JSON longues) ;
+- diagnostiquer un « plantage » au moment de la connexion depuis
+  l'application : la lecture des logs est décrite dans la section
+  « Diagnostic d'un plantage à la connexion » de `docs/ble-config.md`
+  (échec radio vs échec d'appairage/chiffrement vs coupure logique vs crash
+  applicatif Android vs défaut de pile hôte ESP32).
 - [x] application cliente : `rover-mems-ecu-companion`, branche
   `feature/esp32` (heure, reconnexion `autoConnect`, appairage) ;
 - [x] politique de pairing : annonce permanente, bonds seuls acceptés,

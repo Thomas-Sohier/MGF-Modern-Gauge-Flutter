@@ -57,6 +57,7 @@
 
 #if MGF_ENABLE_BLE_CONFIG
 #include "infrastructure/ble_config_service.h"
+#include "infrastructure/companion_art_worker.h"
 #include "infrastructure/companion_gatt.h"
 #endif
 
@@ -342,6 +343,23 @@ static void companion_timer_tick(lv_timer_t *timer) {
     companion_media_t media;
     if (companion_gatt_take_media(&media)) {
         music_screen_set_media(ui->music, &media, now);
+    }
+    // Pochette : le JPEG complet part au worker (décodage hors LVGL) ; l'image
+    // ambre prête est reprise ici, dans la tâche LVGL, sans jamais bloquer.
+    companion_art_jpeg_t art;
+    if (companion_gatt_take_art(&art)) {
+        companion_art_worker_submit(&art);
+    }
+    uint16_t *cover = NULL;
+    int cover_width = 0;
+    int cover_height = 0;
+    if (companion_art_worker_take(&cover, &cover_width, &cover_height)) {
+        if (cover_width == MUSIC_COVER_WIDTH &&
+            cover_height == MUSIC_COVER_HEIGHT) {
+            music_screen_set_cover(ui->music, cover, cover_width, cover_height);
+        } else {
+            companion_art_worker_free(cover);
+        }
     }
     companion_nav_t nav;
     if (companion_gatt_take_nav(&nav)) {
@@ -700,6 +718,9 @@ void app_main(void) {
         .settings = &s_settings_ui,
         .rtc_worker = rtc_worker,
     };
+#if MGF_ENABLE_BLE_CONFIG
+    companion_art_worker_start();
+#endif
     companion_timer =
         lv_timer_create(companion_timer_tick, 200, &s_companion_ui);
     if (companion_timer == NULL) {
@@ -814,6 +835,9 @@ cleanup:
     if (controller != NULL) dashboard_controller_destroy(controller);
     if (companion_timer != NULL) lv_timer_delete(companion_timer);
     if (settings_timer != NULL) lv_timer_delete(settings_timer);
+#if MGF_ENABLE_BLE_CONFIG
+    companion_art_worker_stop();
+#endif
     if (settings_runtime != NULL) {
         settings_runtime_destroy(settings_runtime);
     }

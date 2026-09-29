@@ -25,6 +25,10 @@
 // Snapshot d'objet -> buffer image (utilisé pour exporter le golden).
 #define LV_USE_SNAPSHOT 1
 
+// Décodeur JPEG logiciel (tjpgd) : la pochette compagnon est décodée pour le
+// golden (et réutilisée telle quelle sur cible).
+#define LV_USE_TJPGD 1
+
 // Rendu de la police Michroma à la volée.
 #define LV_USE_TINY_TTF          1
 #define LV_TINY_TTF_FILE_SUPPORT 0

@@ -35,7 +35,6 @@ static const char *TAG = "board_disp";
 #define PIN_LCD_PCLK   GPIO_NUM_42
 #define PIN_I2C_SDA    GPIO_NUM_8
 #define PIN_I2C_SCL    GPIO_NUM_48
-#define PIN_TOUCH_IRQ  GPIO_NUM_1
 #define I2C_PORT       I2C_NUM_0
 #define I2C_HZ         400000
 #define XL9535_ADDRESS 0x20
@@ -113,6 +112,13 @@ static esp_lcd_panel_handle_t s_panel;
 static esp_lcd_panel_io_handle_t s_touch_io;
 static esp_lcd_touch_handle_t s_touch;
 static lv_indev_t *s_touch_indev;
+
+// CST816/CST820 registers: product ID (0xB7 expected on CST820) and
+// DisAutoSleep (non-zero keeps the controller out of low-power standby).
+#define TOUCH_REG_CHIP_ID        0xA7
+#define TOUCH_REG_DIS_AUTO_SLEEP 0xFE
+#define TOUCH_WAKE_ATTEMPTS      2
+
 static lv_display_t *s_display;
 static bool s_lvgl_ready;
 static bool s_backlight_ready;
@@ -159,7 +165,7 @@ static esp_err_t expander_init(void) {
         TAG, "idle LCD serial lines");
 
     // The vendor sequence requires PWR_EN before the LCD reset pulse.  Touch
-    // reset is released with the LCD, then the CST820 gets its own settle time.
+    // stays in reset until touch_bringup(), once the slow LCD init is done.
     ESP_RETURN_ON_ERROR(
         esp_io_expander_set_level(s_expander, EXIO_LCD_RST | EXIO_TOUCH_RST, 0),
         TAG, "assert panel and touch reset");
@@ -167,10 +173,6 @@ static esp_err_t expander_init(void) {
     ESP_RETURN_ON_ERROR(esp_io_expander_set_level(s_expander, EXIO_LCD_RST, 1),
                         TAG, "release LCD reset");
     vTaskDelay(pdMS_TO_TICKS(10));
-    ESP_RETURN_ON_ERROR(
-        esp_io_expander_set_level(s_expander, EXIO_TOUCH_RST, 1), TAG,
-        "release touch reset");
-    vTaskDelay(pdMS_TO_TICKS(50));
     return ESP_OK;
 }
 
@@ -196,7 +198,9 @@ static esp_err_t panel_init(esp_lcd_panel_io_handle_t *out_io,
         .data_width = 16,
         .bits_per_pixel = 16,
         .num_fbs = 2,
-        .bounce_buffer_size_px = LCD_H_RES * 10,
+        // Absorb PSRAM/radio latency spikes; 10 lines caused visible corruption
+        // near the top of the frame on real hardware.
+        .bounce_buffer_size_px = LCD_H_RES * 40,
         .hsync_gpio_num = PIN_LCD_HSYNC,
         .vsync_gpio_num = PIN_LCD_VSYNC,
         .de_gpio_num = PIN_LCD_DE,
@@ -268,6 +272,10 @@ static lv_display_t *lvgl_bringup(esp_lcd_panel_io_handle_t io,
         .flags =
             {
                 .buff_spiram = true,
+                // The buffers are the panel's full framebuffers. Partial mode
+                // would write invalidated areas at their start, corrupting the
+                // top of the displayed frame.
+                .direct_mode = true,
             },
     };
     const lvgl_port_display_rgb_cfg_t rgb_config = {
@@ -278,6 +286,40 @@ static lv_display_t *lvgl_bringup(esp_lcd_panel_io_handle_t io,
             },
     };
     return lvgl_port_add_disp_rgb(&display_config, &rgb_config);
+}
+
+// The CST820 drops into standby a few seconds after reset and then NACKs
+// every I2C access until touched.  Reset it right before talking to it and
+// disable auto-sleep while it is still awake; the write doubles as a probe.
+static esp_err_t touch_controller_wake(esp_lcd_panel_io_handle_t io) {
+    ESP_RETURN_ON_ERROR(
+        esp_io_expander_set_level(s_expander, EXIO_TOUCH_RST, 0), TAG,
+        "assert touch reset");
+    vTaskDelay(pdMS_TO_TICKS(20));
+    ESP_RETURN_ON_ERROR(
+        esp_io_expander_set_level(s_expander, EXIO_TOUCH_RST, 1), TAG,
+        "release touch reset");
+    vTaskDelay(pdMS_TO_TICKS(100));
+    const uint8_t disable = 1;
+    return esp_lcd_panel_io_tx_param(io, TOUCH_REG_DIS_AUTO_SLEEP, &disable, 1);
+}
+
+// Polled instead of lvgl_port_add_touch(): its read callback wraps the I2C
+// read in ESP_ERROR_CHECK (one NACK reboots the dashboard) and its IRQ event
+// mode misses drags, the CST820 IRQ only pulses.
+static void touch_read(lv_indev_t *indev, lv_indev_data_t *data) {
+    esp_lcd_touch_handle_t touch = lv_indev_get_driver_data(indev);
+    esp_lcd_touch_point_data_t point = {0};
+    uint8_t count = 0;
+    if (esp_lcd_touch_read_data(touch) == ESP_OK &&
+        esp_lcd_touch_get_data(touch, &point, &count, 1) == ESP_OK &&
+        count > 0) {
+        data->point.x = point.x;
+        data->point.y = point.y;
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else {
+        data->state = LV_INDEV_STATE_RELEASED;
+    }
 }
 
 static void touch_bringup(lv_display_t *display) {
@@ -301,11 +343,28 @@ static void touch_bringup(lv_display_t *display) {
         return;
     }
 
+    err = ESP_FAIL;
+    for (int attempt = 0; attempt < TOUCH_WAKE_ATTEMPTS && err != ESP_OK;
+         ++attempt) {
+        err = touch_controller_wake(touch_io);
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "optional CST820 not answering at 0x%02x: %s",
+                 ESP_LCD_TOUCH_IO_I2C_CST816S_ADDRESS, esp_err_to_name(err));
+        (void)esp_lcd_panel_io_del(touch_io);
+        return;
+    }
+    uint8_t chip_id = 0;
+    if (esp_lcd_panel_io_rx_param(touch_io, TOUCH_REG_CHIP_ID, &chip_id, 1) ==
+        ESP_OK) {
+        ESP_LOGI(TAG, "CST8xx chip id 0x%02x", chip_id);
+    }
+
     const esp_lcd_touch_config_t touch_config = {
         .x_max = LCD_H_RES,
         .y_max = LCD_V_RES,
         .rst_gpio_num = -1, // CST820 reset is XL9535 IO1
-        .int_gpio_num = PIN_TOUCH_IRQ,
+        .int_gpio_num = -1, // GPIO1 IRQ unused: see touch_read()
         .levels =
             {
                 .reset = 0,
@@ -327,10 +386,17 @@ static void touch_bringup(lv_display_t *display) {
         return;
     }
 
-    lv_indev_t *touch_indev = lvgl_port_add_touch(&(lvgl_port_touch_cfg_t){
-        .disp = display,
-        .handle = touch,
-    });
+    lv_indev_t *touch_indev = NULL;
+    if (lvgl_port_lock(0)) {
+        touch_indev = lv_indev_create();
+        if (touch_indev != NULL) {
+            lv_indev_set_type(touch_indev, LV_INDEV_TYPE_POINTER);
+            lv_indev_set_read_cb(touch_indev, touch_read);
+            lv_indev_set_driver_data(touch_indev, touch);
+            lv_indev_set_display(touch_indev, display);
+        }
+        lvgl_port_unlock();
+    }
     if (touch_indev == NULL) {
         ESP_LOGW(TAG, "optional CST820 could not attach to LVGL");
         (void)esp_lcd_touch_del(touch);
@@ -347,7 +413,10 @@ static void touch_bringup(lv_display_t *display) {
 static void board_display_cleanup(void) {
     // Remove LVGL wrappers before deleting the panel and touch objects they use.
     if (s_touch_indev != NULL) {
-        (void)lvgl_port_remove_touch(s_touch_indev);
+        if (lvgl_port_lock(0)) {
+            lv_indev_delete(s_touch_indev);
+            lvgl_port_unlock();
+        }
         s_touch_indev = NULL;
     }
     if (s_display != NULL) {

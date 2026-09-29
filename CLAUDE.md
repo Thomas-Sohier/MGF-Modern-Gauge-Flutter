@@ -185,10 +185,22 @@ Tous les écrans hors RPM partagent une même grammaire, fournie par le kit :
   dans une boîte aux lettres, appliqué par `companion_timer_tick` (LVGL).
 - Musique/Navigation ne dépendent plus de l'ECU : `music_screen_set_media`,
   `navigation_screen_set_route`, `*_set_link`. Flèche de manœuvre déduite du
-  texte ; pochette, icône PNG et alertes ignorées. Lien à sens unique.
+  texte ; icône PNG et alertes ignorées. Lien à sens unique.
+- Pochette : le contrôle `…0003` (`{art_id,total_bytes,chunk_count}`) ouvre un
+  réassemblage dans un tampon PSRAM (`domain/companion_art.c`, pur et testé),
+  les chunks `…0004` le remplissent. Le JPEG complet part au worker FreeRTOS
+  `companion_art_worker` (hors LVGL) qui le décode via tjpgd puis le convertit
+  en rectangle ambre monochrome tramé (`domain/music_cover.c`,
+  440x308). L'image RGB565 est remise au timer LVGL et affichée en cadrage
+  « cover » sur quasi toute la largeur des deux tiers hauts (rectangle rogné
+  par la racine ronde et bordé par l'anneau).
+  `music_screen_set_cover` prend possession du tampon ; sans image valide,
+  l'écran retombe sur le motif vectoriel déterministe dérivé de titre+artiste.
 - `sim/build/gen_golden music|navigation out.png offline` rend l'état
-  « téléphone déconnecté ». La musique affiche un pictogramme d'état sans
-  pastille de bouton : aucune commande tactile de lecture n'est proposée.
+  « téléphone déconnecté ». La musique ne propose aucun contrôle, aucun header
+  ni pictogramme de transport : pochette ambre (fixture JPEG décodée par le
+  même tjpgd au simulateur) ou repli vectoriel, et progression sur un anneau
+  continu proche du bord.
 - `rtc_worker` effectue les lectures/écritures DS3231 hors LVGL ; l'horloge UI
   lit l'heure système UTC synchronisée. Sans heure valide, elle masque les
   aiguilles et affiche « HEURE / NON SYNCHRONISEE ».

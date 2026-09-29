@@ -11,6 +11,8 @@
 
 #define COMPANION_TEXT_MAX 64U
 #define COMPANION_LINE_MAX 96U
+// Identifiant opaque de pochette (…0003 / métadonnées), pas un texte affiché.
+#define COMPANION_MEDIA_ART_ID_MAX 48U
 // Android plafonne une valeur d'attribut GATT à 512 octets.
 #define COMPANION_PAYLOAD_MAX 512U
 
@@ -26,6 +28,9 @@ typedef struct {
     companion_playback_t state;
     int64_t position_ms; // -1 : inconnue
     int64_t duration_ms; // <= 0 : inconnue
+    // Identifiant de la pochette en cours (vide : aucune). Sert à abandonner
+    // l'ancienne image quand le morceau change.
+    char art_id[COMPANION_MEDIA_ART_ID_MAX];
 } companion_media_t;
 
 typedef enum {

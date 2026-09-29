@@ -23,7 +23,9 @@ if(MGF_ENABLE_BLE_CONFIG)
             "was enabled must be deleted (see docs/ble-config.md)")
     endif()
     list(APPEND MGF_BLE_CONFIG_SRCS "infrastructure/ble_config_service.c"
-                                    "infrastructure/companion_gatt.c")
+                                    "infrastructure/companion_gatt.c"
+                                    "infrastructure/companion_art_worker.c"
+                                    "infrastructure/jpeg_cover.c")
 endif()
 
 # GPIO38/GPIO40 replace microSD DAT0/CMD. Do not add an SDMMC owner here.
@@ -40,6 +42,8 @@ idf_component_register(
         "domain/ble_config_protocol.c"
         "domain/ble_window.c"
         "domain/companion_protocol.c"
+        "domain/companion_art.c"
+        "domain/music_cover.c"
         "domain/flat_json.c"
         "domain/mems_protocol.c"
         "domain/mems_reader.c"

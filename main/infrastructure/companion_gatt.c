@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "host/ble_gap.h"
@@ -29,6 +30,9 @@ static const ble_uuid128_t s_command_uuid = COMPANION_UUID(0x09);
 static const ble_uuid128_t s_time_uuid = COMPANION_UUID(0x0b);
 
 #define KEY_QUEUE_LENGTH 8U
+// Une écriture GATT (chunk binaire) tient dans une valeur d'attribut de 512
+// octets ; l'index big-endian sur 2 octets en fait partie.
+#define ART_CHUNK_MAX 512U
 
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static companion_media_t s_media;
@@ -44,14 +48,47 @@ static size_t s_key_count;
 // Les accès GATT sont sérialisés dans la tâche NimBLE : un tampon statique
 // évite 512 octets de pile par écriture.
 static char s_payload[COMPANION_PAYLOAD_MAX + 1U];
+// Chunks binaires : jamais le tampon texte ci-dessus (NUL, longueurs).
+static uint8_t s_chunk[ART_CHUNK_MAX];
 
 typedef enum {
     CHR_METADATA = 0,
-    CHR_DISCARD,
+    CHR_DISCARD, // icône de manœuvre et alertes : acceptées puis ignorées
+    CHR_ART_CONTROL,
+    CHR_ART_DATA,
     CHR_NAV,
     CHR_COMMAND,
     CHR_TIME,
 } chr_kind_t;
+
+// ── Pochette ────────────────────────────────────────────────────────────────
+// Un seul transfert à la fois, tampon alloué en PSRAM. Le réassemblage et la
+// publication (dernier-gagnant) sont protégés par s_lock ; l'allocation et la
+// libération se font HORS verrou (heap lent), donc hors de la tâche NimBLE.
+static companion_art_reassembler_t s_art;
+static uint8_t *s_art_buffer;
+static bool s_art_ready;
+
+static uint8_t *art_alloc(size_t size) {
+    void *p = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (p != NULL) return p;
+    return heap_caps_malloc(size, MALLOC_CAP_8BIT);
+}
+
+static void art_free(uint8_t *buffer) {
+    if (buffer != NULL) heap_caps_free(buffer);
+}
+
+// Détache le tampon courant (sous verrou) et rend l'ancien à libérer dehors.
+static uint8_t *art_detach_locked(void) {
+    uint8_t *old = s_art_buffer;
+    s_art_buffer = NULL;
+    s_art_ready = false;
+    companion_art_reassembler_reset(&s_art);
+    s_art.buffer = NULL;
+    s_art.capacity = 0;
+    return old;
+}
 
 static bool link_is_bonded(uint16_t conn_handle) {
     struct ble_gap_conn_desc desc;
@@ -75,8 +112,90 @@ static int read_payload(struct os_mbuf *om, size_t *length) {
     return 0;
 }
 
+static int read_chunk(struct os_mbuf *om, uint8_t *out, size_t capacity,
+                      size_t *length) {
+    const uint16_t total = OS_MBUF_PKTLEN(om);
+    if (total < 3U || total > capacity) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+    }
+    uint16_t copied = 0;
+    if (ble_hs_mbuf_to_flat(om, out, (uint16_t)capacity, &copied) != 0 ||
+        copied != total) {
+        return BLE_ATT_ERR_UNLIKELY;
+    }
+    *length = copied;
+    return 0;
+}
+
+static int handle_art_control(size_t length) {
+    companion_art_control_t control;
+    if (!companion_parse_art_control(s_payload, length, &control)) {
+        return BLE_ATT_ERR_UNLIKELY;
+    }
+
+    // Nouveau transfert : l'ancien (en cours ou prêt mais non consommé) est
+    // abandonné. Allocation hors verrou.
+    uint8_t *buffer = art_alloc(control.total_bytes);
+    bool begin_ok = false;
+    uint8_t *old = NULL;
+    portENTER_CRITICAL(&s_lock);
+    old = art_detach_locked();
+    if (buffer != NULL) {
+        s_art.buffer = buffer;
+        s_art.capacity = control.total_bytes;
+        begin_ok = companion_art_reassembler_begin(&s_art, &control);
+        if (!begin_ok) {
+            s_art.buffer = NULL;
+            s_art.capacity = 0;
+            companion_art_reassembler_reset(&s_art);
+        }
+    }
+    portEXIT_CRITICAL(&s_lock);
+    art_free(old);
+    if (buffer == NULL || !begin_ok) {
+        art_free(buffer);
+        ESP_LOGW(TAG, "pochette refusée (contrôle, %u octets)",
+                 (unsigned)control.total_bytes);
+        return BLE_ATT_ERR_UNLIKELY;
+    }
+    return 0;
+}
+
+static int handle_art_data(size_t length) {
+    bool accepted = false;
+    bool abort_transfer = false;
+    uint8_t *to_free = NULL;
+    portENTER_CRITICAL(&s_lock);
+    if (!s_art_ready && s_art.active) {
+        if (companion_art_reassembler_push(&s_art, s_chunk, length)) {
+            if (companion_art_reassembler_complete(&s_art)) {
+                s_art_ready = true;
+            }
+            accepted = true;
+        } else {
+            abort_transfer = true;
+        }
+    }
+    portEXIT_CRITICAL(&s_lock);
+    if (abort_transfer) {
+        portENTER_CRITICAL(&s_lock);
+        to_free = art_detach_locked();
+        portEXIT_CRITICAL(&s_lock);
+        art_free(to_free);
+        ESP_LOGW(TAG, "pochette abandonnée (chunk invalide)");
+        return BLE_ATT_ERR_UNLIKELY;
+    }
+    return accepted ? 0 : BLE_ATT_ERR_UNLIKELY;
+}
+
 static int handle_write(chr_kind_t kind, struct os_mbuf *om) {
     if (kind == CHR_DISCARD) return 0;
+    if (kind == CHR_ART_DATA) {
+        size_t length = 0;
+        const int rc = read_chunk(om, s_chunk, sizeof(s_chunk), &length);
+        if (rc != 0) return rc;
+        return handle_art_data(length);
+    }
     size_t length = 0;
     const int rc = read_payload(om, &length);
     if (rc != 0) return rc;
@@ -91,6 +210,8 @@ static int handle_write(chr_kind_t kind, struct os_mbuf *om) {
         portEXIT_CRITICAL(&s_lock);
         return 0;
     }
+    case CHR_ART_CONTROL:
+        return handle_art_control(length);
     case CHR_NAV: {
         companion_nav_t nav;
         if (!companion_parse_nav(s_payload, length, &nav)) break;
@@ -156,11 +277,11 @@ static const struct ble_gatt_svc_def s_services[] = {
                  .flags = WRITE_FLAGS},
                 {.uuid = &s_art_control_uuid.u,
                  .access_cb = access_cb,
-                 .arg = (void *)CHR_DISCARD,
+                 .arg = (void *)CHR_ART_CONTROL,
                  .flags = WRITE_FLAGS},
                 {.uuid = &s_art_data_uuid.u,
                  .access_cb = access_cb,
-                 .arg = (void *)CHR_DISCARD,
+                 .arg = (void *)CHR_ART_DATA,
                  .flags = STREAM_FLAGS},
                 {.uuid = &s_nav_uuid.u,
                  .access_cb = access_cb,
@@ -201,12 +322,37 @@ const ble_uuid_t *companion_gatt_service_uuid(void) {
 }
 
 void companion_gatt_reset(void) {
+    uint8_t *old = NULL;
     portENTER_CRITICAL(&s_lock);
     s_media_pending = false;
     s_nav_pending = false;
     s_time_pending = false;
     s_key_count = 0;
+    old = art_detach_locked();
     portEXIT_CRITICAL(&s_lock);
+    art_free(old);
+}
+
+bool companion_gatt_take_art(companion_art_jpeg_t *out) {
+    if (out == NULL) return false;
+    bool ready = false;
+    portENTER_CRITICAL(&s_lock);
+    if (s_art_ready && s_art_buffer != NULL) {
+        out->data = s_art_buffer;
+        out->length = s_art.total_bytes;
+        s_art_buffer = NULL;
+        s_art_ready = false;
+        companion_art_reassembler_reset(&s_art);
+        s_art.buffer = NULL;
+        s_art.capacity = 0;
+        ready = true;
+    }
+    portEXIT_CRITICAL(&s_lock);
+    return ready;
+}
+
+void companion_gatt_free_art(uint8_t *data) {
+    art_free(data);
 }
 
 bool companion_gatt_take_media(companion_media_t *out) {

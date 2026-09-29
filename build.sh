@@ -18,7 +18,7 @@ GDIR="$ROOT/test/golden"
 : "${LVGL_DIR:=$SIM/.lvgl}"
 JOBS="$(nproc 2>/dev/null || echo 4)"
 
-CFLAGS=(-O2 -w -I"$SIM" -I"$MAIN" -I"$LVGL_DIR" -DLV_CONF_INCLUDE_SIMPLE)
+CFLAGS=(-O2 -w -I"$SIM" -I"$MAIN" -I"$LVGL_DIR" -I"$LVGL_DIR/src" -DLV_CONF_INCLUDE_SIMPLE)
 
 # Sources UI partagées avec la cible ESP32-S3 ; elles ne dépendent que de LVGL.
 UI_SRCS=(
@@ -34,7 +34,9 @@ UI_SRCS=(
     "$MAIN/ui/screens/idle_screen.c" "$MAIN/ui/screens/admission_screen.c"
     "$MAIN/ui/screens/settings_screen.c"
     "$MAIN/domain/app_settings.c" "$MAIN/domain/display_brightness.c"
-    "$MAIN/domain/companion_protocol.c" "$MAIN/domain/flat_json.c"
+    "$MAIN/domain/companion_protocol.c" "$MAIN/domain/companion_art.c"
+    "$MAIN/domain/music_cover.c" "$MAIN/domain/flat_json.c"
+    "$MAIN/infrastructure/jpeg_cover.c"
     "$MAIN/domain/rtc_time.c"
     "$MAIN/ui/widgets/amber_value.c" "$MAIN/ui/widgets/amber_draw.c" "$MAIN/ui/widgets/amber_ui.c" "$MAIN/ui/widgets/amber_kit.c" "$MAIN/ui/fonts/ui_fonts.c"
 )

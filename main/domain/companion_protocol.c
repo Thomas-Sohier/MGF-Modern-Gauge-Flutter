@@ -176,6 +176,19 @@ static bool media_member(void *context, const char *key,
         } else if (v->type != FLAT_JSON_NULL) {
             return false;
         }
+    } else if (strcmp(key, "art_id") == 0) {
+        if (v->type == FLAT_JSON_NULL) {
+            p->media.art_id[0] = '\0';
+        } else if (v->type == FLAT_JSON_STRING) {
+            const size_t length = strlen(v->string);
+            const size_t copy = length < sizeof(p->media.art_id) - 1U
+                                    ? length
+                                    : sizeof(p->media.art_id) - 1U;
+            memcpy(p->media.art_id, v->string, copy);
+            p->media.art_id[copy] = '\0';
+        } else {
+            return false;
+        }
     } else if (strcmp(key, "state") == 0) {
         if (v->type != FLAT_JSON_STRING) return false;
         if (strcmp(v->string, "playing") == 0) {
@@ -197,7 +210,7 @@ static bool media_member(void *context, const char *key,
         if (!is_integer(v)) return false;
         p->media.duration_ms = (int64_t)v->number;
     }
-    // Autres membres (album, art_id…) : ignorés, compatibilité ascendante.
+    // Autres membres (album…) : ignorés, compatibilité ascendante.
     return true;
 }
 

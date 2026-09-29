@@ -62,6 +62,8 @@ L’amont passe temporairement l’I²C à 1 MHz pour accélérer les nombreux b
 - Reset via XL9535 IO1, IRQ GPIO1.
 - Le composant ESP-IDF `esp_lcd_touch_cst816s` peut servir de pilote compatible ; valider en pratique l’identifiant, les coordonnées et les gestes.
 - Ne pas dépendre uniquement d’un IRQ maintenu pour suivre le doigt : le CST820 nécessite des lectures répétées.
+- Le CST820 passe en veille automatique quelques secondes après son reset et ne répond plus en I²C (NACK) jusqu’au prochain appui : le firmware refait le reset IO1 juste avant d’ouvrir le tactile (après l’init LCD) et écrit `0x01` dans `0xFE` (DisAutoSleep).
+- `i2c_master_probe()` prend un timeout en **millisecondes** : lui passer `pdMS_TO_TICKS()` (FreeRTOS à 100 Hz) donne un timeout nul et un faux `ESP_ERR_TIMEOUT` sur toutes les adresses.
 
 ## Rétroéclairage
 

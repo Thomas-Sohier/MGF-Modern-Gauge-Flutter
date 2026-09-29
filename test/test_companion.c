@@ -79,10 +79,19 @@ static void test_media(void) {
     assert(strcmp(m.artist, "CAFE NOIR") == 0);
     assert(m.state == COMPANION_PLAYBACK_PLAYING);
     assert(m.position_ms == 142000 && m.duration_ms == 228000);
+    assert(m.art_id[0] == '\0'); // art_id null -> vide
     assert(companion_media_position_at(&m, 1000, 3500) == 144500);
     assert(companion_media_position_at(&m, 1000, 1000 + 200000) == 228000);
     m.state = COMPANION_PLAYBACK_PAUSED;
     assert(companion_media_position_at(&m, 1000, 9000) == 142000);
+
+    // L'art_id opaque est transporté tel quel (comparé pour abandonner
+    // l'ancienne pochette) ; null devient vide.
+    assert(PARSE(companion_parse_media,
+                 "{\"title\":\"x\",\"state\":\"paused\","
+                 "\"art_id\":\"a1b2c3\"}",
+                 &m));
+    assert(strcmp(m.art_id, "a1b2c3") == 0);
 
     assert(!PARSE(companion_parse_media, "{\"title\":\"x\"}", &m));
     assert(!PARSE(companion_parse_media,
@@ -90,6 +99,8 @@ static void test_media(void) {
     assert(!PARSE(companion_parse_media,
                   "{\"title\":\"x\",\"state\":\"paused\",\"position_ms\":1.5}",
                   &m));
+    assert(!PARSE(companion_parse_media,
+                  "{\"title\":\"x\",\"state\":\"paused\",\"art_id\":7}", &m));
 }
 
 static void test_nav(void) {

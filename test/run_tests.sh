@@ -48,6 +48,14 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
 "$BUILD_DIR/test_companion"
 
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    "$ROOT/test/test_music_cover.c" \
+    "$ROOT/main/domain/companion_art.c" \
+    "$ROOT/main/domain/music_cover.c" \
+    "$ROOT/main/domain/flat_json.c" \
+    -lm -o "$BUILD_DIR/test_music_cover"
+"$BUILD_DIR/test_music_cover"
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_ble_window.c" \
     "$ROOT/main/domain/ble_window.c" -o "$BUILD_DIR/test_ble_window"
 "$BUILD_DIR/test_ble_window"
