@@ -3,9 +3,16 @@
 Application preferences are stored in the ESP-IDF `nvs` partition through
 `main/infrastructure/settings_store.[ch]`. The small typed model currently
 contains brightness (0–100%), last viewed dashboard page, startup page, theme,
-units, and the UTC offset used to display legal time. The current defaults are
-100% brightness, RPM page, startup on the last viewed page, amber theme,
-metric units, and UTC+0.
+units, the UTC offset used to display legal time, and the colour mode (normal
+or inverted palette). The current defaults are 100% brightness, RPM page,
+startup on the last viewed page, amber theme, metric units, UTC+0, and normal
+colours.
+
+`color_mode` (`colors` key, schema 3) selects the normal amber palette or the
+same palette reversed (amber background `#FF8C00`, near-black foreground
+`#170F08`, swapped intermediate tones: dim `#A85C00` and separator `#6B451B`). It is applied
+instantly to the whole UI and to the music cover without recreating screens,
+and is set before any LVGL object is created at boot.
 
 `utc_offset_minutes` (multiple of 15, −720..+840) comes from the companion
 phone's time sync and is stored as a biased quarter-hour count in one `u8`
@@ -18,9 +25,11 @@ The application schema is versioned (`APP_SETTINGS_SCHEMA_VERSION`). A missing
 namespace, unsupported schema, incomplete record, NVS type mismatch, or invalid
 enum/range is treated as a clean first boot and loaded from defaults. Loading
 does not rewrite flash. Schema 1 (no `startup` key) is migrated explicitly in
-memory with "last viewed page", which was its behaviour, and UTC+0; the next save
-rewrites the record as schema 2 even if no value changed. Other versions are
-never guessed.
+memory with "last viewed page", which was its behaviour, and UTC+0; schema 2
+(no `colors` key) keeps all its values and gets normal colours, its only
+behaviour. In both cases the next save rewrites the record as schema 3 even
+if no value changed. A schema 3 record missing `colors` is incomplete and
+falls back to defaults. Other versions are never guessed.
 
 The intended lifecycle is:
 
@@ -38,9 +47,13 @@ The intended lifecycle is:
 `settings_runtime_read()` is used by the optional BLE service. The NimBLE
 service queues accepted writes in its own protected single-slot hand-off; the
 LVGL timer consumes that slot through `ble_config_service_take_settings_update`,
-applies brightness, units and page, then lets the coordinator save it. The
+merges the local-only fields (`app_settings_merge_ble_v1`: startup page, UTC
+offset, colour mode), applies brightness, units and page, then lets the
+coordinator save it. The BLE payload format is unchanged. The
 runtime's `settings_runtime_submit()` remains the equivalent public hand-off for
-other transports. No callback in the NimBLE task calls LVGL or NVS. BLE writes
+other transports; it applies the snapshot as given, so callers must pass a
+full snapshot (merged with `settings_runtime_read()` if their format lacks
+local-only fields). No callback in the NimBLE task calls LVGL or NVS. BLE writes
 therefore acknowledge acceptance into RAM; the NVS commit is asynchronous and
 may still be retried.
 
@@ -49,8 +62,9 @@ currently update temperatures (°C/°F) and MAP pressure (kPa/psi) on the amber
 RPM, temperatures and admission pages; RPM, voltage, percentages and timing
 values are unchanged. The theme field remains validated and persisted, but the
 only compiled theme is amber. The on-device settings screen
-(`ui/screens/settings_screen.c`, opened by a ~1 s hold) edits brightness and
-the startup page through the public runtime setters.
+(`ui/screens/settings_screen.c`, opened by an upward swipe or a ~1 s hold) edits
+brightness, the startup page and the colour mode through the public runtime
+setters.
 
 The coordinator remains independent of LVGL and NVS. `settings_store_save()`
 remains the only NVS adapter; it skips both `nvs_set_*` calls and `nvs_commit()`

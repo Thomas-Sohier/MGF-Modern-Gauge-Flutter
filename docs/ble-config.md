@@ -43,12 +43,12 @@ en C pur et testé sur hôte (`test/test_companion.c`).
   (inconnu, clé perdue, simple scanner) est **coupé après 10 s**, ou dès
   l'échec du chiffrement.
 - **Fenêtre d'appairage** : c'est le seul moment où un nouveau bond peut être
-  créé. On l'ouvre depuis l'écran Réglages (maintien ~1 s sur une page) →
-  Bluetooth → **APPAIRER**, pour 5 minutes (`domain/ble_window.c`). Hors
-  fenêtre, `ble_hs_cfg.sm_bonding = 0` : un appairage ne produit aucune clé
-  stockée, le lien est refusé et aucun bond existant n'est évincé. La fenêtre
-  se referme dès qu'un téléphone appairé est lié, à l'échéance, ou par un
-  second appui. La fermeture ne coupe pas le téléphone déjà lié.
+  créé. On l'ouvre depuis l'écran Réglages (glissement vers le haut ou
+  maintien ~1 s sur une page) → Bluetooth → **APPAIRER**, pour 5 minutes
+  (`domain/ble_window.c`). Hors fenêtre, `ble_hs_cfg.sm_bonding = 0` : un
+  appairage ne produit aucune clé stockée, le lien est refusé et aucun bond
+  existant n'est évincé. La fenêtre se referme dès qu'un téléphone appairé
+  est lié, à l'échéance, ou par un second appui. La fermeture ne coupe pas le téléphone déjà lié.
 - Un téléphone qui a « oublié » la jauge alors qu'elle garde sa clé
   (`REPEAT_PAIRING`) ne peut se ré-appairer que pendant la fenêtre.
 - Bonds conservés en NVS (`CONFIG_BT_NIMBLE_NVS_PERSIST=y`,
@@ -141,8 +141,9 @@ guidage est effacé.
 Les octets sont little-endian et chaque payload commence par la version `1`.
 
 - `settings` : 5 octets `[version, brightness, page, theme, units]`. La page
-  de démarrage et le décalage horaire ne sont **pas** dans ce format : une
-  écriture BLE conserve les valeurs locales (`app_settings_merge_ble_v1`).
+  de démarrage, le décalage horaire et la palette (couleurs inversées) ne
+  sont **pas** dans ce format, qui reste inchangé : une écriture BLE conserve
+  les valeurs locales (`app_settings_merge_ble_v1`).
 - `datetime` : 10 octets `[version, basis, year_lo, year_hi, month, day,
   weekday, hour, minute, second]`. `basis` vaut `0` pour UTC et `1` pour
   local ; `LOCAL` est refusé à la frontière RTC (le DS3231 stocke de l'UTC).

@@ -2,7 +2,7 @@
 // rend une frame offscreen avec des données ECU mock et exporte le rendu en PNG
 // (golden test).
 //
-// Usage : gen_golden <style> <chemin_png> [scenario]
+// Usage : gen_golden <style> <chemin_png> [scenario] [palette]
 //
 //   style    : boot | amber | clock | music | navigation | faults | temps |
 //              injection | lambda | ignition | idle | admission | dashboard |
@@ -10,7 +10,13 @@
 //   scenario : standard (défaut) | offline | missing | hot | sensor_fault |
 //              imperial | long | paused | unsynced | reconnected
 //
-// Un scénario inconnu est refusé avec un code de retour 2.
+//   palette  : normal (défaut) | inverted (palette inversée dès la création)
+//              | toggled (créé en normal puis basculé à chaud par
+//              ui_theme_apply_inverted : doit être identique à « inverted »)
+//              | roundtrip (normal -> inversé -> normal à chaud : doit être
+//              identique au golden normal, aucune dérive)
+//
+// Un scénario ou une palette inconnus sont refusés avec un code de retour 2.
 
 #include "lvgl.h"
 #include "ui/screens/boot_screen.h"
@@ -28,6 +34,7 @@
 #include "ui/screens/settings_screen.h"
 #include "ui/navigation/dashboard_navigator.h"
 #include "ui/fonts/ui_fonts.h"
+#include "ui/themes/ui_theme.h"
 #include "domain/app_settings.h"
 #include "domain/ecu_data.h"
 #include "domain/companion_protocol.h"
@@ -448,6 +455,18 @@ int main(int argc, char **argv) {
         fprintf(stderr, "scenario inconnu : %s\n", argv[3]);
         return 2;
     }
+    const char *palette = (argc > 4) ? argv[4] : "normal";
+    const bool palette_inverted = strcmp(palette, "inverted") == 0;
+    const bool palette_toggled = strcmp(palette, "toggled") == 0;
+    const bool palette_roundtrip = strcmp(palette, "roundtrip") == 0;
+    if (!palette_inverted && !palette_toggled && !palette_roundtrip &&
+        strcmp(palette, "normal") != 0) {
+        fprintf(stderr, "palette inconnue : %s\n", palette);
+        return 2;
+    }
+    ui_theme_set_inverted(palette_inverted);
+    settings_screen_t *settings_view = NULL;
+    music_screen_t *music_view = NULL;
 
     // Cible LILYGO T-RGB H597 : écran IPS ROND 480x480 (driver ST7701S,
     // interface RGB). On rend à la résolution réelle, avec masque circulaire.
@@ -518,6 +537,7 @@ int main(int argc, char **argv) {
         }
     } else if (strcmp(style, "music") == 0) {
         music_screen_t *view = music_screen_create(screen);
+        music_view = view;
         if (view == NULL) {
             fprintf(stderr, "music: allocation echouee\n");
             return 1;
@@ -542,6 +562,13 @@ int main(int argc, char **argv) {
                 jpeg_cover_decode_amber(
                     k_music_cover_jpeg, k_music_cover_jpeg_len,
                     MUSIC_COVER_WIDTH, MUSIC_COVER_HEIGHT, cover)) {
+                // Même remise que app_main.c : rendu canonique normal,
+                // converti vers la palette active.
+                if (ui_theme_is_inverted()) {
+                    music_cover_convert_palette(
+                        cover, (size_t)MUSIC_COVER_WIDTH * MUSIC_COVER_HEIGHT,
+                        false, true);
+                }
                 music_screen_set_cover(view, cover, MUSIC_COVER_WIDTH,
                                        MUSIC_COVER_HEIGHT);
             } else {
@@ -634,7 +661,9 @@ int main(int argc, char **argv) {
         app_settings_defaults(&values);
         values.brightness_percent = 60;
         values.startup_page = APP_SETTINGS_PAGE_RPM;
+        if (palette_inverted) values.color_mode = APP_SETTINGS_COLORS_INVERTED;
         settings_screen_show(settings, &values);
+        settings_view = settings;
         settings_screen_set_bluetooth(settings,
                                       scenario == SCENARIO_OFFLINE
                                           ? SETTINGS_BLE_UNAVAILABLE
@@ -643,6 +672,30 @@ int main(int argc, char **argv) {
     } else {
         fprintf(stderr, "style inconnu : %s\n", style);
         return 2;
+    }
+
+    // Bascules à chaud comme sur la cible (apply_color_mode dans app_main.c),
+    // chacune précédée d'un rendu complet dans la palette courante.
+    const int toggles = palette_toggled ? 1 : (palette_roundtrip ? 2 : 0);
+    for (int toggle = 0; toggle < toggles; toggle++) {
+        lv_obj_update_layout(screen);
+        lv_refr_now(disp);
+        const bool from_inverted = ui_theme_is_inverted();
+        const bool inverted = !from_inverted;
+        if (!ui_theme_apply_inverted(screen, inverted)) {
+            fprintf(stderr, "bascule de palette refusee\n");
+            return 1;
+        }
+        music_screen_palette_changed(music_view, from_inverted, inverted);
+        if (settings_view != NULL) {
+            app_settings_t values;
+            app_settings_defaults(&values);
+            values.brightness_percent = 60;
+            values.startup_page = APP_SETTINGS_PAGE_RPM;
+            values.color_mode = inverted ? APP_SETTINGS_COLORS_INVERTED
+                                         : APP_SETTINGS_COLORS_NORMAL;
+            settings_screen_set_settings(settings_view, &values);
+        }
     }
 
     // Résout la disposition puis force un cycle de rendu.

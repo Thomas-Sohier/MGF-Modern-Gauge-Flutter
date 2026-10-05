@@ -47,6 +47,17 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/main/domain/rtc_time.c" -lm -o "$BUILD_DIR/test_companion"
 "$BUILD_DIR/test_companion"
 
+gcc -std=c11 -Wall -Wextra -Werror \
+    -I"$ROOT/test/companion_mocks" -I"$ROOT/test/mocks" -I"$ROOT/main" \
+    "$ROOT/test/test_companion_gatt.c" \
+    "$ROOT/main/infrastructure/companion_gatt.c" \
+    "$ROOT/main/domain/companion_art.c" \
+    "$ROOT/main/domain/companion_protocol.c" \
+    "$ROOT/main/domain/flat_json.c" \
+    "$ROOT/main/domain/rtc_time.c" \
+    -lm -o "$BUILD_DIR/test_companion_gatt"
+"$BUILD_DIR/test_companion_gatt"
+
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_music_cover.c" \
     "$ROOT/main/domain/companion_art.c" \
@@ -54,6 +65,10 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/main/domain/flat_json.c" \
     -lm -o "$BUILD_DIR/test_music_cover"
 "$BUILD_DIR/test_music_cover"
+
+gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
+    "$ROOT/test/test_music_cover_fit.c" -lm -o "$BUILD_DIR/test_music_cover_fit"
+"$BUILD_DIR/test_music_cover_fit"
 
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_ble_window.c" \

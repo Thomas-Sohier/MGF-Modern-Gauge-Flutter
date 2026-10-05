@@ -88,6 +88,17 @@ gcc "${CFLAGS[@]}" \
     "${UI_SRCS[@]}" "${LVGL_OBJS[@]}" \
     -lm -o "$BUILD/gen_golden"
 
+# 3b. Test tactile du navigateur contre le vrai LVGL (gestes, taps, maintien).
+echo ">> test tactile du navigateur..."
+gcc "${CFLAGS[@]}" -DMGF_SIMULATOR=1 \
+    "$SIM/test_navigator_touch.c" \
+    "$MAIN/ui/navigation/dashboard_navigator.c" "$MAIN/ui/navigation/ui_instrumentation.c" \
+    "$MAIN/ui/themes/ui_theme.c" "$MAIN/ui/fonts/ui_fonts.c" \
+    "$MAIN/ui/widgets/amber_kit.c" "$MAIN/ui/widgets/amber_ui.c" \
+    "$MAIN/ui/widgets/amber_draw.c" "$MAIN/ui/widgets/amber_value.c" \
+    "${LVGL_OBJS[@]}" -lm -o "$BUILD/test_navigator_touch"
+"$BUILD/test_navigator_touch"
+
 # 4. Régénération des références visuelles (états nominaux).
 echo ">> génération des goldens standard..."
 "$BUILD/gen_golden" boot  "$GDIR/boot_amber.png"
@@ -130,4 +141,36 @@ echo ">> génération des goldens scénarios..."
 "$BUILD/gen_golden" navigation "$GDIR/navigation_long_amber.png"         long
 # Tableau de bord : alerte thermique globale posée sur la page NAVIGATION.
 "$BUILD/gen_golden" dashboard  "$GDIR/dashboard_hot_amber.png"           hot
+# Palette inversée (réglage local « COULEURS ») : fond ambre, premier plan
+# quasi noir, pochette convertie sans perte.
+echo ">> génération des goldens palette inversée..."
+"$BUILD/gen_golden" boot       "$GDIR/boot_inverted_amber.png"           standard inverted
+"$BUILD/gen_golden" amber      "$GDIR/rpm_inverted_amber.png"            standard inverted
+"$BUILD/gen_golden" amber      "$GDIR/rpm_offline_inverted_amber.png"    offline  inverted
+for style in clock music navigation faults temps injection settings; do
+    "$BUILD/gen_golden" "$style" "$GDIR/${style}_inverted_amber.png" standard inverted
+done
+"$BUILD/gen_golden" dashboard  "$GDIR/dashboard_hot_inverted_amber.png"  hot      inverted
+
+# Bascule à chaud : restyler les écrans existants doit donner exactement le
+# rendu créé directement dans la palette cible, et l'aller-retour doit
+# retrouver le golden normal (aucune dérive), pochette comprise.
+echo ">> vérification de la bascule de palette à chaud..."
+TOGGLE_DIR="$BUILD/palette_toggle"
+mkdir -p "$TOGGLE_DIR"
+check_toggle() { # <style> <scenario> <golden inversé> <golden normal>
+    "$BUILD/gen_golden" "$1" "$TOGGLE_DIR/toggled.png" "$2" toggled >/dev/null
+    cmp -s "$TOGGLE_DIR/toggled.png" "$GDIR/$3" \
+        || { echo "ERREUR bascule $1/$2 != $3"; exit 1; }
+    "$BUILD/gen_golden" "$1" "$TOGGLE_DIR/roundtrip.png" "$2" roundtrip >/dev/null
+    cmp -s "$TOGGLE_DIR/roundtrip.png" "$GDIR/$4" \
+        || { echo "ERREUR aller-retour $1/$2 != $4"; exit 1; }
+}
+check_toggle amber      standard rpm_inverted_amber.png           rpm_amber.png
+check_toggle amber      offline  rpm_offline_inverted_amber.png   rpm_offline_amber.png
+for style in clock music navigation faults temps injection settings; do
+    check_toggle "$style" standard "${style}_inverted_amber.png" "${style}_amber.png"
+done
+check_toggle dashboard  hot      dashboard_hot_inverted_amber.png dashboard_hot_amber.png
+echo ">> bascule de palette : OK"
 echo ">> OK — goldens régénérés dans test/golden/"

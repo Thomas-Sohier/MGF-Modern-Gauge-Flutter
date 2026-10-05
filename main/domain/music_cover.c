@@ -1,8 +1,10 @@
 #include "domain/music_cover.h"
 
+#include "domain/amber_palette.h"
+
 #include <string.h>
 
-#define COVER_LEVELS 16
+#define COVER_LEVELS MUSIC_COVER_LEVELS
 
 // Matrice de Bayer 4x4 (0..15), seuils de tramage ordonné.
 static const uint8_t k_bayer[16] = {
@@ -22,19 +24,76 @@ static uint8_t expand6(uint16_t v) {
     return (uint8_t)((v << 2) | (v >> 4));
 }
 
-// Fond #1B1712, ambre #FFB51B.
-static uint16_t amber_level_color(int level) {
+static void palette_channels(uint32_t rgb, uint8_t out[3]) {
+    out[0] = (uint8_t)((rgb >> 16) & 0xFFU);
+    out[1] = (uint8_t)((rgb >> 8) & 0xFFU);
+    out[2] = (uint8_t)(rgb & 0xFFU);
+}
+
+uint16_t music_cover_level_color(int level, bool inverted) {
     if (level < 0) level = 0;
     if (level > COVER_LEVELS - 1) level = COVER_LEVELS - 1;
-    static const uint8_t bg[3] = {0x1B, 0x17, 0x12};
-    static const uint8_t amber[3] = {0xFF, 0xB5, 0x1B};
+    uint8_t bg[3];
+    uint8_t amber[3];
+    palette_channels(amber_palette_rgb(inverted, AMBER_PALETTE_ROLE_BG), bg);
+    palette_channels(amber_palette_rgb(inverted, AMBER_PALETTE_ROLE_BRIGHT),
+                     amber);
     uint8_t rgb[3];
     for (int c = 0; c < 3; c++) {
-        rgb[c] = (uint8_t)((bg[c] * (COVER_LEVELS - 1 - level) +
-                            amber[c] * level) /
-                           (COVER_LEVELS - 1));
+        rgb[c] =
+            (uint8_t)((bg[c] * (COVER_LEVELS - 1 - level) + amber[c] * level) /
+                      (COVER_LEVELS - 1));
     }
     return rgb565(rgb[0], rgb[1], rgb[2]);
+}
+
+static uint16_t amber_level_color(int level) {
+    return music_cover_level_color(level, false);
+}
+
+size_t music_cover_convert_palette(uint16_t *pixels, size_t count,
+                                   bool from_inverted, bool to_inverted) {
+    if (pixels == NULL || count == 0) return 0;
+
+    uint16_t from[COVER_LEVELS];
+    uint16_t to[COVER_LEVELS];
+    for (int level = 0; level < COVER_LEVELS; level++) {
+        from[level] = music_cover_level_color(level, from_inverted);
+        to[level] = music_cover_level_color(level, to_inverted);
+    }
+
+    // Index rapide par composante rouge (5 bits) : les niveaux de la palette
+    // ont des rouges distincts. En cas de collision (palette future), on
+    // retombe sur une recherche linéaire exacte.
+    int8_t by_red[32];
+    memset(by_red, -1, sizeof(by_red));
+    bool indexed = true;
+    for (int level = 0; level < COVER_LEVELS && indexed; level++) {
+        const unsigned red = from[level] >> 11;
+        if (by_red[red] >= 0) indexed = false;
+        by_red[red] = (int8_t)level;
+    }
+
+    size_t matched = 0;
+    for (size_t i = 0; i < count; i++) {
+        const uint16_t pixel = pixels[i];
+        int level = -1;
+        if (indexed) {
+            const int candidate = by_red[pixel >> 11];
+            if (candidate >= 0 && from[candidate] == pixel) level = candidate;
+        } else {
+            for (int l = 0; l < COVER_LEVELS; l++) {
+                if (from[l] == pixel) {
+                    level = l;
+                    break;
+                }
+            }
+        }
+        if (level < 0) continue;
+        pixels[i] = to[level];
+        matched++;
+    }
+    return matched;
 }
 
 uint16_t music_cover_amber_pixel(uint8_t r, uint8_t g, uint8_t b, int dither) {

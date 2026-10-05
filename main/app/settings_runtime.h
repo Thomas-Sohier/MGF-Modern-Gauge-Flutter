@@ -38,6 +38,9 @@ bool settings_runtime_set_startup_page(settings_runtime_t *runtime,
 // Décalage UTC -> heure légale reçu du téléphone (persisté, anti-rebond).
 bool settings_runtime_set_utc_offset(settings_runtime_t *runtime,
                                      int16_t utc_offset_minutes);
+// Palette normale/inversée, réglage local (absent du protocole BLE v1).
+bool settings_runtime_set_color_mode(settings_runtime_t *runtime,
+                                     app_settings_color_mode_t color_mode);
 bool settings_runtime_update(settings_runtime_t *runtime,
                              const app_settings_t *settings);
 

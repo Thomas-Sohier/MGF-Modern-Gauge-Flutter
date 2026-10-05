@@ -23,6 +23,48 @@ static void test_settings_round_trip(void) {
     assert(app_settings_equal(&source, &decoded));
 }
 
+// La palette inversée est locale : le protocole v1 ne change pas (mêmes
+// octets qu'en couleurs normales) et une écriture BLE fusionnée la conserve.
+static void test_inverted_colors_stay_local(void) {
+    app_settings_t local;
+    app_settings_defaults(&local);
+    local.brightness_percent = 70;
+    local.startup_page = APP_SETTINGS_PAGE_CLOCK;
+    local.utc_offset_minutes = 60;
+    local.color_mode = APP_SETTINGS_COLORS_INVERTED;
+    app_settings_t normal = local;
+    normal.color_mode = APP_SETTINGS_COLORS_NORMAL;
+
+    uint8_t inverted_payload[BLE_CONFIG_SETTINGS_PAYLOAD_SIZE];
+    uint8_t normal_payload[BLE_CONFIG_SETTINGS_PAYLOAD_SIZE];
+    size_t inverted_size = 0;
+    size_t normal_size = 0;
+    assert(ble_config_settings_encode(
+        &local, inverted_payload, sizeof(inverted_payload), &inverted_size));
+    assert(ble_config_settings_encode(&normal, normal_payload,
+                                      sizeof(normal_payload), &normal_size));
+    assert(inverted_size == BLE_CONFIG_SETTINGS_PAYLOAD_SIZE);
+    assert(normal_size == inverted_size);
+    assert(memcmp(inverted_payload, normal_payload, inverted_size) == 0);
+
+    // Le téléphone renvoie une luminosité : la palette décodée est normale,
+    // la fusion restaure le réglage local.
+    const uint8_t phone[BLE_CONFIG_SETTINGS_PAYLOAD_SIZE] = {
+        BLE_CONFIG_PROTOCOL_VERSION, 25U, APP_SETTINGS_PAGE_RPM,
+        APP_SETTINGS_THEME_AMBER, APP_SETTINGS_UNITS_IMPERIAL};
+    app_settings_t incoming;
+    assert(ble_config_settings_decode(phone, sizeof(phone), &incoming) ==
+           BLE_CONFIG_PARSE_OK);
+    assert(incoming.color_mode == APP_SETTINGS_COLORS_NORMAL);
+    app_settings_merge_ble_v1(&local, &incoming);
+    assert(app_settings_is_valid(&incoming));
+    assert(incoming.color_mode == APP_SETTINGS_COLORS_INVERTED);
+    assert(incoming.brightness_percent == 25U);
+    assert(incoming.units == APP_SETTINGS_UNITS_IMPERIAL);
+    assert(incoming.startup_page == APP_SETTINGS_PAGE_CLOCK);
+    assert(incoming.utc_offset_minutes == 60);
+}
+
 static void test_settings_rejects_malformed_payloads(void) {
     app_settings_t decoded;
     uint8_t payload[BLE_CONFIG_SETTINGS_PAYLOAD_SIZE] = {
@@ -123,6 +165,7 @@ static void test_datetime_rejects_malformed_payloads(void) {
 int main(void) {
     test_settings_round_trip();
     test_settings_rejects_malformed_payloads();
+    test_inverted_colors_stay_local();
     test_datetime_round_trip();
     test_datetime_rejects_malformed_payloads();
     puts("BLE config protocol tests: OK");

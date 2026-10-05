@@ -10,31 +10,39 @@
 #include <math.h>
 #include <stdio.h>
 
-// Trois réglages empilés dans le repère 320, chacun avec sa légende :
-// luminosité (−, 16 crans du AW9364, +), page de démarrage (‹ nom ›) et
-// fenêtre Bluetooth (pilule d'état). Le bouton OK referme la surimpression.
+// Quatre réglages empilés dans le repère 320, chacun avec sa légende :
+// luminosité (−, 16 crans du AW9364, +), page de démarrage (‹ nom ›),
+// fenêtre Bluetooth et palette (pilules d'état). Le bouton OK referme la
+// surimpression.
 #define CX            160.0f
-#define BRIGHT_CAP_Y  84.0f
-#define BRIGHT_ROW_Y  108.0f
-#define RULE_1_Y      132.0f
-#define STARTUP_CAP_Y 150.0f
-#define STARTUP_ROW_Y 174.0f
-#define RULE_2_Y      198.0f
-#define BLE_CAP_Y     216.0f
-#define BLE_ROW_Y     242.0f
-#define OK_Y          286.0f
+#define BRIGHT_CAP_Y  74.0f
+#define BRIGHT_ROW_Y  95.0f
+#define RULE_1_Y      116.0f
+#define STARTUP_CAP_Y 131.0f
+#define STARTUP_ROW_Y 152.0f
+#define RULE_2_Y      173.0f
+#define BLE_CAP_Y     188.0f
+#define BLE_ROW_Y     210.0f
+#define COLORS_CAP_Y  238.0f
+#define COLORS_ROW_Y  260.0f
+#define OK_Y          294.0f
 
 #define SIDE_LEFT   64.0f
 #define SIDE_RIGHT  256.0f
 #define SIDE_RADIUS 16.0f
-#define OK_RADIUS   19.0f
+#define OK_RADIUS   17.0f
 #define STEPS_LEFT  92.0f
 #define STEPS_RIGHT 228.0f
 #define STEP_GAP    2.0f
 #define STEP_HEIGHT 16.0f
 #define PILL_WIDTH  172.0f
-#define PILL_HEIGHT 32.0f
-#define TARGET_SIZE 48.0f
+#define PILL_HEIGHT 28.0f
+#define TARGET_SIZE 44.0f
+// Cibles tactiles des pilules et de OK : pas de recouvrement vertical entre
+// la pilule du bas (246..274) et OK (276..312).
+#define PILL_TARGET_HEIGHT 32.0f
+#define OK_TARGET_WIDTH    64.0f
+#define OK_TARGET_HEIGHT   36.0f
 
 struct settings_screen_s {
     settings_screen_actions_t actions;
@@ -44,17 +52,20 @@ struct settings_screen_s {
     lv_obj_t *title;
     lv_obj_t *page_name;
     lv_obj_t *ble_text;
+    lv_obj_t *colors_text;
     lv_obj_t *ok_text;
     lv_obj_t *minus;
     lv_obj_t *plus;
     lv_obj_t *previous;
     lv_obj_t *next;
     lv_obj_t *bluetooth;
+    lv_obj_t *colors;
     lv_obj_t *ok;
     uint8_t level;
     app_settings_page_t startup_page;
     settings_ble_state_t ble_state;
     uint32_t ble_remaining_s;
+    app_settings_color_mode_t color_mode;
 };
 
 static const char *page_label(app_settings_page_t page) {
@@ -169,6 +180,17 @@ static void draw_bluetooth(lv_layer_t *layer, const ui_layout_t *layout,
     }
 }
 
+// Pilule de palette : contour en couleurs normales, pleine quand la palette
+// inversée est active (même grammaire que la pilule Bluetooth).
+static void draw_colors(lv_layer_t *layer, const ui_layout_t *layout,
+                        const settings_screen_t *scr) {
+    const bool inverted = scr->color_mode == APP_SETTINGS_COLORS_INVERTED;
+    draw_rounded_rect(layer, layout, CX, COLORS_ROW_Y, PILL_WIDTH, PILL_HEIGHT,
+                      inverted ? ui_theme_amber_bright()
+                               : ui_theme_amber_separator(),
+                      inverted);
+}
+
 static void canvas_draw_cb(lv_event_t *event) {
     lv_obj_t *canvas = lv_event_get_target(event);
     lv_layer_t *layer = lv_event_get_layer(event);
@@ -196,6 +218,7 @@ static void canvas_draw_cb(lv_event_t *event) {
                  ui_theme_amber_bright());
 
     draw_bluetooth(layer, &layout, scr);
+    draw_colors(layer, &layout, scr);
     amber_draw_dot(layer, &layout, CX, OK_Y, OK_RADIUS,
                    ui_theme_amber_bright());
 }
@@ -239,6 +262,26 @@ static void refresh_bluetooth_text(settings_screen_t *scr) {
     if (amber_kit_set_text(scr->ble_text, text)) {
         amber_kit_place(scr->ble_text, CX, BLE_ROW_Y, AMBER_ALIGN_CENTER);
     }
+}
+
+static void refresh_colors_text(settings_screen_t *scr) {
+    const bool inverted = scr->color_mode == APP_SETTINGS_COLORS_INVERTED;
+    lv_obj_set_style_text_color(
+        scr->colors_text,
+        inverted ? ui_theme_amber_bg() : ui_theme_amber_bright(), 0);
+    if (amber_kit_set_text(scr->colors_text,
+                           inverted ? "INVERSEES" : "NORMALES")) {
+        amber_kit_place(scr->colors_text, CX, COLORS_ROW_Y, AMBER_ALIGN_CENTER);
+    }
+}
+
+static void set_color_mode(settings_screen_t *scr,
+                           app_settings_color_mode_t mode) {
+    if (mode < 0 || mode >= APP_SETTINGS_COLORS_COUNT) return;
+    if (mode == scr->color_mode) return;
+    scr->color_mode = mode;
+    lv_obj_invalidate(scr->canvas);
+    refresh_colors_text(scr);
 }
 
 // ── Interaction ─────────────────────────────────────────────────────────────
@@ -293,6 +336,15 @@ static void button_event_cb(lv_event_t *event) {
             scr->actions.bluetooth_toggled(
                 scr->actions.context, scr->ble_state == SETTINGS_BLE_CLOSED);
         }
+    } else if (target == scr->colors) {
+        const app_settings_color_mode_t next =
+            scr->color_mode == APP_SETTINGS_COLORS_INVERTED
+                ? APP_SETTINGS_COLORS_NORMAL
+                : APP_SETTINGS_COLORS_INVERTED;
+        set_color_mode(scr, next);
+        if (scr->actions.color_mode_changed != NULL) {
+            scr->actions.color_mode_changed(scr->actions.context, next);
+        }
     } else if (target == scr->ok) {
         settings_screen_hide(scr);
         if (scr->actions.closed != NULL) {
@@ -302,8 +354,8 @@ static void button_event_cb(lv_event_t *event) {
 }
 
 // Appui hors des contrôles : ferme la surimpression, comme OK. Le press
-// d'ouverture (maintien) vise la page sous la surimpression, LVGL n'émet donc
-// pas de CLICKED ici au relâcher.
+// d'ouverture (glissement ou maintien) vise la page sous la surimpression,
+// LVGL n'émet donc pas de CLICKED ici au relâcher.
 static void overlay_event_cb(lv_event_t *event) {
     settings_screen_t *scr = lv_event_get_user_data(event);
     if (scr == NULL) return;
@@ -378,7 +430,8 @@ settings_screen_create(lv_obj_t *parent,
 
     if (create_caption(scr, "LUMINOSITE", BRIGHT_CAP_Y) == NULL ||
         create_caption(scr, "PAGE AU DEMARRAGE", STARTUP_CAP_Y) == NULL ||
-        create_caption(scr, "BLUETOOTH", BLE_CAP_Y) == NULL) {
+        create_caption(scr, "BLUETOOTH", BLE_CAP_Y) == NULL ||
+        create_caption(scr, "COULEURS", COLORS_CAP_Y) == NULL) {
         goto fail;
     }
 
@@ -386,15 +439,18 @@ settings_screen_create(lv_obj_t *parent,
                                      ui_theme_amber_bright(), "");
     scr->ble_text = amber_kit_label(scr->root, amber_kit_font_caption(),
                                     ui_theme_amber_bright(), "");
+    scr->colors_text = amber_kit_label(scr->root, amber_kit_font_caption(),
+                                       ui_theme_amber_bright(), "");
     scr->ok_text = amber_kit_label(scr->root, amber_kit_font_label(),
                                    ui_theme_amber_bg(), "OK");
     if (scr->page_name == NULL || scr->ble_text == NULL ||
-        scr->ok_text == NULL) {
+        scr->colors_text == NULL || scr->ok_text == NULL) {
         goto fail;
     }
     amber_kit_place(scr->ok_text, CX, OK_Y, AMBER_ALIGN_CENTER);
     refresh_page_name(scr);
     refresh_bluetooth_text(scr);
+    refresh_colors_text(scr);
 
     scr->minus =
         create_target(scr, SIDE_LEFT, BRIGHT_ROW_Y, TARGET_SIZE, TARGET_SIZE);
@@ -404,10 +460,14 @@ settings_screen_create(lv_obj_t *parent,
         create_target(scr, SIDE_LEFT, STARTUP_ROW_Y, TARGET_SIZE, TARGET_SIZE);
     scr->next =
         create_target(scr, SIDE_RIGHT, STARTUP_ROW_Y, TARGET_SIZE, TARGET_SIZE);
-    scr->bluetooth = create_target(scr, CX, BLE_ROW_Y, PILL_WIDTH, TARGET_SIZE);
-    scr->ok = create_target(scr, CX, OK_Y, TARGET_SIZE, TARGET_SIZE);
+    scr->bluetooth =
+        create_target(scr, CX, BLE_ROW_Y, PILL_WIDTH, PILL_TARGET_HEIGHT);
+    scr->colors =
+        create_target(scr, CX, COLORS_ROW_Y, PILL_WIDTH, PILL_TARGET_HEIGHT);
+    scr->ok = create_target(scr, CX, OK_Y, OK_TARGET_WIDTH, OK_TARGET_HEIGHT);
     if (scr->minus == NULL || scr->plus == NULL || scr->previous == NULL ||
-        scr->next == NULL || scr->bluetooth == NULL || scr->ok == NULL) {
+        scr->next == NULL || scr->bluetooth == NULL || scr->colors == NULL ||
+        scr->ok == NULL) {
         goto fail;
     }
 
@@ -430,6 +490,7 @@ void settings_screen_set_settings(settings_screen_t *scr,
     }
     scr->startup_page = settings->startup_page;
     refresh_page_name(scr);
+    set_color_mode(scr, settings->color_mode);
 }
 
 void settings_screen_show(settings_screen_t *scr,

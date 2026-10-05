@@ -12,13 +12,17 @@
 
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
+#include "esp_log.h"
+#define COVER_LOG(...) ESP_LOGI("jpeg_cover", __VA_ARGS__)
+#else
+#define COVER_LOG(...) ((void)0)
 #endif
 
 // Tampon de travail recommandé par TJpgDec.
 #define JPEG_COVER_WORK_SIZE 4096U
 // Bornes défensives : une pochette compagnon fait au plus 480x480.
 #define JPEG_COVER_MAX_DIMENSION 1024
-#define JPEG_COVER_MAX_PIXELS (1024U * 1024U)
+#define JPEG_COVER_MAX_PIXELS    (1024U * 1024U)
 
 typedef struct {
     const uint8_t *data;
@@ -59,7 +63,8 @@ static int tjpgd_output(JDEC *jd, void *bitmap, JRECT *rect) {
     jpeg_cover_ctx_t *ctx = jd->device;
     const uint8_t *src = bitmap; // RGB888 (3 octets/pixel)
     for (int y = rect->top; y <= (int)rect->bottom; y++) {
-        uint16_t *row = ctx->pixels + (size_t)y * (size_t)ctx->width + rect->left;
+        uint16_t *row =
+            ctx->pixels + (size_t)y * (size_t)ctx->width + rect->left;
         for (int x = rect->left; x <= (int)rect->right; x++) {
             const uint8_t r = *src++;
             const uint8_t g = *src++;
@@ -82,29 +87,51 @@ bool jpeg_cover_decode_amber(const uint8_t *jpeg, size_t length, int width,
     jpeg_cover_ctx_t ctx = {.data = jpeg, .length = length};
     JDEC jd;
     uint8_t work[JPEG_COVER_WORK_SIZE];
-    if (jd_prepare(&jd, tjpgd_input, work, sizeof(work), &ctx) != JDR_OK) {
+    const JRESULT prepared =
+        jd_prepare(&jd, tjpgd_input, work, sizeof(work), &ctx);
+    COVER_LOG("prepare: JRESULT=%d bytes=%u consumed=%u work=%u", (int)prepared,
+              (unsigned)length, (unsigned)ctx.position, (unsigned)sizeof(work));
+    if (prepared != JDR_OK) {
         return false;
     }
     if (jd.width == 0 || jd.height == 0 ||
         jd.width > JPEG_COVER_MAX_DIMENSION ||
         jd.height > JPEG_COVER_MAX_DIMENSION ||
         (size_t)jd.width * (size_t)jd.height > JPEG_COVER_MAX_PIXELS) {
+        COVER_LOG("dimensions rejected: %ux%u", (unsigned)jd.width,
+                  (unsigned)jd.height);
         return false;
     }
 
     const size_t pixel_count = (size_t)jd.width * (size_t)jd.height;
     ctx.pixels = cover_alloc(pixel_count * sizeof(uint16_t));
+#ifdef ESP_PLATFORM
+    COVER_LOG(
+        "source allocation: %ux%u bytes=%u ok=%d internal free/largest=%u/%u psram free/largest=%u/%u",
+        (unsigned)jd.width, (unsigned)jd.height,
+        (unsigned)(pixel_count * sizeof(uint16_t)), ctx.pixels != NULL,
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL |
+                                          MALLOC_CAP_8BIT),
+        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL |
+                                                   MALLOC_CAP_8BIT),
+        (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT),
+        (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM |
+                                                   MALLOC_CAP_8BIT));
+#endif
     if (ctx.pixels == NULL) return false;
     ctx.width = jd.width;
 
     const JRESULT result = jd_decomp(&jd, tjpgd_output, 0);
+    COVER_LOG("decode: JRESULT=%d consumed=%u/%u", (int)result,
+              (unsigned)ctx.position, (unsigned)length);
     if (result != JDR_OK) {
         cover_free(ctx.pixels);
         return false;
     }
 
-    const bool ok = music_cover_render(ctx.pixels, jd.width, jd.height, out,
-                                       width, height);
+    const bool ok =
+        music_cover_render(ctx.pixels, jd.width, jd.height, out, width, height);
+    COVER_LOG("amber render: ok=%d output=%dx%d", ok, width, height);
     cover_free(ctx.pixels);
     return ok;
 }

@@ -62,9 +62,18 @@ static void art_worker_task(void *argument) {
 
         if (!has_job) continue;
 
-        uint16_t *pixels =
-            art_alloc((size_t)MUSIC_COVER_WIDTH * MUSIC_COVER_HEIGHT *
-                      sizeof(uint16_t));
+        uint16_t *pixels = art_alloc((size_t)MUSIC_COVER_WIDTH *
+                                     MUSIC_COVER_HEIGHT * sizeof(uint16_t));
+        ESP_LOGI(
+            TAG,
+            "cover output allocation: bytes=%u ok=%d internal free=%u psram free=%u",
+            (unsigned)(MUSIC_COVER_WIDTH * MUSIC_COVER_HEIGHT *
+                       sizeof(uint16_t)),
+            pixels != NULL,
+            (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL |
+                                              MALLOC_CAP_8BIT),
+            (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM |
+                                              MALLOC_CAP_8BIT));
         const bool decoded =
             pixels != NULL &&
             jpeg_cover_decode_amber(job.data, job.length, MUSIC_COVER_WIDTH,
@@ -78,6 +87,8 @@ static void art_worker_task(void *argument) {
             continue;
         }
 
+        ESP_LOGI(TAG, "cover JPEG decoded: bytes=%u output=%dx%d",
+                 (unsigned)job.length, MUSIC_COVER_WIDTH, MUSIC_COVER_HEIGHT);
         xSemaphoreTake(s_worker.lock, portMAX_DELAY);
         if (!s_worker.running) {
             // Arrêt demandé pendant le décodage : ne rien publier.
@@ -130,6 +141,7 @@ void companion_art_worker_start(void) {
 bool companion_art_worker_submit(companion_art_jpeg_t *art) {
     if (art == NULL || art->data == NULL || art->length == 0) return false;
     if (s_worker.task == NULL || !s_worker.running) {
+        ESP_LOGW(TAG, "cover submit rejected: worker unavailable");
         art_free(art->data);
         art->data = NULL;
         art->length = 0;

@@ -6,9 +6,10 @@
 #include "domain/app_settings.h"
 #include "lvgl.h"
 
-// Écran de réglages ambre, affiché en surimpression du dashboard (maintien
-// prolongé). Il ne touche ni aux réglages ni au BLE : chaque action est
-// remontée à l'application, qui applique puis resynchronise l'écran.
+// Écran de réglages ambre, affiché en surimpression du dashboard (glissement
+// vers le haut ou maintien prolongé). Il ne touche ni aux réglages ni au BLE :
+// chaque action est remontée à l'application, qui applique puis resynchronise
+// l'écran.
 typedef struct settings_screen_s settings_screen_t;
 
 typedef enum {
@@ -25,6 +26,8 @@ typedef struct {
     void (*startup_page_changed)(void *context, app_settings_page_t page);
     // true : ouvrir la fenêtre d'appairage BLE ; false : la fermer.
     void (*bluetooth_toggled)(void *context, bool open);
+    // Palette normale ou inversée (appliquée instantanément par l'application).
+    void (*color_mode_changed)(void *context, app_settings_color_mode_t mode);
     void (*closed)(void *context);
 } settings_screen_actions_t;
 

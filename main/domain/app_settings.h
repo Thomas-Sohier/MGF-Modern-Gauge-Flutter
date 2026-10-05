@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define APP_SETTINGS_SCHEMA_VERSION             2U
+#define APP_SETTINGS_SCHEMA_VERSION             3U
 #define APP_SETTINGS_DEFAULT_BRIGHTNESS_PERCENT 100U
 
 typedef enum {
@@ -37,6 +37,15 @@ typedef enum {
     APP_SETTINGS_UNITS_COUNT,
 } app_settings_units_t;
 
+// Palette de l'interface et des pochettes : ambre sur fond sombre (normal)
+// ou la même palette inversée (fond ambre, premier plan quasi noir). Réglage
+// purement local : absent du protocole BLE de réglages v1.
+typedef enum {
+    APP_SETTINGS_COLORS_NORMAL = 0,
+    APP_SETTINGS_COLORS_INVERTED,
+    APP_SETTINGS_COLORS_COUNT,
+} app_settings_color_mode_t;
+
 typedef struct {
     uint8_t brightness_percent;
     app_settings_page_t selected_page; // dernière page vue
@@ -46,6 +55,7 @@ typedef struct {
     // Décalage UTC -> heure légale (fuseau + heure d'été), fourni par le
     // téléphone à chaque connexion ; multiple de 15, -720..+840.
     int16_t utc_offset_minutes;
+    app_settings_color_mode_t color_mode; // schéma 3, local uniquement
 } app_settings_t;
 
 #define APP_SETTINGS_UTC_OFFSET_MIN (-720)
@@ -56,7 +66,8 @@ bool app_settings_is_valid(const app_settings_t *settings);
 // Page à afficher au démarrage : la page fixe choisie, sinon la dernière vue.
 app_settings_page_t app_settings_boot_page(const app_settings_t *settings);
 // Champs absents du protocole BLE de réglages v1 (page de démarrage,
-// décalage horaire) : une écriture BLE conserve les valeurs locales.
+// décalage horaire, couleurs inversées) : une écriture BLE conserve les
+// valeurs locales.
 void app_settings_merge_ble_v1(const app_settings_t *current,
                                app_settings_t *incoming);
 bool app_settings_equal(const app_settings_t *left,

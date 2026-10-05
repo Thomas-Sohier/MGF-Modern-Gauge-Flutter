@@ -142,6 +142,15 @@ bool settings_runtime_set_utc_offset(settings_runtime_t *runtime,
     return apply_update(runtime, &next);
 }
 
+bool settings_runtime_set_color_mode(settings_runtime_t *runtime,
+                                     app_settings_color_mode_t color_mode) {
+    if (runtime == NULL) return false;
+    app_settings_t next = *settings_coordinator_current(runtime->coordinator);
+    next.color_mode = color_mode;
+    if (!app_settings_is_valid(&next)) return false;
+    return apply_update(runtime, &next);
+}
+
 bool settings_runtime_update(settings_runtime_t *runtime,
                              const app_settings_t *settings) {
     if (runtime == NULL || settings == NULL || !app_settings_is_valid(settings))

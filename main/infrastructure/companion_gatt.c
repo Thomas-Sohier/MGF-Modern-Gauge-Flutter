@@ -144,6 +144,7 @@ static int handle_art_control(size_t length) {
         s_art.buffer = buffer;
         s_art.capacity = control.total_bytes;
         begin_ok = companion_art_reassembler_begin(&s_art, &control);
+        if (begin_ok) s_art_buffer = buffer;
         if (!begin_ok) {
             s_art.buffer = NULL;
             s_art.capacity = 0;
@@ -158,18 +159,25 @@ static int handle_art_control(size_t length) {
                  (unsigned)control.total_bytes);
         return BLE_ATT_ERR_UNLIKELY;
     }
+    ESP_LOGI(TAG, "cover control accepted: id=%s bytes=%u chunks=%u",
+             control.art_id, (unsigned)control.total_bytes,
+             (unsigned)control.chunk_count);
     return 0;
 }
 
 static int handle_art_data(size_t length) {
     bool accepted = false;
     bool abort_transfer = false;
+    size_t completed_bytes = 0;
+    unsigned completed_chunks = 0;
     uint8_t *to_free = NULL;
     portENTER_CRITICAL(&s_lock);
     if (!s_art_ready && s_art.active) {
         if (companion_art_reassembler_push(&s_art, s_chunk, length)) {
             if (companion_art_reassembler_complete(&s_art)) {
                 s_art_ready = true;
+                completed_bytes = s_art.bytes_received;
+                completed_chunks = s_art.received_count;
             }
             accepted = true;
         } else {
@@ -177,6 +185,10 @@ static int handle_art_data(size_t length) {
         }
     }
     portEXIT_CRITICAL(&s_lock);
+    if (completed_bytes != 0) {
+        ESP_LOGI(TAG, "cover assembly complete: bytes=%u chunks=%u",
+                 (unsigned)completed_bytes, completed_chunks);
+    }
     if (abort_transfer) {
         portENTER_CRITICAL(&s_lock);
         to_free = art_detach_locked();

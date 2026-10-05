@@ -27,6 +27,7 @@
 #include "ui/screens/settings_screen.h"
 #include "ui/navigation/dashboard_navigator.h"
 #include "ui/fonts/ui_fonts.h"
+#include "ui/themes/ui_theme.h"
 #include "infrastructure/fake_ecu.h"
 #include "infrastructure/kline_board_config.h"
 #include "infrastructure/settings_store.h"
@@ -38,6 +39,7 @@
 #include "domain/companion_protocol.h"
 #include "domain/rtc_time.h"
 #include "domain/display_brightness.h"
+#include "domain/music_cover.h"
 #include "app/dashboard_controller.h"
 #include "app/settings_runtime.h"
 #include "infrastructure/runtime_diagnostics.h"
@@ -131,11 +133,29 @@ static ecu_source_t disconnected_ecu_source(void) {
 }
 
 typedef struct {
+    lv_obj_t *screen; // écran actif : navigateur + surimpression réglages
     dashboard_navigator_t *navigator;
     clock_screen_t *clock;
+    music_screen_t *music;
 } settings_apply_context_t;
 
 static settings_apply_context_t s_settings_apply_context;
+
+// Palette normale/inversée appliquée instantanément, sans recréer les écrans
+// (média, pochette, itinéraire et page courante sont conservés) : les styles
+// locaux sont remappés rôle par rôle et les callbacks de dessin relisent la
+// palette active. No-op si la palette est déjà la bonne.
+static void apply_color_mode(settings_apply_context_t *context,
+                             app_settings_color_mode_t mode) {
+    const bool inverted = mode == APP_SETTINGS_COLORS_INVERTED;
+    const bool from = ui_theme_is_inverted();
+    if (!ui_theme_apply_inverted(context->screen, inverted)) return;
+    // La pochette affichée appartient à l'écran musique : ses pixels sont
+    // convertis sans perte (music_cover_convert_palette) par
+    // music_screen_palette_changed.
+    music_screen_palette_changed(context->music, from, inverted);
+    ESP_LOGI(TAG, "palette %s", inverted ? "inverted" : "normal");
+}
 
 static bool apply_settings(void *context, const app_settings_t *settings) {
     settings_apply_context_t *apply_context = context;
@@ -148,6 +168,7 @@ static bool apply_settings(void *context, const app_settings_t *settings) {
         return false;
     }
     dashboard_navigator_set_units(apply_context->navigator, settings->units);
+    apply_color_mode(apply_context, settings->color_mode);
     clock_screen_set_utc_offset(apply_context->clock,
                                 settings->utc_offset_minutes);
     board_display_backlight_set_brightness(
@@ -187,7 +208,7 @@ static void refresh_settings_screen(settings_ui_t *ui) {
         ble_window_remaining_s(&ui->ble_window, lv_tick_get()));
 }
 
-static void settings_open_on_hold(void *context) {
+static void settings_open(void *context) {
     settings_ui_t *ui = context;
     app_settings_t current;
     if (ui == NULL || !settings_runtime_read(ui->runtime, &current)) return;
@@ -204,6 +225,12 @@ static void settings_startup_page_changed(void *context,
                                           app_settings_page_t page) {
     settings_ui_t *ui = context;
     settings_runtime_set_startup_page(ui->runtime, page);
+}
+
+static void settings_color_mode_changed(void *context,
+                                        app_settings_color_mode_t mode) {
+    settings_ui_t *ui = context;
+    settings_runtime_set_color_mode(ui->runtime, mode);
 }
 
 static void settings_bluetooth_toggled(void *context, bool open) {
@@ -233,8 +260,8 @@ static void settings_timer_tick(lv_timer_t *timer) {
 #if MGF_ENABLE_BLE_CONFIG
     app_settings_t pending;
     if (ble_config_service_take_settings_update(&pending)) {
-        // Le protocole BLE v1 ne porte ni la page de démarrage ni le fuseau :
-        // on garde les valeurs locales.
+        // Le protocole BLE v1 ne porte ni la page de démarrage, ni le fuseau,
+        // ni la palette inversée : on garde les valeurs locales.
         app_settings_t current;
         if (settings_runtime_read(runtime, &current)) {
             app_settings_merge_ble_v1(&current, &pending);
@@ -356,8 +383,19 @@ static void companion_timer_tick(lv_timer_t *timer) {
     if (companion_art_worker_take(&cover, &cover_width, &cover_height)) {
         if (cover_width == MUSIC_COVER_WIDTH &&
             cover_height == MUSIC_COVER_HEIGHT) {
+            // Le worker rend toujours la palette normale (forme canonique) :
+            // conversion exacte vers la palette active avant remise.
+            if (ui_theme_is_inverted()) {
+                music_cover_convert_palette(
+                    cover, (size_t)cover_width * (size_t)cover_height, false,
+                    true);
+            }
             music_screen_set_cover(ui->music, cover, cover_width, cover_height);
+            ESP_LOGI(TAG, "cover handed to music screen: %dx%d", cover_width,
+                     cover_height);
         } else {
+            ESP_LOGW(TAG, "cover handoff rejected: dimensions=%dx%d",
+                     cover_width, cover_height);
             companion_art_worker_free(cover);
         }
     }
@@ -503,6 +541,9 @@ void app_main(void) {
     } else {
         ESP_LOGI(TAG, "application preferences loaded");
     }
+    // Palette choisie avant toute création d'objet LVGL (écran de démarrage
+    // compris) : aucune bascule visible au boot.
+    ui_theme_set_inverted(settings.color_mode == APP_SETTINGS_COLORS_INVERTED);
 
     lv_display_t *display = NULL;
     bool lvgl_locked = false;
@@ -664,8 +705,10 @@ void app_main(void) {
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 
     s_settings_apply_context = (settings_apply_context_t){
+        .screen = screen,
         .navigator = navigator,
         .clock = clock_view,
+        .music = music_view,
     };
     // Page fixe choisie dans les réglages, sinon la dernière page vue.
     settings.selected_page = app_settings_boot_page(&settings);
@@ -688,13 +731,15 @@ void app_main(void) {
         navigator, settings_runtime_page_changed, settings_runtime);
 
     // Réglages en surimpression, créés après le navigateur pour le couvrir ;
-    // ouverts par un maintien prolongé sur n'importe quelle page.
+    // ouverts par un glissement vers le haut ou un maintien prolongé sur
+    // n'importe quelle page.
     s_settings_ui = (settings_ui_t){.runtime = settings_runtime};
     const settings_screen_actions_t settings_actions = {
         .context = &s_settings_ui,
         .brightness_changed = settings_brightness_changed,
         .startup_page_changed = settings_startup_page_changed,
         .bluetooth_toggled = settings_bluetooth_toggled,
+        .color_mode_changed = settings_color_mode_changed,
     };
     settings_screen = settings_screen_create(screen, &settings_actions);
     if (settings_screen == NULL) {
@@ -702,8 +747,8 @@ void app_main(void) {
         goto cleanup;
     }
     s_settings_ui.screen = settings_screen;
-    dashboard_navigator_set_hold_callback(navigator, settings_open_on_hold,
-                                          &s_settings_ui);
+    dashboard_navigator_set_settings_callback(navigator, settings_open,
+                                              &s_settings_ui);
 
     settings_timer = lv_timer_create(settings_timer_tick, 250, &s_settings_ui);
     if (settings_timer == NULL) {

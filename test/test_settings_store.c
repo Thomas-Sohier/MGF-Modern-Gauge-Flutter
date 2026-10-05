@@ -15,19 +15,19 @@ struct mock_semaphore {
 struct mock_nvs_state {
     bool schema_present;
     uint32_t schema;
-    uint8_t values[6];
-    bool value_present[6];
+    uint8_t values[7];
+    bool value_present[7];
     uint32_t set_calls;
     uint32_t value_sets_before_schema;
     uint32_t commit_calls;
     esp_err_t flash_error;
     esp_err_t open_error;
     esp_err_t schema_error;
-    esp_err_t value_errors[6];
+    esp_err_t value_errors[7];
     esp_err_t stage_error;
     esp_err_t commit_error;
     uint32_t staged_schema;
-    uint8_t staged_values[6];
+    uint8_t staged_values[7];
 };
 
 static struct mock_nvs_state g_nvs;
@@ -35,7 +35,7 @@ static struct mock_semaphore g_mutex;
 
 static int value_index(const char *key) {
     static const char *const keys[] = {
-        "brightness", "page", "theme", "units", "startup", "utc_q15",
+        "brightness", "page", "theme", "units", "startup", "utc_q15", "colors",
     };
     for (size_t index = 0; index < sizeof(keys) / sizeof(keys[0]); index++) {
         if (strcmp(key, keys[index]) == 0) return (int)index;
@@ -92,7 +92,7 @@ esp_err_t nvs_set_u32(nvs_handle_t handle, const char *key, uint32_t value) {
     if (g_nvs.stage_error != ESP_OK) return g_nvs.stage_error;
     g_nvs.set_calls++;
     g_nvs.staged_schema = value;
-    assert(g_nvs.value_sets_before_schema == 6U);
+    assert(g_nvs.value_sets_before_schema == 7U);
     return ESP_OK;
 }
 
@@ -101,7 +101,7 @@ esp_err_t nvs_set_u8(nvs_handle_t handle, const char *key, uint8_t value) {
     const int index = value_index(key);
     assert(index >= 0);
     if (g_nvs.stage_error != ESP_OK) return g_nvs.stage_error;
-    if (g_nvs.value_sets_before_schema == 6U) {
+    if (g_nvs.value_sets_before_schema == 7U) {
         g_nvs.value_sets_before_schema = 0;
     }
     g_nvs.set_calls++;
@@ -159,12 +159,12 @@ static void test_transaction_and_reload(void) {
     changed.brightness_percent = 42;
 
     assert(settings_store_save(&changed) == ESP_OK);
-    assert(g_nvs.set_calls == 7U);
+    assert(g_nvs.set_calls == 8U);
     assert(g_nvs.commit_calls == 1U);
     assert(g_nvs.schema == APP_SETTINGS_SCHEMA_VERSION);
     assert(g_nvs.values[0] == 42U);
     assert(settings_store_save(&changed) == ESP_OK);
-    assert(g_nvs.set_calls == 7U);
+    assert(g_nvs.set_calls == 8U);
     assert(g_nvs.commit_calls == 1U);
 
     app_settings_t out = {0};
@@ -257,6 +257,67 @@ static void test_schema_1_is_migrated(void) {
     assert(app_settings_boot_page(&reloaded) == APP_SETTINGS_PAGE_RPM);
 }
 
+static void test_schema_2_is_migrated_to_normal_colors(void) {
+    // Enregistrement schéma 2 : startup + fuseau, pas de clé « colors ».
+    g_nvs.schema = 2U;
+    g_nvs.values[0] = 35U;
+    g_nvs.values[1] = APP_SETTINGS_PAGE_MUSIC;
+    g_nvs.values[2] = APP_SETTINGS_THEME_AMBER;
+    g_nvs.values[3] = APP_SETTINGS_UNITS_IMPERIAL;
+    g_nvs.values[4] = APP_SETTINGS_PAGE_CLOCK;
+    g_nvs.values[5] = 64U + 8U; // UTC+2
+    g_nvs.value_present[6] = false;
+    // Une valeur résiduelle ne doit pas être lue pour un schéma 2.
+    g_nvs.values[6] = APP_SETTINGS_COLORS_INVERTED;
+
+    app_settings_t out = {0};
+    assert(settings_store_load(&out) == ESP_OK);
+    assert(out.brightness_percent == 35U);
+    assert(out.selected_page == APP_SETTINGS_PAGE_MUSIC);
+    assert(out.units == APP_SETTINGS_UNITS_IMPERIAL);
+    assert(out.startup_page == APP_SETTINGS_PAGE_CLOCK);
+    assert(out.utc_offset_minutes == 120);
+    assert(out.color_mode == APP_SETTINGS_COLORS_NORMAL);
+
+    // Valeurs inchangées mais flash au schéma 2 : une seule réécriture v3.
+    const uint32_t commits = g_nvs.commit_calls;
+    assert(settings_store_save(&out) == ESP_OK);
+    assert(g_nvs.commit_calls == commits + 1U);
+    assert(g_nvs.schema == APP_SETTINGS_SCHEMA_VERSION);
+    assert(g_nvs.values[6] == (uint8_t)APP_SETTINGS_COLORS_NORMAL);
+    assert(g_nvs.values[4] == (uint8_t)APP_SETTINGS_PAGE_CLOCK);
+    assert(g_nvs.values[5] == 72U);
+    assert(settings_store_save(&out) == ESP_OK);
+    assert(g_nvs.commit_calls == commits + 1U);
+}
+
+static void test_inverted_colors_round_trip(void) {
+    app_settings_t out = {0};
+    assert(settings_store_load(&out) == ESP_OK);
+    out.color_mode = APP_SETTINGS_COLORS_INVERTED;
+    assert(settings_store_save(&out) == ESP_OK);
+    assert(g_nvs.values[6] == (uint8_t)APP_SETTINGS_COLORS_INVERTED);
+
+    app_settings_t reloaded = {0};
+    assert(settings_store_load(&reloaded) == ESP_OK);
+    assert(reloaded.color_mode == APP_SETTINGS_COLORS_INVERTED);
+    assert(app_settings_equal(&reloaded, &out));
+
+    // Palette inconnue : enregistrement rejeté, retour aux défauts.
+    app_settings_t defaults;
+    app_settings_defaults(&defaults);
+    g_nvs.values[6] = APP_SETTINGS_COLORS_COUNT;
+    assert(settings_store_load(&reloaded) == ESP_OK);
+    assert(app_settings_equal(&reloaded, &defaults));
+
+    // Schéma 3 sans clé « colors » : incomplet, défauts (jamais deviné).
+    g_nvs.values[6] = APP_SETTINGS_COLORS_INVERTED;
+    g_nvs.value_present[6] = false;
+    assert(settings_store_load(&reloaded) == ESP_OK);
+    assert(app_settings_equal(&reloaded, &defaults));
+    g_nvs.value_present[6] = true;
+}
+
 static void test_invalid_save_values_are_rejected(void) {
     app_settings_t settings;
     app_settings_defaults(&settings);
@@ -271,6 +332,8 @@ int main(void) {
     test_invalid_records_use_defaults();
     test_unexpected_errors_disable_save_until_reload();
     test_schema_1_is_migrated();
+    test_schema_2_is_migrated_to_normal_colors();
+    test_inverted_colors_round_trip();
     test_invalid_save_values_are_rejected();
     puts("settings store tests: OK");
     return 0;

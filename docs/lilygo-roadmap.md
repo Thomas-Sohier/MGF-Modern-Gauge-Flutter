@@ -162,8 +162,8 @@ C’est la solution la plus complexe et la plus fragile face aux mises à jour E
 
 - [x] ajouter une interface applicative de modification des réglages via le
   runtime settings ;
-- [x] écran tactile de réglages (maintien ~1 s) : luminosité, page de
-  démarrage, ouverture BLE temporisée ;
+- [x] écran tactile de réglages (swipe haut ou maintien ~1 s) : luminosité,
+  page de démarrage, ouverture BLE temporisée ;
 - [x] migration du schéma NVS 1 -> 2 (ajout de la page de démarrage) ;
 - [x] appliquer à l’exécution les changements BLE de luminosité, unités et page ;
 - [x] éviter les accès concurrents entre la tâche NimBLE et la tâche LVGL : BLE

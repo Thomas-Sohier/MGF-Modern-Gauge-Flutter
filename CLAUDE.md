@@ -89,7 +89,8 @@ main/
   infrastructure/     # ESP-IDF : board_display, K-line UART, mems_ecu, fake_ecu,
                       # NVS, DS3231, BLE NimBLE, diagnostics
   ui/navigation/      # dashboard_navigator (11 pages, swipe cyclique, tap
-                      # tiers gauche/droit, maintien 1 s -> réglages)
+                      # tiers gauche/droit, swipe haut ou maintien 1 s
+                      # -> réglages)
   ui/screens/         # style_amber (★ RPM), boot, clock, music, navigation,
                       # faults, temps, injection, lambda, ignition, idle,
                       # admission, settings (surimpression)
@@ -163,20 +164,39 @@ Tous les écrans hors RPM partagent une même grammaire, fournie par le kit :
 
 ### Réglages (`main/ui/screens/settings_screen.c`)
 
-- Surimpression opaque ouverte par un **maintien ~1 s** (doigt immobile) sur
-  n'importe quelle page ; fermée par **OK**. Le maintien est **annulé si le
-  doigt bouge de plus de 18 px** (échelle 480) et le tap qui suit un maintien
-  est ignoré (`ui/navigation/dashboard_hold.h`). Luminosité (16 crans AW9364,
-  jamais 0), **page de démarrage** (fixe ou « dernière vue », défaut) et
+- Surimpression opaque ouverte par un **glissement vers le haut** ou un
+  **maintien ~1 s** (doigt immobile) sur n'importe quelle page ; fermée par
+  **OK**. La racine du navigateur **n'a pas** `LV_OBJ_FLAG_GESTURE_BUBBLE` :
+  sinon LVGL envoie `LV_EVENT_GESTURE` à l'écran actif et aucun swipe
+  n'arrive (couvert par `sim/test_navigator_touch.c`, lancé par
+  `./build.sh`). Le maintien est **annulé si le doigt bouge de plus de
+  18 px** (échelle 480) et le tap qui suit un maintien est ignoré
+  (`ui/navigation/dashboard_hold.h`). Luminosité (16 crans AW9364, jamais 0),
+  **page de démarrage** (fixe ou « dernière vue », défaut),
   fenêtre d'**appairage** Bluetooth de 5 min (`domain/ble_window`, refermée
-  dès qu'un téléphone est lié ; « INDISPONIBLE » si le BLE est absent).
+  dès qu'un téléphone est lié ; « INDISPONIBLE » si le BLE est absent) et
+  **couleurs** normales/inversées.
 - L'écran ne fait que remonter des actions : `app_main.c` les applique via
   `settings_runtime_*` et resynchronise l'affichage dans le timer réglages.
 - La persistance NVS est exécutée par `settings_persistence` hors LVGL après
   l'anti-rebond de 3 s ; le coordinateur attend l'acquittement réel du snapshot.
-- `startup_page` et `utc_offset_minutes` (schéma NVS **v2**, migration depuis
-  v1) ne sont **pas** dans le protocole BLE de réglages v1 : les valeurs
-  locales sont conservées lors d'une écriture BLE (`app_settings_merge_ble_v1`).
+- `startup_page`, `utc_offset_minutes` et `color_mode` (schéma NVS **v3**,
+  migrations v1/v2 -> couleurs normales) ne sont **pas** dans le protocole BLE
+  de réglages v1 : les valeurs locales sont conservées lors d'une écriture BLE
+  (`app_settings_merge_ble_v1`).
+- **Palette inversée** (`domain/amber_palette.h`) : fond `#FF8C00`, premier
+  plan `#170F08`, tons intermédiaires échangés (éteint `#A85C00`,
+  séparateur `#6B451B`). `ui_theme_amber_*` renvoie le rôle dans la palette
+  active ; `ui_theme_apply_inverted(écran, inv)` bascule à chaud **sans
+  recréer les écrans** : couleurs de palette des styles locaux remappées rôle
+  par rôle (exact, réversible), callbacks de dessin relus à l'invalidation.
+  Toute couleur d'UI doit donc venir de `ui_theme_amber_*` et vivre soit dans
+  un style local, soit être relue au dessin (jamais copiée dans une struct :
+  `dash_icons` garde sa couleur en `LV_STYLE_LINE_COLOR`). Pochette : le worker
+  rend toujours la palette normale, `music_cover_convert_palette` (niveau
+  L -> 15-L, sans perte) la convertit à la remise et lors d'une bascule.
+  Goldens `*_inverted_amber.png` ; `./build.sh` vérifie que bascule et
+  aller-retour sont identiques au pixel près aux goldens.
 
 ### Application compagnon (`infrastructure/companion_gatt.c`)
 

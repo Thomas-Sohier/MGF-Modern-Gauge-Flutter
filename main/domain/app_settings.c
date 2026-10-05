@@ -11,6 +11,7 @@ void app_settings_defaults(app_settings_t *settings) {
         .startup_page = APP_SETTINGS_STARTUP_LAST_PAGE,
         .theme = APP_SETTINGS_THEME_AMBER,
         .units = APP_SETTINGS_UNITS_METRIC,
+        .color_mode = APP_SETTINGS_COLORS_NORMAL,
     };
 }
 
@@ -24,7 +25,9 @@ bool app_settings_is_valid(const app_settings_t *settings) {
            settings->units >= 0 && settings->units < APP_SETTINGS_UNITS_COUNT &&
            settings->utc_offset_minutes >= APP_SETTINGS_UTC_OFFSET_MIN &&
            settings->utc_offset_minutes <= APP_SETTINGS_UTC_OFFSET_MAX &&
-           settings->utc_offset_minutes % 15 == 0;
+           settings->utc_offset_minutes % 15 == 0 &&
+           settings->color_mode >= 0 &&
+           settings->color_mode < APP_SETTINGS_COLORS_COUNT;
 }
 
 app_settings_page_t app_settings_boot_page(const app_settings_t *settings) {
@@ -39,6 +42,7 @@ void app_settings_merge_ble_v1(const app_settings_t *current,
     if (current == NULL || incoming == NULL) return;
     incoming->startup_page = current->startup_page;
     incoming->utc_offset_minutes = current->utc_offset_minutes;
+    incoming->color_mode = current->color_mode;
 }
 
 bool app_settings_equal(const app_settings_t *left,
@@ -48,5 +52,6 @@ bool app_settings_equal(const app_settings_t *left,
            left->selected_page == right->selected_page &&
            left->startup_page == right->startup_page &&
            left->theme == right->theme && left->units == right->units &&
-           left->utc_offset_minutes == right->utc_offset_minutes;
+           left->utc_offset_minutes == right->utc_offset_minutes &&
+           left->color_mode == right->color_mode;
 }

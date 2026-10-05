@@ -20,11 +20,16 @@ static const char *TAG = "settings";
 // Décalage UTC en quarts d'heure + 64 (0..120) : tient dans un u8.
 #define KEY_UTC_OFFSET  "utc_q15"
 #define UTC_OFFSET_BIAS 64
+// Schéma 3 : palette normale/inversée (app_settings_color_mode_t).
+#define KEY_COLORS "colors"
 
 // Schéma 1 : sans page de démarrage, l'écran rouvrait toujours la dernière
 // page vue. Il est migré en mémoire ; la clé manquante est écrite à la
 // prochaine sauvegarde (un chargement n'écrit jamais la flash).
 #define LEGACY_SCHEMA_NO_STARTUP 1U
+// Schéma 2 : sans palette, l'interface était toujours en couleurs normales.
+// Même migration en mémoire que le schéma 1.
+#define LEGACY_SCHEMA_NO_COLORS 2U
 
 static nvs_handle_t s_handle;
 static app_settings_t s_loaded;
@@ -118,7 +123,8 @@ esp_err_t settings_store_load(app_settings_t *out) {
         return err;
     }
     if (schema != APP_SETTINGS_SCHEMA_VERSION &&
-        schema != LEGACY_SCHEMA_NO_STARTUP) {
+        schema != LEGACY_SCHEMA_NO_STARTUP &&
+        schema != LEGACY_SCHEMA_NO_COLORS) {
         // Do not guess a migration for an unknown record: only documented
         // legacy representations are accepted above.
         err = finish_with_defaults(out, "unsupported schema");
@@ -132,13 +138,17 @@ esp_err_t settings_store_load(app_settings_t *out) {
     uint8_t units = 0;
     uint8_t startup = (uint8_t)APP_SETTINGS_STARTUP_LAST_PAGE;
     uint8_t utc_q15 = UTC_OFFSET_BIAS;
+    uint8_t colors = (uint8_t)APP_SETTINGS_COLORS_NORMAL;
     err = read_u8(s_handle, KEY_BRIGHTNESS, &brightness);
     if (err == ESP_OK) err = read_u8(s_handle, KEY_PAGE, &page);
     if (err == ESP_OK) err = read_u8(s_handle, KEY_THEME, &theme);
     if (err == ESP_OK) err = read_u8(s_handle, KEY_UNITS, &units);
-    if (err == ESP_OK && schema == APP_SETTINGS_SCHEMA_VERSION) {
+    if (err == ESP_OK && schema >= LEGACY_SCHEMA_NO_COLORS) {
         err = read_u8(s_handle, KEY_STARTUP, &startup);
         if (err == ESP_OK) err = read_u8(s_handle, KEY_UTC_OFFSET, &utc_q15);
+    }
+    if (err == ESP_OK && schema == APP_SETTINGS_SCHEMA_VERSION) {
+        err = read_u8(s_handle, KEY_COLORS, &colors);
     }
     if (err != ESP_OK) {
         if (is_invalid_record_error(err)) {
@@ -159,6 +169,7 @@ esp_err_t settings_store_load(app_settings_t *out) {
         .utc_offset_minutes = (int16_t)(((int)utc_q15 - UTC_OFFSET_BIAS) * 15),
         .theme = (app_settings_theme_t)theme,
         .units = (app_settings_units_t)units,
+        .color_mode = (app_settings_color_mode_t)colors,
     };
     if (!app_settings_is_valid(out)) {
         err = finish_with_defaults(out, "settings are invalid");
@@ -210,6 +221,9 @@ esp_err_t settings_store_save(const app_settings_t *settings) {
         err = nvs_set_u8(
             s_handle, KEY_UTC_OFFSET,
             (uint8_t)(settings->utc_offset_minutes / 15 + UTC_OFFSET_BIAS));
+    }
+    if (err == ESP_OK) {
+        err = nvs_set_u8(s_handle, KEY_COLORS, (uint8_t)settings->color_mode);
     }
     if (err == ESP_OK) {
         err = nvs_set_u32(s_handle, KEY_SCHEMA, APP_SETTINGS_SCHEMA_VERSION);

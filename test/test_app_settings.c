@@ -66,6 +66,35 @@ static void test_validation_boundaries(void) {
     assert(!app_settings_is_valid(&settings));
 }
 
+static void test_color_mode(void) {
+    app_settings_t settings;
+    app_settings_defaults(&settings);
+    assert(settings.color_mode == APP_SETTINGS_COLORS_NORMAL);
+    settings.color_mode = APP_SETTINGS_COLORS_INVERTED;
+    assert(app_settings_is_valid(&settings));
+    settings.color_mode = APP_SETTINGS_COLORS_COUNT;
+    assert(!app_settings_is_valid(&settings));
+    settings.color_mode = (app_settings_color_mode_t)-1;
+    assert(!app_settings_is_valid(&settings));
+
+    app_settings_t left;
+    app_settings_t right;
+    app_settings_defaults(&left);
+    right = left;
+    right.color_mode = APP_SETTINGS_COLORS_INVERTED;
+    assert(!app_settings_equal(&left, &right));
+
+    // Fusion BLE v1 : la palette locale survit à une écriture distante, dans
+    // les deux sens.
+    app_settings_t incoming;
+    app_settings_defaults(&incoming);
+    app_settings_merge_ble_v1(&right, &incoming);
+    assert(incoming.color_mode == APP_SETTINGS_COLORS_INVERTED);
+    incoming.color_mode = APP_SETTINGS_COLORS_INVERTED;
+    app_settings_merge_ble_v1(&left, &incoming);
+    assert(incoming.color_mode == APP_SETTINGS_COLORS_NORMAL);
+}
+
 static void test_equality(void) {
     app_settings_t left;
     app_settings_t right;
@@ -105,6 +134,7 @@ int main(void) {
     test_defaults();
     test_validation_boundaries();
     test_equality();
+    test_color_mode();
     test_boot_page();
     puts("app settings tests: OK");
     return 0;

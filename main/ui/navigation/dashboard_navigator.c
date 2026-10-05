@@ -39,8 +39,8 @@ struct dashboard_navigator_s {
     uint32_t last_gesture_ms;
     dashboard_page_changed_cb_t page_changed;
     void *page_changed_context;
-    dashboard_hold_cb_t hold;
-    void *hold_context;
+    dashboard_settings_cb_t open_settings;
+    void *open_settings_context;
     dashboard_hold_t press_hold;
 };
 
@@ -198,12 +198,12 @@ static void navigation_event_cb(lv_event_t *event) {
         // pression : revenir au point de départ ne le réarme pas.
         dashboard_hold_move_cancelled(&navigator->press_hold, point.x, point.y,
                                       min_dimension);
-        if (navigator->hold == NULL ||
+        if (navigator->open_settings == NULL ||
             !dashboard_hold_should_fire(
                 &navigator->press_hold, lv_tick_get(),
                 point_in_visible_disc(navigator, &point)))
             return;
-        navigator->hold(navigator->hold_context);
+        navigator->open_settings(navigator->open_settings_context);
         return;
     }
 
@@ -223,6 +223,14 @@ static void navigation_event_cb(lv_event_t *event) {
         } else if (direction == LV_DIR_RIGHT) {
             dashboard_navigator_previous(navigator);
             navigator->last_gesture_ms = now;
+        } else if (direction == LV_DIR_TOP) {
+            // Glissement vers le haut : réglages. Le CLICKED du relâcher vise
+            // encore la racine, pas la surimpression, et y est ignoré car le
+            // geste a annulé le maintien.
+            navigator->last_gesture_ms = now;
+            if (navigator->open_settings != NULL) {
+                navigator->open_settings(navigator->open_settings_context);
+            }
         }
         return;
     }
@@ -275,9 +283,12 @@ dashboard_navigator_t *dashboard_navigator_create(lv_obj_t *parent) {
     lv_obj_remove_style_all(navigator->root);
     lv_obj_set_size(navigator->root, LV_PCT(100), LV_PCT(100));
     lv_obj_center(navigator->root);
-    lv_obj_clear_flag(navigator->root, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(navigator->root,
-                    LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+    // LVGL remonte LV_EVENT_GESTURE tant que l'objet porte GESTURE_BUBBLE
+    // (actif par défaut) : la racine doit l'arrêter pour recevoir les gestes
+    // des pages, sinon ils partent vers l'écran actif et sont perdus.
+    lv_obj_clear_flag(navigator->root,
+                      LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_add_flag(navigator->root, LV_OBJ_FLAG_CLICKABLE);
 
     navigator->thermal_alert = thermal_alert_create(navigator->root);
     if (navigator->thermal_alert == NULL) {
@@ -340,12 +351,12 @@ void dashboard_navigator_set_page_changed_callback(
     navigator->page_changed_context = context;
 }
 
-void dashboard_navigator_set_hold_callback(dashboard_navigator_t *navigator,
-                                           dashboard_hold_cb_t callback,
-                                           void *context) {
+void dashboard_navigator_set_settings_callback(dashboard_navigator_t *navigator,
+                                               dashboard_settings_cb_t callback,
+                                               void *context) {
     if (navigator == NULL) return;
-    navigator->hold = callback;
-    navigator->hold_context = context;
+    navigator->open_settings = callback;
+    navigator->open_settings_context = context;
 }
 
 void dashboard_navigator_set_units(dashboard_navigator_t *navigator,

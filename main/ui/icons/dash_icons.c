@@ -2,9 +2,11 @@
 
 #include "ui/themes/ui_theme.h"
 
+// La couleur n'est pas copiée ici : elle vit dans le style local
+// LV_STYLE_LINE_COLOR de l'objet, que ui_theme_restyle_tree sait remapper lors
+// d'une bascule de palette.
 typedef struct {
     dash_icon_type_t type;
-    lv_color_t color;
 } dash_icon_data_t;
 
 static lv_coord_t sx(const lv_area_t *a, int n) {
@@ -249,6 +251,7 @@ static void dash_icon_draw_event(lv_event_t *e) {
     if (!data) return;
 
     lv_layer_t *layer = lv_event_get_layer(e);
+    const lv_color_t color = lv_obj_get_style_line_color(obj, LV_PART_MAIN);
 
     lv_area_t a;
     lv_obj_get_coords(obj, &a);
@@ -262,22 +265,22 @@ static void dash_icon_draw_event(lv_event_t *e) {
 
     switch (data->type) {
     case DASH_ICON_COOLANT:
-        draw_coolant(layer, &a, data->color);
+        draw_coolant(layer, &a, color);
         break;
     case DASH_ICON_BATTERY:
-        draw_battery(layer, &a, data->color);
+        draw_battery(layer, &a, color);
         break;
     case DASH_ICON_OIL:
-        draw_oil(layer, &a, data->color);
+        draw_oil(layer, &a, color);
         break;
     case DASH_ICON_ENGINE:
-        draw_engine(layer, &a, data->color);
+        draw_engine(layer, &a, color);
         break;
     case DASH_ICON_OBD_LINK:
-        draw_obd_link(layer, &a, data->color);
+        draw_obd_link(layer, &a, color);
         break;
     case DASH_ICON_OBD_DISCONNECTED:
-        draw_obd_disconnected(layer, &a, data->color);
+        draw_obd_disconnected(layer, &a, color);
         break;
     default:
         break;
@@ -310,7 +313,7 @@ lv_obj_t *dash_icon_create(lv_obj_t *parent, dash_icon_type_t type,
     }
 
     data->type = type;
-    data->color = color;
+    lv_obj_set_style_line_color(obj, color, LV_PART_MAIN);
 
     lv_obj_set_user_data(obj, data);
 
@@ -325,10 +328,13 @@ void dash_icon_set_color(lv_obj_t *obj, lv_color_t color) {
     if (!obj) return;
 
     dash_icon_data_t *data = lv_obj_get_user_data(obj);
-    if (!data || lv_color_eq(data->color, color)) return;
+    if (!data ||
+        lv_color_eq(lv_obj_get_style_line_color(obj, LV_PART_MAIN), color)) {
+        return;
+    }
 
-    data->color = color;
-    lv_obj_invalidate(obj);
+    // Couleur : propriété de style réelle -> lv_obj invalide l'objet.
+    lv_obj_set_style_line_color(obj, color, LV_PART_MAIN);
 }
 
 void dash_icon_set_type(lv_obj_t *obj, dash_icon_type_t type) {

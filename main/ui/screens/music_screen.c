@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "domain/music_cover.h"
+#include "ui/screens/music_cover_fit.h"
 #include "src/misc/cache/lv_image_cache.h"
 #include "ui/themes/ui_theme.h"
 #include "ui/ui_layout.h"
@@ -24,28 +25,27 @@
 // de repli.
 //
 // Composition : anneau de progression continu proche du bord (piste sombre,
-// départ à 12 h, sens horaire), grande pochette rectangulaire (cadrage « cover »
-// rogné par le root rond et bordé par l'anneau) sur les deux tiers hauts, puis
+// départ à 12 h, sens horaire), pochette en cadrage « cover » (échelle
+// uniforme, rognage centré) sur toute la largeur intérieure de l'anneau et
+// jusqu'au titre, découpée par l'arc intérieur de l'anneau, puis
 // titre, artiste et durée totale. Aucun header, bouton ni pictogramme de
 // transport : l'état figé (pause/arrêt) se lit uniquement au fait que l'anneau
 // cesse d'avancer.
-#define RING_R 155.0f
-#define RING_W 7.0f
-// La pochette remplit les deux tiers hauts à l'intérieur de l'anneau. Son
-// parent est un disque tangent au bord intérieur : il découpe les côtés de
-// l'image selon le même arc que la progression, au lieu d'une coupe carrée.
-#define COVER_CLIP_X   14.0f
-#define COVER_CLIP_Y   14.0f
-#define COVER_CLIP_D   292.0f
-#define COVER_IMAGE_Y1 219.0f
-
-// Géométrie des textes sous la pochette (repère 320).
-#define TRACK_Y      234.0f
-#define ARTIST_Y     258.0f
-#define RULE_Y       272.0f
-#define TIME_Y       288.0f
-#define TRACK_WIDTH  248.0f
-#define ARTIST_WIDTH 210.0f
+// Géométrie (repère 320) et cadrage « cover » : music_cover_fit.h. La
+// pochette remplit toute la largeur intérieure de l'anneau jusqu'au titre ;
+// son parent est un disque tangent au bord intérieur de l'anneau, qui découpe
+// les côtés de l'image selon le même arc que la progression.
+#define RING_R         MUSIC_RING_R
+#define RING_W         MUSIC_RING_W
+#define COVER_CLIP_XY  MUSIC_COVER_CLIP_XY
+#define COVER_CLIP_D   MUSIC_COVER_CLIP_D
+#define COVER_IMAGE_Y1 MUSIC_COVER_IMAGE_Y1
+#define TRACK_Y        MUSIC_TRACK_Y
+#define ARTIST_Y       MUSIC_ARTIST_Y
+#define RULE_Y         MUSIC_RULE_Y
+#define TIME_Y         MUSIC_TIME_Y
+#define TRACK_WIDTH    MUSIC_TRACK_WIDTH
+#define ARTIST_WIDTH   MUSIC_ARTIST_WIDTH
 
 struct music_screen_s {
     amber_page_t page;
@@ -75,8 +75,8 @@ static void draw_cover_fallback(lv_layer_t *layer, const ui_layout_t *layout) {
     const lv_color_t amber = ui_theme_amber_bright();
     const lv_color_t bg = ui_theme_amber_bg();
     const float radius = COVER_CLIP_D * 0.5f;
-    const float cy = COVER_CLIP_Y + radius;
-    for (float y = COVER_CLIP_Y; y <= COVER_IMAGE_Y1; y += 0.75f) {
+    const float cy = COVER_CLIP_XY + radius;
+    for (float y = COVER_CLIP_XY; y <= COVER_IMAGE_Y1; y += 0.75f) {
         const float dy = y - cy;
         const float half = sqrtf(LV_MAX(0.0f, radius * radius - dy * dy));
         amber_draw_line(layer, layout, AMBER_KIT_CX - half, y,
@@ -221,7 +221,7 @@ void music_screen_set_cover(music_screen_t *scr, uint16_t *pixels, int width,
     scr->cover_height = 0;
 
     if (pixels != NULL && width > 0 && height > 0 && scr->cover != NULL &&
-        scr->cover_img != NULL) {
+        scr->cover_viewport != NULL && scr->cover_img != NULL) {
         scr->cover_pixels = pixels;
         scr->cover_width = width;
         scr->cover_height = height;
@@ -237,14 +237,23 @@ void music_screen_set_cover(music_screen_t *scr, uint16_t *pixels, int width,
             .data_size = (uint32_t)width * (uint32_t)height * 2U,
             .data = (const uint8_t *)pixels,
         };
-        // Le bitmap possède déjà le ratio de la zone « cover ». On le met à
-        // l'échelle uniformément sur la largeur du disque, puis son parent rond
-        // découpe les côtés suivant l'arc intérieur de la progression.
-        const int32_t box_w = lv_obj_get_width(scr->cover);
-        const uint32_t scale = (uint32_t)((int64_t)box_w * 256 / width);
-        lv_image_set_scale(scr->cover_img, scale);
+        // Cadrage « cover » : l'objet image a la taille exacte de la fenêtre
+        // et centre le bitmap ; une échelle uniforme (pivot au centre) le
+        // grossit jusqu'à couvrir largeur ET hauteur. Le dépassement est
+        // rogné symétriquement par la fenêtre, sans déformation, quelles que
+        // soient les proportions de la source.
+        const int32_t box_w = lv_obj_get_width(scr->cover_viewport);
+        const int32_t box_h = lv_obj_get_height(scr->cover_viewport);
+        music_cover_fit_t fit;
+        if (!music_cover_fit(width, height, box_w, box_h, &fit)) {
+            fit.scale = LV_SCALE_NONE;
+        }
         lv_image_set_src(scr->cover_img, &scr->cover_dsc);
-        lv_obj_align(scr->cover_img, LV_ALIGN_TOP_MID, 0, 0);
+        lv_obj_set_size(scr->cover_img, box_w, box_h);
+        lv_image_set_inner_align(scr->cover_img, LV_IMAGE_ALIGN_CENTER);
+        lv_image_set_pivot(scr->cover_img, width / 2, height / 2);
+        lv_image_set_scale(scr->cover_img, fit.scale);
+        lv_obj_center(scr->cover_img);
         lv_obj_remove_flag(scr->cover_img, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(scr->cover, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -257,6 +266,19 @@ void music_screen_set_cover(music_screen_t *scr, uint16_t *pixels, int width,
         }
     }
     amber_page_invalidate(&scr->page);
+}
+
+void music_screen_palette_changed(music_screen_t *scr, bool from_inverted,
+                                  bool to_inverted) {
+    if (scr == NULL || from_inverted == to_inverted) return;
+    if (scr->cover_pixels != NULL) {
+        music_cover_convert_palette(scr->cover_pixels,
+                                    (size_t)scr->cover_width *
+                                        (size_t)scr->cover_height,
+                                    from_inverted, to_inverted);
+        lv_image_cache_drop(&scr->cover_dsc);
+        lv_obj_invalidate(scr->cover_img);
+    }
 }
 
 music_screen_t *music_screen_create(lv_obj_t *parent) {
@@ -290,22 +312,22 @@ music_screen_t *music_screen_create(lv_obj_t *parent) {
     lv_obj_remove_style_all(scr->cover);
     lv_obj_set_size(scr->cover, cover_d, cover_d);
     lv_obj_set_pos(scr->cover,
-                   (int32_t)lroundf(ui_layout_x(&layout, COVER_CLIP_X)),
-                   (int32_t)lroundf(ui_layout_y(&layout, COVER_CLIP_Y)));
+                   (int32_t)lroundf(ui_layout_x(&layout, COVER_CLIP_XY)),
+                   (int32_t)lroundf(ui_layout_y(&layout, COVER_CLIP_XY)));
     lv_obj_set_style_radius(scr->cover, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_clip_corner(scr->cover, true, 0);
     // Fond transparent : sans image, le motif vectoriel du canvas reste visible.
     lv_obj_set_style_bg_opa(scr->cover, LV_OPA_TRANSP, 0);
     lv_obj_clear_flag(scr->cover,
                       LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    // Un second clipping, rectangulaire, arrête l'image 12 px avant le titre.
+    // Un second clipping, rectangulaire, arrête l'image juste avant le titre.
     // Le parent circulaire continue simultanément à découper ses côtés.
     scr->cover_viewport = lv_obj_create(scr->cover);
     if (scr->cover_viewport == NULL) goto fail;
     lv_obj_remove_style_all(scr->cover_viewport);
     lv_obj_set_size(
         scr->cover_viewport, cover_d,
-        (int32_t)lroundf((COVER_IMAGE_Y1 - COVER_CLIP_Y) * layout.scale));
+        (int32_t)lroundf((COVER_IMAGE_Y1 - COVER_CLIP_XY) * layout.scale));
     lv_obj_align(scr->cover_viewport, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_set_style_radius(scr->cover_viewport, 0, 0);
     lv_obj_set_style_clip_corner(scr->cover_viewport, true, 0);
