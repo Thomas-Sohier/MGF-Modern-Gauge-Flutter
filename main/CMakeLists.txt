@@ -34,7 +34,9 @@ set(MGF_LILYGO_SDMMC_ENABLED 0 CACHE INTERNAL "SDMMC is unavailable in the K-lin
 idf_component_register(
     SRCS
         "app_main.c"
+        "app/companion_bridge.c"
         "app/dashboard_controller.c"
+        "app/settings_bridge.c"
         "app/settings_coordinator.c"
         "app/settings_runtime.c"
         "domain/app_settings.c"
@@ -46,6 +48,7 @@ idf_component_register(
         "domain/music_cover.c"
         "domain/flat_json.c"
         "domain/mems_protocol.c"
+        "domain/mems_mapping.c"
         "domain/mems_reader.c"
         "domain/mems19_reader.c"
         "domain/mems_session.c"

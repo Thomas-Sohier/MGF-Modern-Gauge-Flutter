@@ -140,13 +140,11 @@ bool companion_art_reassembler_push(companion_art_reassembler_t *r,
         return false;
     }
 
-    const size_t offset =
-        index == 0U ? 0U : (size_t)index * chunk_size;
+    const size_t offset = index == 0U ? 0U : (size_t)index * chunk_size;
     if (offset >= r->total_bytes) return false; // débordement
 
     const size_t remaining = r->total_bytes - offset;
-    const size_t expected =
-        remaining < chunk_size ? remaining : chunk_size;
+    const size_t expected = remaining < chunk_size ? remaining : chunk_size;
     if (payload != expected) return false;
     if (offset + payload > r->capacity) return false;
 

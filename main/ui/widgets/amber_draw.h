@@ -30,3 +30,11 @@ void amber_draw_dot(lv_layer_t *layer, const ui_layout_t *layout, float x,
 void amber_draw_tick(lv_layer_t *layer, const ui_layout_t *layout, float cx,
                      float cy, float angle_deg, float inner, float outer,
                      float width, lv_color_t color, bool rounded);
+
+// Invalide uniquement la boîte englobante du secteur annulaire
+// [start, start + sweep] (degrés LVGL, sens horaire depuis 3 h) entre les
+// rayons r_in et r_out, dans le repère 320 de `obj`, élargie de `margin_px`
+// pixels physiques (antialiasing, arrondis du centre/rayon).
+void amber_invalidate_sector(lv_obj_t *obj, float cx, float cy, float r_in,
+                             float r_out, float start, float sweep,
+                             float margin_px);

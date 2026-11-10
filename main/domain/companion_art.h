@@ -21,7 +21,7 @@
 // 2048 chunks couvrent 256 Kio dès ~128 octets utiles par chunk (MTU ≥ 133),
 // très en deçà du MTU négocié habituel (~517).
 #define COMPANION_ART_MAX_CHUNKS 2048U
-#define COMPANION_ART_BITS ((COMPANION_ART_MAX_CHUNKS + 7U) / 8U)
+#define COMPANION_ART_BITS       ((COMPANION_ART_MAX_CHUNKS + 7U) / 8U)
 
 typedef struct {
     char art_id[COMPANION_ART_ID_MAX];

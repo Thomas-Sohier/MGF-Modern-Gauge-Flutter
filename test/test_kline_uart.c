@@ -22,7 +22,12 @@ static struct {
     size_t gpio_level_count;
     esp_err_t wait_result;
     int64_t now_us;
+    int gpio_fail_at;     // 1-based index of the gpio_set_level call to fail
+    int set_pin_calls;    // uart_set_pin calls (attach/reattach)
+    int64_t busy_wait_us; // cumulated esp_rom_delay_us time
 } uart_mock;
+
+#define MOCK_TICK_US (1000000 / configTICK_RATE_HZ)
 
 static void enqueue(const uint8_t *data, size_t len) {
     assert(len <= sizeof(uart_mock.rx) - uart_mock.len);
@@ -58,6 +63,7 @@ esp_err_t uart_set_pin(uart_port_t uart_num, int tx, int rx, int rts, int cts) {
     (void)rx;
     (void)rts;
     (void)cts;
+    uart_mock.set_pin_calls++;
     if (uart_mock.sync_on_reattach && tx == 40) {
         const uint8_t sync[] = {0x00, 0x55, 0x76, 0x83};
         enqueue(sync, sizeof(sync));
@@ -83,7 +89,7 @@ int uart_read_bytes(uart_port_t uart_num, void *buffer, uint32_t length,
     (void)uart_num;
     size_t available = uart_mock.len - uart_mock.pos;
     if (available == 0) {
-        uart_mock.now_us += (int64_t)ticks * 1000;
+        uart_mock.now_us += (int64_t)ticks * MOCK_TICK_US;
         return 0;
     }
     size_t count = available < length ? available : length;
@@ -124,6 +130,9 @@ esp_err_t gpio_set_level(int gpio_num, unsigned int level) {
     uart_mock.gpio_levels[uart_mock.gpio_level_count] = (uint8_t)level;
     uart_mock.gpio_times[uart_mock.gpio_level_count] = uart_mock.now_us;
     uart_mock.gpio_level_count++;
+    if (uart_mock.gpio_fail_at > 0 &&
+        (int)uart_mock.gpio_level_count == uart_mock.gpio_fail_at)
+        return ESP_ERR_MOCK_IO;
     return ESP_OK;
 }
 
@@ -131,8 +140,15 @@ int64_t esp_timer_get_time(void) {
     return uart_mock.now_us;
 }
 
+// vTaskDelay(n) réel : réveil au n-ième front de tick, donc une durée dans
+// ](n-1)·tick, n·tick]. Le mock prend le pire cas (n ticks pleins).
 void vTaskDelay(TickType_t ticks) {
-    uart_mock.now_us += (int64_t)ticks * 1000;
+    uart_mock.now_us += (int64_t)ticks * MOCK_TICK_US;
+}
+
+void esp_rom_delay_us(uint32_t us) {
+    uart_mock.now_us += us;
+    uart_mock.busy_wait_us += us;
 }
 
 static kline_uart_config_t valid_config(bool local_echo) {
@@ -234,11 +250,50 @@ static void test_local_echo_reads_partial_chunks(void) {
     kline_uart_destroy(k);
 }
 
+static void test_slow_init_error_reattaches_uart(void) {
+    memset(&uart_mock, 0, sizeof(uart_mock));
+    uart_mock.wait_result = ESP_OK;
+    kline_uart_config_t config = valid_config(false);
+    kline_uart_t *k = kline_uart_create(&config);
+    assert(k != NULL);
+    const int attach_calls = uart_mock.set_pin_calls;
+    uart_mock.gpio_fail_at = 5; // échec au milieu des bits de données
+    kline_transport_t transport = kline_uart_transport(k);
+    assert(transport.wake_up(transport.ctx, 0x16) < 0);
+    assert(uart_mock.set_pin_calls == attach_calls + 1);
+    // La ligne est remise au repos (haut) avant de rendre le TX à l'UART.
+    assert(uart_mock.gpio_levels[uart_mock.gpio_level_count - 1] == 1);
+    kline_uart_destroy(k);
+}
+
+static void test_slow_init_timing_with_coarse_tick(void) {
+    // Horloge décalée par rapport au tick (et, compilé avec
+    // -DconfigTICK_RATE_HZ=100, tick grossier de 10 ms) : chaque bit doit
+    // tout de même tomber exactement sur l'échéance absolue.
+    memset(&uart_mock, 0, sizeof(uart_mock));
+    uart_mock.wait_result = ESP_OK;
+    uart_mock.now_us = 337;
+    kline_uart_config_t config = valid_config(false);
+    kline_uart_t *k = kline_uart_create(&config);
+    assert(k != NULL);
+    uart_mock.sync_on_reattach = true;
+    kline_transport_t transport = kline_uart_transport(k);
+    assert(transport.wake_up(transport.ctx, 0x16) == 0);
+    for (size_t i = 2; i <= 10; i++)
+        assert(uart_mock.gpio_times[i] - uart_mock.gpio_times[i - 1] == 200000);
+    assert(uart_mock.busy_wait_us > 0);
+    // Moins de 2 ticks d'attente active par bit.
+    assert(uart_mock.busy_wait_us <= 10 * 2 * MOCK_TICK_US);
+    kline_uart_destroy(k);
+}
+
 int main(void) {
     test_runtime_configuration_validation();
     test_transport_and_local_echo();
     test_slow_init_validates_sync();
     test_local_echo_reads_partial_chunks();
+    test_slow_init_error_reattaches_uart();
+    test_slow_init_timing_with_coarse_tick();
     puts("kline uart tests: OK");
     return 0;
 }

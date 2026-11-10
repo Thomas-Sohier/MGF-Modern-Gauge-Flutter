@@ -6,11 +6,12 @@
 
 #include "driver/gpio.h"
 #include "esp_log.h"
-
-#include "infrastructure/kline_board_config.h"
+#include "esp_rom_sys.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
+#include "infrastructure/kline_board_config.h"
 
 static const char *TAG = "kline_uart";
 
@@ -19,53 +20,10 @@ static const char *TAG = "kline_uart";
 #define KLINE_SLOW_INIT_BIT_MS          200 // 5 bauds
 #define KLINE_SLOW_INIT_SYNC_TIMEOUT_MS 1000
 
-static bool kline_gpio_is_reserved(int gpio) {
-    switch (gpio) {
-    case 0:
-    case 1:
-    case 2:
-    case 3:
-    case 4:
-    case 5:
-    case 6:
-    case 7:
-    case 8:
-    case 9:
-    case 10:
-    case 11:
-    case 12:
-    case 13:
-    case 14:
-    case 15:
-    case 16:
-    case 17:
-    case 18:
-    case 19:
-    case 20:
-    case 21:
-    case 39:
-    case 41:
-    case 42:
-    case 43:
-    case 44:
-    case 45:
-    case 46:
-    case 47:
-    case 48:
-        return true;
-    default:
-        return false;
-    }
-}
-
 static bool kline_uart_config_valid(const kline_uart_config_t *config) {
     if (config == NULL || config->uart_num < UART_NUM_0 ||
-        config->uart_num > UART_NUM_2 || config->tx_gpio < 0 ||
-        config->tx_gpio > 48 || config->rx_gpio < 0 || config->rx_gpio > 48 ||
-        config->tx_gpio == config->rx_gpio ||
-        (config->tx_gpio >= 34 && config->tx_gpio <= 39) ||
-        kline_gpio_is_reserved(config->tx_gpio) ||
-        kline_gpio_is_reserved(config->rx_gpio)) {
+        config->uart_num > UART_NUM_2 ||
+        !MGF_KLINE_PINS_VALID(config->tx_gpio, config->rx_gpio)) {
         return false;
     }
     // MEMS uses 9600 8N1. Zero means the documented default; accepting a
@@ -127,14 +85,19 @@ static void kline_flush(void *ctx) {
 }
 
 // Attend jusqu'à l'instant absolu `start_us + plus_ms` (limite la dérive du
-// bit-bang, comme le sleepUntil du projet Go).
+// bit-bang, comme le sleepUntil du projet Go). Robuste quel que soit
+// CONFIG_FREERTOS_HZ : on dort par ticks en s'arrêtant au moins un tick avant
+// l'échéance (vTaskDelay(n) peut durer jusqu'à n ticks pleins), puis on finit
+// en attente active à la microseconde.
 static void sleep_until(int64_t start_us, int plus_ms) {
-    int64_t remaining_us =
-        start_us + (int64_t)plus_ms * 1000 - esp_timer_get_time();
-    if (remaining_us > 0) {
-        TickType_t ticks = pdMS_TO_TICKS((remaining_us + 999) / 1000);
-        if (ticks > 0) vTaskDelay(ticks);
+    const int64_t deadline_us = start_us + (int64_t)plus_ms * 1000;
+    const int64_t tick_us = 1000000 / (int64_t)configTICK_RATE_HZ;
+    int64_t remaining_us = deadline_us - esp_timer_get_time();
+    if (remaining_us > 2 * tick_us) {
+        vTaskDelay((TickType_t)((remaining_us - tick_us) / tick_us));
+        remaining_us = deadline_us - esp_timer_get_time();
     }
+    if (remaining_us > 0) esp_rom_delay_us((uint32_t)remaining_us);
 }
 
 static bool kline_wait_for_slow_init_sync(kline_uart_t *k,
@@ -163,6 +126,24 @@ static bool kline_wait_for_slow_init_sync(kline_uart_t *k,
     return true;
 }
 
+// Rend le GPIO TX au pilote UART (après le bit-bang, ou sur erreur).
+static esp_err_t kline_reattach_uart(kline_uart_t *k) {
+    return uart_set_pin(k->uart_num, k->tx_gpio, k->rx_gpio, UART_PIN_NO_CHANGE,
+                        UART_PIN_NO_CHANGE);
+}
+
+// Échec en cours de bit-bang : remettre la ligne au repos et le TX à l'UART
+// pour qu'une nouvelle tentative reparte d'un état propre.
+static int kline_wake_up_abort(kline_uart_t *k) {
+    (void)gpio_set_level(k->tx_gpio, 1);
+    esp_err_t err = kline_reattach_uart(k);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "reattache UART après échec slow init: %s",
+                 esp_err_to_name(err));
+    }
+    return -1;
+}
+
 // Réveil « slow init » 5 bauds requis par MEMS 1.9 : émet l'adresse ECU bit à
 // bit (LSB d'abord) en pilotant le GPIO TX à la main, puis rend le brochage au
 // pilote UART. Portage de `MEMS19Reader.wakeUp` (ecureader_mems19.go).
@@ -179,28 +160,29 @@ static int kline_wake_up(void *ctx, uint8_t ecu_address) {
     if (gpio_reset_pin(k->tx_gpio) != ESP_OK ||
         gpio_set_direction(k->tx_gpio, GPIO_MODE_OUTPUT) != ESP_OK ||
         gpio_set_level(k->tx_gpio, 1) != ESP_OK) {
-        return -1;
+        return kline_wake_up_abort(k);
     }
     vTaskDelay(pdMS_TO_TICKS(2000)); // ligne stable avant le start bit
 
     const int b = KLINE_SLOW_INIT_BIT_MS;
     int64_t start = esp_timer_get_time();
 
-    if (gpio_set_level(k->tx_gpio, 0) != ESP_OK) return -1; // start bit
+    if (gpio_set_level(k->tx_gpio, 0) != ESP_OK) // start bit
+        return kline_wake_up_abort(k);
     sleep_until(start, b);
     for (int i = 0; i < 8; i++) { // 8 bits de données, LSB d'abord
         if (gpio_set_level(k->tx_gpio, (ecu_address >> i) & 1) != ESP_OK)
-            return -1;
+            return kline_wake_up_abort(k);
         sleep_until(start, b + (i + 1) * b);
     }
-    if (gpio_set_level(k->tx_gpio, 1) != ESP_OK) return -1; // stop bit
+    if (gpio_set_level(k->tx_gpio, 1) != ESP_OK) // stop bit
+        return kline_wake_up_abort(k);
     sleep_until(start, b + 9 * b);
 
     // Ré-attacher le TX à l'UART puis vérifier la synchronisation ECU. Les
     // trois octets sont attendus par MEMS 1.9 ; un ECU absent ou un mauvais
     // timing doit faire échouer la connexion, pas laisser un faux handshake.
-    esp_err_t err = uart_set_pin(k->uart_num, k->tx_gpio, k->rx_gpio,
-                                 UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    esp_err_t err = kline_reattach_uart(k);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "reattache UART après slow init: %s",
                  esp_err_to_name(err));

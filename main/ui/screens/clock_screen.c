@@ -4,6 +4,7 @@
 #include "ui/themes/ui_theme.h"
 #include "ui/ui_layout.h"
 #include "ui/widgets/amber_ui.h"
+#include "ui/widgets/amber_kit.h"
 #include "domain/rtc_time.h"
 
 #include <math.h>
@@ -308,7 +309,7 @@ clock_screen_t *clock_screen_create(lv_obj_t *parent) {
     screen->hands = amber_ui_canvas_create(screen->root, screen, hands_draw_cb);
     if (screen->hands == NULL) goto fail;
 
-    const lv_font_t *font = amber_ui_font_hero();
+    const lv_font_t *font = amber_kit_font_hero();
     for (int i = 0; i < CARDINAL_COUNT; i++) {
         screen->labels[i] =
             amber_ui_label_create(screen->root, font, ui_theme_amber_bright(),
@@ -323,7 +324,7 @@ clock_screen_t *clock_screen_create(lv_obj_t *parent) {
     }
 
     screen->message = amber_ui_label_create(
-        screen->root, amber_ui_font_caption(), ui_theme_amber_bright(),
+        screen->root, amber_kit_font_caption(), ui_theme_amber_bright(),
         "HEURE\nNON SYNCHRONISEE", MESSAGE_WIDTH);
     if (screen->message == NULL) goto fail;
     amber_ui_place_centered(screen->message, screen->root, CLOCK_CX, MESSAGE_Y,

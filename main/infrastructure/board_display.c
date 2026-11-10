@@ -8,6 +8,7 @@
 #include "esp_check.h"
 #include "esp_log.h"
 #include "esp_rom_sys.h"
+#include "esp_timer.h"
 
 #include "esp_io_expander_tca95xx_16bit.h"
 #include "esp_lcd_panel_io.h"
@@ -119,10 +120,16 @@ static lv_indev_t *s_touch_indev;
 #define TOUCH_REG_DIS_AUTO_SLEEP 0xFE
 #define TOUCH_WAKE_ATTEMPTS      2
 
+// Niveau bas minimal pour éteindre (et réinitialiser) l'AW9364.
+#define BACKLIGHT_OFF_HOLD_US 3000
+
 static lv_display_t *s_display;
 static bool s_lvgl_ready;
 static bool s_backlight_ready;
 static uint8_t s_backlight_level;
+// Instant (esp_timer, µs) où la ligne AW9364 est passée à 0 : la remise sous
+// tension n'est permise qu'après BACKLIGHT_OFF_HOLD_US de niveau bas.
+static int64_t s_backlight_off_since_us;
 static portMUX_TYPE s_backlight_lock = portMUX_INITIALIZER_UNLOCKED;
 static shared_i2c_bus_t s_shared_i2c_bus;
 static shared_i2c_master_context_t s_shared_i2c_context;
@@ -466,6 +473,7 @@ static void board_display_cleanup(void) {
         s_backlight_ready = false;
     }
     s_backlight_level = 0;
+    s_backlight_off_since_us = esp_timer_get_time();
 }
 
 lv_display_t *board_display_start(void) {
@@ -489,6 +497,7 @@ lv_display_t *board_display_start(void) {
     s_backlight_ready = true;
     (void)gpio_set_level(PIN_LCD_BL, 0);
     s_backlight_level = 0;
+    s_backlight_off_since_us = esp_timer_get_time();
 
     err = i2c_bus_init();
     if (err != ESP_OK) {
@@ -542,33 +551,49 @@ void board_display_backlight_set_brightness(uint8_t level) {
         return;
     }
 
-    portENTER_CRITICAL(&s_backlight_lock);
-    if (level == s_backlight_level) {
-        portEXIT_CRITICAL(&s_backlight_lock);
-        return;
-    }
-    if (level == 0) {
-        gpio_set_level(PIN_LCD_BL, 0);
-        esp_rom_delay_us(3000);
-        s_backlight_level = 0;
-        portEXIT_CRITICAL(&s_backlight_lock);
-        return;
-    }
-    if (s_backlight_level == 0) {
-        gpio_set_level(PIN_LCD_BL, 1);
-        s_backlight_level = 16;
-        esp_rom_delay_us(30);
-    }
+    // Les impulsions AW9364 restent atomiques (section critique de quelques
+    // µs), mais le maintien bas de 3 ms qui éteint/réinitialise le pilote se
+    // fait hors section critique : on mémorise l'instant d'extinction et une
+    // remise sous tension attend, interruptions actives, que ce délai soit
+    // écoulé, puis revérifie l'état sous verrou.
+    for (;;) {
+        portENTER_CRITICAL(&s_backlight_lock);
+        if (level == s_backlight_level) {
+            portEXIT_CRITICAL(&s_backlight_lock);
+            return;
+        }
+        if (level == 0) {
+            gpio_set_level(PIN_LCD_BL, 0);
+            s_backlight_level = 0;
+            s_backlight_off_since_us = esp_timer_get_time();
+            portEXIT_CRITICAL(&s_backlight_lock);
+            return;
+        }
+        if (s_backlight_level == 0) {
+            const int64_t wait_us = s_backlight_off_since_us +
+                                    BACKLIGHT_OFF_HOLD_US -
+                                    esp_timer_get_time();
+            if (wait_us > 0) {
+                portEXIT_CRITICAL(&s_backlight_lock);
+                esp_rom_delay_us((uint32_t)wait_us);
+                continue;
+            }
+            gpio_set_level(PIN_LCD_BL, 1);
+            s_backlight_level = 16;
+            esp_rom_delay_us(30);
+        }
 
-    const uint8_t from = (uint8_t)(16 - s_backlight_level);
-    const uint8_t to = (uint8_t)(16 - level);
-    const uint8_t pulses = (uint8_t)((16 + to - from) % 16);
-    for (uint8_t i = 0; i < pulses; ++i) {
-        gpio_set_level(PIN_LCD_BL, 0);
-        gpio_set_level(PIN_LCD_BL, 1);
+        const uint8_t from = (uint8_t)(16 - s_backlight_level);
+        const uint8_t to = (uint8_t)(16 - level);
+        const uint8_t pulses = (uint8_t)((16 + to - from) % 16);
+        for (uint8_t i = 0; i < pulses; ++i) {
+            gpio_set_level(PIN_LCD_BL, 0);
+            gpio_set_level(PIN_LCD_BL, 1);
+        }
+        s_backlight_level = level;
+        portEXIT_CRITICAL(&s_backlight_lock);
+        return;
     }
-    s_backlight_level = level;
-    portEXIT_CRITICAL(&s_backlight_lock);
 }
 
 void board_display_backlight_on(void) {

@@ -15,6 +15,26 @@ CONFIG_SPIRAM_SPEED_80M=y
 # ── CPU 240 MHz ───────────────────────────────────────────────────────────────
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 
+# ── Performances de rendu ────────────────────────────────────────────────────
+# -O2 au lieu de -Og (défaut IDF) : le rendu logiciel LVGL (arcs, TTF) en
+# profite directement. N'ajoute rien en IRAM.
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+# Cache de données 64 Ko (au lieu de 32) et lignes de 64 octets : les buffers
+# LVGL et framebuffers sont en PSRAM, dont l'accès passe par ce cache. Coûte
+# 32 Ko de RAM interne rendus au heap en configuration 32 Ko.
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+# Tick 1 ms : vTaskDelay/pdMS_TO_TICKS de la tâche LVGL et du bit-bang K-line
+# ne sont plus arrondis à 10 ms (aucun délai du projet n'est exprimé en ticks).
+CONFIG_FREERTOS_HZ=1000
+
+# ── Watchdog / erreurs fatales ───────────────────────────────────────────────
+# CONFIG_ESP_TASK_WDT_PANIC reste désactivé : composition des 11 pages au boot
+# (tâche main, verrou LVGL tenu) et rendu LVGL non épinglé non mesurés sur la
+# carte ; à réévaluer après les premiers essais matériels. Un assert LVGL, lui,
+# appelle abort() -> panic handler -> redémarrage (cf. CMakeLists.txt racine).
+CONFIG_ESP_SYSTEM_PANIC_PRINT_REBOOT=y
+
 # ── Flash 16 Mo QIO 80 MHz + table de partitions personnalisée ───────────────
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
@@ -49,6 +69,13 @@ CONFIG_LV_USE_VECTOR_GRAPHIC=y         # logo vectoriel de l'écran de boot
 CONFIG_LV_USE_MATRIX=y                 # dépendance du rendu vectoriel
 CONFIG_LV_USE_FLOAT=y                  # dépendance du rendu vectoriel
 CONFIG_LV_DEF_REFR_PERIOD=30
+# Cache de propriétés de style par objet (2 x 32 bits par lv_obj_t) : accélère
+# lv_obj_get_style_* sur les nombreux objets des 11 pages.
+CONFIG_LV_OBJ_STYLE_CACHE=y
+# Un assert LVGL (NULL, échec d'allocation) ne doit pas figer l'écran dans le
+# `while(1);` par défaut : LV_ASSERT_HANDLER est défini à `abort();` par le
+# CMakeLists.txt racine, d'où l'en-tête stdlib.h.
+CONFIG_LV_ASSERT_HANDLER_INCLUDE="stdlib.h"
 CONFIG_LV_FONT_MONTSERRAT_20=y        # fallback si le TTF échoue
 CONFIG_LV_FONT_MONTSERRAT_48=y
 

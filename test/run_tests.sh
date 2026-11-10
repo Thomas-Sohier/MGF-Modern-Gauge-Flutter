@@ -100,6 +100,7 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_mems.c" \
     "$ROOT/main/domain/mems_protocol.c" \
+    "$ROOT/main/domain/mems_mapping.c" \
     "$ROOT/main/domain/mems_reader.c" \
     "$ROOT/main/domain/mems19_reader.c" \
     "$ROOT/main/domain/mems_session.c" \
@@ -112,6 +113,15 @@ gcc -std=c11 -Wall -Wextra -Werror \
     "$ROOT/main/infrastructure/kline_uart_esp32.c" \
     -o "$BUILD_DIR/test_kline_uart"
 "$BUILD_DIR/test_kline_uart"
+
+# Same transport with a coarse 100 Hz FreeRTOS tick: the 5-baud timing must
+# not depend on CONFIG_FREERTOS_HZ.
+gcc -std=c11 -Wall -Wextra -Werror -DconfigTICK_RATE_HZ=100 \
+    -I"$ROOT/test/kline_mocks" -I"$ROOT/main" \
+    "$ROOT/test/test_kline_uart.c" \
+    "$ROOT/main/infrastructure/kline_uart_esp32.c" \
+    -o "$BUILD_DIR/test_kline_uart_100hz"
+"$BUILD_DIR/test_kline_uart_100hz"
 
 gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
     "$ROOT/test/test_kline_config.c" -o "$BUILD_DIR/test_kline_config"

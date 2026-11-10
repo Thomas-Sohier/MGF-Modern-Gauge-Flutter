@@ -5,6 +5,7 @@
 #include "ui/widgets/amber_ui.h"
 #include "ui/widgets/amber_value.h"
 #include "ui/widgets/amber_kit.h"
+#include "ui/widgets/amber_draw.h"
 #include "ui/ui_layout.h"
 #include "domain/value_smoothing.h"
 
@@ -29,7 +30,7 @@
 // Plage régime
 #define RPM_MIN 0.0f
 #define RPM_MAX 8000.0f
-// Constante de temps du lissage d'affichage (trames MEMS toutes ~200 ms).
+// Constante de temps du lissage d'affichage (trames MEMS 0x80 toutes ~100 ms, ~10 Hz).
 #define RPM_SMOOTHING_TAU_MS 100.0f
 
 // Traits de séparation
@@ -107,19 +108,10 @@ struct amber_screen_s {
     bool has_latest_data;
 };
 
-// Michroma n'existe qu'en une graisse : on simule le gras en superposant un
-// second calque décalé (spread px de part et d'autre). L'écart dépend de la
-// taille (trop d'écart sur un petit texte le ferait « doubler »).
-#define BOLD_XL 2 // grande valeur (« 800 »)
-#define BOLD_SM 1 // RPM / valeurs des indicateurs
-
-static ui_layout_t layout_of(const lv_area_t *area) {
-    ui_layout_t layout =
-        ui_layout_fit(lv_area_get_width(area), lv_area_get_height(area));
-    layout.ox += area->x1;
-    layout.oy += area->y1;
-    return layout;
-}
+// Décalage optique historique vers la gauche (px physiques à 480) : hérité de
+// l'ancien faux-gras à deux calques, conservé pour ne pas déplacer le texte.
+#define SHIFT_XL 2 // grande valeur (« 800 »)
+#define SHIFT_SM 1 // RPM / valeurs des indicateurs
 
 static float circle_bottom_y(float x) {
     const float dx = x - DIAL_CX;
@@ -133,6 +125,9 @@ static float separator_bottom_y(float x) {
 
 // ── 3. DESSIN : primitives ───────────────────────────────────────────────────
 
+// Trait en coordonnées physiques TRONQUÉES (et non arrondies comme
+// amber_draw_line) : la grille du RPM est calée sur cette troncature, passer
+// par amber_draw_line la décalerait d'un pixel. Conserver tel quel.
 static void draw_line(lv_layer_t *l, float x1, float y1, float x2, float y2,
                       float w, lv_color_t c) {
     lv_draw_line_dsc_t d;
@@ -142,10 +137,10 @@ static void draw_line(lv_layer_t *l, float x1, float y1, float x2, float y2,
     d.width = LV_MAX(1, (int32_t)lroundf(w));
     d.round_start = 0;
     d.round_end = 0;
-    d.p1.x = x1;
-    d.p1.y = y1;
-    d.p2.x = x2;
-    d.p2.y = y2;
+    d.p1.x = (int32_t)x1;
+    d.p1.y = (int32_t)y1;
+    d.p2.x = (int32_t)x2;
+    d.p2.y = (int32_t)y2;
     lv_draw_line(l, &d);
 }
 
@@ -166,13 +161,29 @@ static void draw_arc_bar(lv_layer_t *l, int32_t cx, int32_t cy, int32_t r_out,
     lv_draw_arc(l, &d);
 }
 
+// Géométrie angulaire des barres, partagée par le dessin et l'invalidation.
+static float bar_deg(void) {
+    const float total_gaps = (float)(SEG_COUNT - 1) * SEG_GAP_DEG;
+    return (DIAL_SWEEP - total_gaps) / (float)SEG_COUNT;
+}
+
+// Invalide les barres [first, last) (marge 2 px pour l'antialiasing).
+static void invalidate_bars(lv_obj_t *canvas, int32_t first, int32_t last) {
+    if (last <= first) return;
+    const float pitch = bar_deg() + SEG_GAP_DEG;
+    const float a0 = DIAL_START + (float)first * pitch;
+    const float a1 = DIAL_START + (float)(last - 1) * pitch + bar_deg();
+    amber_invalidate_sector(canvas, DIAL_CX, DIAL_CY, DIAL_R_IN, DIAL_R_OUT, a0,
+                            a1 - a0, 2.0f);
+}
+
 static void canvas_draw_cb(lv_event_t *e) {
     lv_obj_t *obj = lv_event_get_target(e);
     lv_layer_t *layer = lv_event_get_layer(e);
 
     lv_area_t a;
     lv_obj_get_coords(obj, &a);
-    const ui_layout_t t = layout_of(&a);
+    const ui_layout_t t = amber_draw_layout(&a);
 
     const int32_t cx = (int32_t)lroundf(ui_layout_x(&t, DIAL_CX));
     const int32_t cy = (int32_t)lroundf(ui_layout_y(&t, DIAL_CY));
@@ -181,9 +192,8 @@ static void canvas_draw_cb(lv_event_t *e) {
     const int32_t bar_thickness = r_out - r_in;
 
     // Répartition uniforme stricte : 26 barres et 25 interstices égaux
-    const float total_gaps = (float)(SEG_COUNT - 1) * SEG_GAP_DEG;
-    const float bar_deg = (DIAL_SWEEP - total_gaps) / (float)SEG_COUNT;
-    const float pitch_deg = bar_deg + SEG_GAP_DEG;
+    const float bar_span = bar_deg();
+    const float pitch_deg = bar_span + SEG_GAP_DEG;
 
     amber_screen_t *scr = lv_obj_get_user_data(obj);
     if (scr == NULL) return;
@@ -198,7 +208,7 @@ static void canvas_draw_cb(lv_event_t *e) {
     // Dessin direct des 26 barres
     for (int i = 0; i < SEG_COUNT; i++) {
         const float a0 = DIAL_START + (float)i * pitch_deg;
-        const float a1 = a0 + bar_deg;
+        const float a1 = a0 + bar_span;
         const lv_color_t col =
             (i < bright) ? ui_theme_amber_bright() : ui_theme_amber_dim();
         draw_arc_bar(layer, cx, cy, r_out, bar_thickness, a0, a1, col);
@@ -249,13 +259,13 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
     if (scr->canvas == NULL) goto fail;
 
     scr->value = amber_value_widget_create(
-        parent, ui_font_or(ui_font_xxl, amber_ui_font_hero()), RPM_VAL_X,
-        RPM_VAL_Y, BOLD_XL, "0");
+        parent, ui_font_or(ui_font_xxl, amber_kit_font_hero()),
+        RPM_VAL_X - amber_ui_bold_spread(SHIFT_XL), RPM_VAL_Y, "0");
     if (scr->value == NULL) goto fail;
 
     scr->unit = amber_value_widget_create(
-        parent, ui_font_or(ui_font_rpm_unit, amber_ui_font_value()), DIAL_CX,
-        RPM_UNIT_Y, BOLD_SM, "RPM");
+        parent, ui_font_or(ui_font_rpm_unit, amber_kit_font_label()),
+        DIAL_CX - amber_ui_bold_spread(SHIFT_SM), RPM_UNIT_Y, "RPM");
     if (scr->unit == NULL) goto fail;
 
     for (int i = 0; i < M_COUNT; i++) {
@@ -268,11 +278,12 @@ amber_screen_t *amber_screen_create(lv_obj_t *parent) {
 
         if (i == M_OBD) {
             scr->ind_value[i] = amber_value_widget_create(
-                parent, amber_ui_font_value(), kInd[i].x, kInd[i].label_y,
-                BOLD_SM, "");
+                parent, amber_kit_font_label(),
+                kInd[i].x - amber_ui_bold_spread(SHIFT_SM), kInd[i].label_y,
+                "");
             if (scr->ind_value[i] == NULL) goto fail;
         } else if (!amber_readout_create(
-                       &scr->readout[i], parent, amber_ui_font_value(),
+                       &scr->readout[i], parent, amber_kit_font_label(),
                        amber_kit_font_caption(), kInd[i].x,
                        kInd[i].label_y + IND_CAP_DY, unit_of(i, scr->units))) {
             goto fail;
@@ -321,7 +332,7 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     scr->has_latest_data = true;
 
     // Le compte-tours suit la cible avec un léger retard plutôt que par
-    // paliers de 200 ms ; le premier échantillon (NAN initial) saute direct.
+    // paliers de 100 ms ; le premier échantillon (NAN initial) saute direct.
     const uint32_t now = lv_tick_get();
     scr->rpm_smoothed = value_smoothing_step(
         scr->rpm_smoothed, d->connected ? d->rpm : NAN,
@@ -415,9 +426,16 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     }
 
     if (dial_changed) {
+        // Premier rendu ou changement de liaison : tout le cadran. Sinon
+        // seules les barres [ancien, nouveau) changent de couleur.
+        if (!scr->has_snapshot || d->connected != scr->connected_display) {
+            lv_obj_invalidate(scr->canvas);
+        } else {
+            invalidate_bars(scr->canvas, LV_MIN(scr->rpm_segment, rpm_segment),
+                            LV_MAX(scr->rpm_segment, rpm_segment));
+        }
         scr->rpm = rpm_ok ? rpm : NAN;
         scr->rpm_segment = rpm_segment;
-        lv_obj_invalidate(scr->canvas);
     }
     scr->rpm_display = rpm_display;
     scr->coolant_display = coolant_display;

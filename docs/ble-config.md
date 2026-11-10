@@ -99,7 +99,7 @@ applicative — d'où la marge volontaire sur les tailles de tâches BT.
 Contrat repris de l'ancien boîtier Linux/Go (cf. README et ADR 0007 de
 l'application). Le téléphone écrit du JSON UTF-8 (≤ 512 octets) ; la tâche
 NimBLE le décode et dépose le dernier état dans une boîte aux lettres que le
-timer LVGL (`companion_timer_tick`, 200 ms) consomme. Aucun appel LVGL dans
+timer LVGL de `main/app/companion_bridge.c` (200 ms) consomme. Aucun appel LVGL dans
 la tâche NimBLE.
 
 | Car. | Contenu | Usage sur la jauge |

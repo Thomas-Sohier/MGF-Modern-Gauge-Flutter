@@ -85,7 +85,9 @@ main/
   app_main.c          # composition matériel/police/UI ; redémarre si le boot échoue
   domain/             # pur C, testé sur hôte : ecu_data, MEMS (protocole,
                       # lecteurs 1.6/1.9, session), réglages, protocole BLE, RTC
-  app/                # dashboard_controller, settings_coordinator/runtime
+  app/                # dashboard_controller, settings_coordinator/runtime,
+                      # settings_bridge (réglages <-> écrans, timer, appairage,
+                      # service BLE), companion_bridge (téléphone -> écrans)
   infrastructure/     # ESP-IDF : board_display, K-line UART, mems_ecu, fake_ecu,
                       # NVS, DS3231, BLE NimBLE, diagnostics
   ui/navigation/      # dashboard_navigator (11 pages, swipe cyclique, tap
@@ -132,11 +134,16 @@ docs/                 # K-line MEMS, NVS, BLE, RTC, roadmap LILYGO
 - **Séparateurs fins** avec marge à chaque intersection (grille jamais fermée) ;
   cellules d'extrémité (eau/OBD) relevées pour suivre la courbe du cadran.
 - **Texte** : police **Michroma** (OFL, esprit Microgramma — substitut libre à la
-  police propriétaire). Le calque de faux-gras de `amber_value_widget` reste
-  masqué pour éviter un texte doublé. Légendes du kit à **20 px**, petits
+  police propriétaire). `amber_value_widget` n'a qu'un label (plus de calque
+  de faux-gras, qui doublait le texte). Légendes du kit à **20 px**, petits
   libellés à **22 px** ; grandes valeurs à 30/56/72 px.
-- **Lissage** : le RPM affiché suit la valeur ECU (~5 Hz) via
+- **Lissage** : le RPM affiché suit la valeur ECU (~10 Hz) via
   `value_smoothing_step` (τ 100 ms) pour éviter un bargraph en escalier.
+- **Invalidation partielle** : un changement de régime n'invalide que les
+  barres concernées, la couronne du kit que les segments/repères changés
+  (`amber_invalidate_sector`, élargi au degré entier car LVGL tronque les
+  angles d'arc). La racine n'a plus de `clip_corner` (calques ARGB coûteux) :
+  l'écran est physiquement rond.
 - **API** : `amber_screen_create(parent)` / `amber_screen_update(scr, ecu_data_t*)` /
   `amber_screen_set_units(scr, units)` / `amber_screen_destroy(scr)`.
 
@@ -176,8 +183,8 @@ Tous les écrans hors RPM partagent une même grammaire, fournie par le kit :
   fenêtre d'**appairage** Bluetooth de 5 min (`domain/ble_window`, refermée
   dès qu'un téléphone est lié ; « INDISPONIBLE » si le BLE est absent) et
   **couleurs** normales/inversées.
-- L'écran ne fait que remonter des actions : `app_main.c` les applique via
-  `settings_runtime_*` et resynchronise l'affichage dans le timer réglages.
+- L'écran ne fait que remonter des actions : `app/settings_bridge.c` les
+  applique via `settings_runtime_*` et resynchronise l'affichage dans le timer réglages.
 - La persistance NVS est exécutée par `settings_persistence` hors LVGL après
   l'anti-rebond de 3 s ; le coordinateur attend l'acquittement réel du snapshot.
 - `startup_page`, `utc_offset_minutes` et `color_mode` (schéma NVS **v3**,
@@ -202,7 +209,7 @@ Tous les écrans hors RPM partagent une même grammaire, fournie par le kit :
 
 - Service GATT `7f3a0001-…` repris de l'ancien boîtier Go ; JSON décodé dans
   la tâche NimBLE par `domain/companion_protocol.c` (C pur, testé), déposé
-  dans une boîte aux lettres, appliqué par `companion_timer_tick` (LVGL).
+  dans une boîte aux lettres, appliqué par le timer de `app/companion_bridge.c` (LVGL).
 - Musique/Navigation ne dépendent plus de l'ECU : `music_screen_set_media`,
   `navigation_screen_set_route`, `*_set_link`. Flèche de manœuvre déduite du
   texte ; icône PNG et alertes ignorées. Lien à sens unique.
@@ -243,6 +250,12 @@ Tous les écrans hors RPM partagent une même grammaire, fournie par le kit :
   (main/CMakeLists.txt) et les symboles `_binary_*` dans `app_main.c`.
 - **Allocateur LVGL** : la cible utilise `CONFIG_LV_USE_CLIB_MALLOC` (heap
   ESP-IDF, PSRAM en secours), comme le sim. Ne pas revenir au pool fixe 64 Ko.
+- **Assert LVGL = redémarrage** : `LV_ASSERT_HANDLER` appelle `abort()`
+  (CMakeLists.txt racine + `CONFIG_LV_ASSERT_HANDLER_INCLUDE="stdlib.h"`) au
+  lieu du `while(1);` qui figeait l'écran. Le watchdog de tâche ne panique
+  toujours pas (`ESP_TASK_WDT_PANIC` à valider sur la carte).
+- **Tick FreeRTOS 1 kHz** (`-O2`, D-cache 64 Ko) : exprimer les délais avec
+  `pdMS_TO_TICKS`, jamais en ticks bruts.
 - **Nouvelle source dans le sim** : l'ajouter à `UI_SRCS` de `build.sh` (et à
   `main/CMakeLists.txt` pour la cible).
 - **Toujours régénérer les golden** après une modif d'UI (`./build.sh`) et

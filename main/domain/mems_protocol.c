@@ -1,5 +1,7 @@
 #include "domain/mems_protocol.h"
 
+#include <math.h>
+
 // Décalages des trames, calqués sur les structs Go (`structures.go`). L'octet
 // [0] est l'écho de commande, [1] la taille utile (BytesinFrame).
 
@@ -26,6 +28,7 @@
 
 // --- Trame 0x7D -------------------------------------------------------------
 #define F7D_CMD        0
+#define F7D_SIZE       1
 #define F7D_IGN_SWITCH 2
 #define F7D_THROTTLE   3
 #define F7D_AFR        5
@@ -45,16 +48,25 @@ static int round_div(int num, int den) {
     return -(((-num) + den / 2) / den);
 }
 
+// Température brute (offset -55 °C) ; 0xFF signale un capteur non supporté.
+static float decode_temp(uint8_t raw) {
+    if (raw == MEMS_TEMP_UNSUPPORTED_RAW) return NAN;
+    return (float)((int)raw - 55);
+}
+
 bool mems_parse_frame_80(const uint8_t *frame, size_t len, mems_data_t *out) {
     if (frame == NULL || out == NULL) return false;
     if (len != MEMS_FRAME_80_LEN) return false;
     if (frame[F80_CMD] != MEMS_CMD_DATA_80) return false;
+    if (frame[F80_SIZE] != MEMS_FRAME_80_SIZE_BYTE) return false;
+    const int rpm = (frame[F80_RPM_HI] << 8) | frame[F80_RPM_LO];
+    if (rpm > MEMS_RPM_MAX_PLAUSIBLE) return false;
 
-    out->engine_rpm = (frame[F80_RPM_HI] << 8) | frame[F80_RPM_LO];
-    out->coolant_temp = (int)frame[F80_COOLANT] - 55;
-    out->ambient_temp = (int)frame[F80_AMBIENT] - 55;
-    out->intake_air_temp = (int)frame[F80_INTAKE_AIR] - 55;
-    out->fuel_temp = (int)frame[F80_FUEL] - 55;
+    out->engine_rpm = rpm;
+    out->coolant_temp = decode_temp(frame[F80_COOLANT]);
+    out->ambient_temp = decode_temp(frame[F80_AMBIENT]);
+    out->intake_air_temp = decode_temp(frame[F80_INTAKE_AIR]);
+    out->fuel_temp = decode_temp(frame[F80_FUEL]);
     out->map_kpa = (float)frame[F80_MAP];
     out->battery_voltage = (float)frame[F80_BATTERY] / 10.0f;
     out->throttle_pot_voltage = (float)frame[F80_THROTTLE_POT] * 0.02f;
@@ -78,6 +90,7 @@ bool mems_parse_frame_7d(const uint8_t *frame, size_t len, mems_data_t *out) {
     if (frame == NULL || out == NULL) return false;
     if (len != MEMS_FRAME_7D_LEN) return false;
     if (frame[F7D_CMD] != MEMS_CMD_DATA_7D) return false;
+    if (frame[F7D_SIZE] != MEMS_FRAME_7D_SIZE_BYTE) return false;
 
     out->ignition_switch = frame[F7D_IGN_SWITCH] != 0;
     out->throttle_angle = round_div((int)frame[F7D_THROTTLE] * 6, 10);
@@ -85,48 +98,4 @@ bool mems_parse_frame_7d(const uint8_t *frame, size_t len, mems_data_t *out) {
     out->lambda_voltage_mv = (int)frame[F7D_LAMBDA_V] * 5;
     out->closed_loop = frame[F7D_LOOP] != 0;
     return true;
-}
-
-void mems_to_ecu_data(const mems_data_t *in, bool connected, ecu_data_t *out) {
-    if (in == NULL || out == NULL) return;
-
-    // Les champs non fournis par MEMS (injection, trims, ralenti...) restent
-    // explicitement indisponibles plutôt que non initialisés.
-    *out = ecu_data_unavailable();
-    out->connected = connected;
-    out->rpm = (float)in->engine_rpm;
-    out->coolant_temp = (float)in->coolant_temp;
-    out->battery_voltage = in->battery_voltage;
-    out->ambient_temp = (float)in->ambient_temp;
-    out->intake_air_temp = (float)in->intake_air_temp;
-    out->fuel_rail_temp = (float)in->fuel_temp;
-    out->map_sensor_kpa = in->map_kpa;
-    out->throttle_pot_voltage = in->throttle_pot_voltage;
-    out->ignition_advance = in->ignition_advance;
-    out->coil_1_charge_time = in->coil_time;
-    out->coil_2_charge_time = in->coil_time;
-    out->coil_time_microseconds = in->coil_time * 1000.0f;
-    out->estimated_air_fuel = in->air_fuel_ratio;
-    out->lambda_mv = (float)in->lambda_voltage_mv;
-    out->o2_mv = (float)in->lambda_voltage_mv;
-    out->idle_valve_position = (float)in->iac_position;
-
-    out->faults_available = true;
-    out->fault_flags =
-        (in->coolant_sensor_fault ? ECU_FAULT_COOLANT_SENSOR : 0u) |
-        (in->intake_air_sensor_fault ? ECU_FAULT_INTAKE_AIR_SENSOR : 0u) |
-        (in->fuel_pump_fault ? ECU_FAULT_FUEL_PUMP : 0u) |
-        (in->throttle_pot_fault ? ECU_FAULT_THROTTLE_POT : 0u);
-
-    // Estimation du % de gaz depuis la tension du potentiomètre papillon
-    // (le pourcentage n'est pas fourni tel quel par MEMS). Plage nominale
-    // ~0.6 V (fermé) .. ~4.6 V (plein gaz).
-    const float lo = 0.6f, hi = 4.6f;
-    float pct = (in->throttle_pot_voltage - lo) / (hi - lo) * 100.0f;
-    if (pct < 0.0f) pct = 0.0f;
-    if (pct > 100.0f) pct = 100.0f;
-    out->throttle = pct;
-
-    // MEMS 1.6/1.9 : pas de sonde de température d'huile. oil_temp reste NAN
-    // (affiché « -- ») plutôt qu'un faux 0 °C permanent.
 }

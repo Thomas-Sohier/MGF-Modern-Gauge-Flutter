@@ -455,6 +455,29 @@ bool amber_page_create(amber_page_t *page, lv_obj_t *parent,
     return true;
 }
 
+// Invalidation partielle de la couronne (marge 3 px : centre/rayon arrondis
+// et antialiasing de lv_draw_arc).
+static void rim_invalidate_segments(const amber_page_t *page, int first,
+                                    int last) {
+    if (last <= first) return;
+    const float step = AMBER_KIT_RIM_SWEEP / (float)page->rim_segments;
+    amber_invalidate_sector(page->canvas, AMBER_KIT_CX, AMBER_KIT_CX,
+                            AMBER_KIT_RIM_R_IN, AMBER_KIT_RIM_R_OUT,
+                            AMBER_KIT_RIM_START + first * step,
+                            (float)(last - first) * step, 3.0f);
+}
+
+// Repère : trait radial de 3.2 px entre R_IN-9 et R_IN-2.5 (cf.
+// amber_kit_draw_rim) ; ±2° et R_IN-12..R_IN le couvrent largement.
+static void rim_invalidate_marker(const amber_page_t *page, int marker) {
+    if (marker < 0 || marker > page->rim_segments) return;
+    const float step = AMBER_KIT_RIM_SWEEP / (float)page->rim_segments;
+    const float angle = AMBER_KIT_RIM_START + marker * step;
+    amber_invalidate_sector(page->canvas, AMBER_KIT_CX, AMBER_KIT_CX,
+                            AMBER_KIT_RIM_R_IN - 12.0f, AMBER_KIT_RIM_R_IN,
+                            angle - 2.0f, 4.0f, 3.0f);
+}
+
 void amber_page_set_rim(amber_page_t *page, float from, float to, float marker,
                         bool active) {
     if (page == NULL || page->canvas == NULL) return;
@@ -475,11 +498,29 @@ void amber_page_set_rim(amber_page_t *page, float from, float to, float marker,
         mark == page->rim_marker && active == page->rim_active) {
         return;
     }
+    if (page->rim != AMBER_RIM_SEGMENTS) {
+        lv_obj_invalidate(page->canvas);
+    } else if (active != page->rim_active) {
+        rim_invalidate_segments(page, 0, n); // toute la couronne change
+        rim_invalidate_marker(page, page->rim_marker);
+        rim_invalidate_marker(page, mark);
+    } else {
+        // Seule la différence symétrique des plages allumées change.
+        if (active) {
+            rim_invalidate_segments(page, LV_MIN(page->rim_from, lit_from),
+                                    LV_MAX(page->rim_from, lit_from));
+            rim_invalidate_segments(page, LV_MIN(page->rim_to, lit_to),
+                                    LV_MAX(page->rim_to, lit_to));
+        }
+        if (mark != page->rim_marker) {
+            rim_invalidate_marker(page, page->rim_marker);
+            rim_invalidate_marker(page, mark);
+        }
+    }
     page->rim_from = lit_from;
     page->rim_to = lit_to;
     page->rim_marker = mark;
     page->rim_active = active;
-    lv_obj_invalidate(page->canvas);
 }
 
 void amber_page_set_hero(amber_page_t *page, const char *text, bool available) {

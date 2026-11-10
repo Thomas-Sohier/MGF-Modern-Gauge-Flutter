@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "domain/ecu_data.h"
-
 // Protocole Rover MEMS (ROSCO) — couche PURE, sans aucune E/S.
 //
 // Portage C de la partie décodage du projet Go de référence
@@ -40,16 +38,32 @@
 #define MEMS_FRAME_80_LEN   29u // 80 1C + 27 octets de données
 #define MEMS_FRAME_7D_LEN   33u // 7D 20 + 31 octets de données
 
+// Octet [1] de chaque trame : taille annoncée par l'ECU (BytesinFrame). MEMS
+// n'a pas de checksum ; vérifier cet octet est le seul moyen de détecter un
+// décalage d'un octet (ex. écho local du transceiver non absorbé : la trame
+// reçue commence alors par « 80 80 1C … »).
+#define MEMS_FRAME_80_SIZE_BYTE 0x1Cu
+#define MEMS_FRAME_7D_SIZE_BYTE 0x20u
+
+// Octet brut de température signalant un capteur absent / non supporté.
+#define MEMS_TEMP_UNSUPPORTED_RAW 0xFFu
+
+// Borne de plausibilité du régime : au-delà, la trame est considérée corrompue
+// (le moteur K16 coupe vers 7000 tr/min ; 10000 laisse une large marge). Seule
+// borne appliquée volontairement : 0 tr/min (moteur arrêté) reste valide.
+#define MEMS_RPM_MAX_PLAUSIBLE 10000
+
 // Instantané « riche » décodé depuis les deux trames MEMS. On garde les champs
 // utiles au tableau de bord et au diagnostic ; les nombreux octets inconnus du
 // protocole ne sont pas exposés. Valeurs déjà converties en unités physiques.
 typedef struct {
     // Trame 0x80
-    int engine_rpm;             // tr/min (big-endian 16 bits)
-    int coolant_temp;           // °C (brut - 55)
-    int ambient_temp;           // °C (brut - 55)
-    int intake_air_temp;        // °C (brut - 55)
-    int fuel_temp;              // °C (brut - 55 ; 0xFF => non supporté)
+    int engine_rpm; // tr/min (big-endian 16 bits)
+    // Températures : °C (brut - 55) ; NAN si brut 0xFF (capteur non supporté).
+    float coolant_temp;
+    float ambient_temp;
+    float intake_air_temp;
+    float fuel_temp;
     float map_kpa;              // pression collecteur (kPa)
     float battery_voltage;      // V (brut / 10)
     float throttle_pot_voltage; // V (brut * 0.02)
@@ -77,20 +91,13 @@ typedef struct {
 
 // Décode la trame 0x80 (RPM/températures/batterie…). `frame` doit contenir
 // exactement MEMS_FRAME_80_LEN octets, écho de commande 0x80 inclus en [0].
-// Renvoie false si la taille est mauvaise ou l'écho incorrect.
+// Renvoie false si la longueur est mauvaise, l'écho [0] ou l'octet de taille
+// [1] incorrect, ou le régime implausible (> MEMS_RPM_MAX_PLAUSIBLE) ; `out`
+// n'est alors pas modifié.
 bool mems_parse_frame_80(const uint8_t *frame, size_t len, mems_data_t *out);
 
 // Décode la trame 0x7D (papillon/lambda…). `frame` doit contenir exactement
 // MEMS_FRAME_7D_LEN octets, écho 0x7D inclus en [0]. Complète `out` (les champs
 // 0x80 sont laissés intacts ; appeler _80 puis _7D sur le même `out`).
+// Mêmes contrôles d'écho et de taille que _80 ; `out` intact en cas d'échec.
 bool mems_parse_frame_7d(const uint8_t *frame, size_t len, mems_data_t *out);
-
-// Projette l'instantané MEMS vers le modèle consommé par l'écran.
-//
-// Correspondances : rpm/coolant_temp/battery_voltage directs ; throttle estimé
-// depuis la tension du potentiomètre papillon (0.6 V fermé .. 4.6 V plein gaz,
-// approx.) ; `connected` fixé par l'appelant selon l'état de la liaison.
-//
-// Les champs sans équivalent MEMS valent NAN — en particulier `oil_temp`
-// (pas de sonde d'huile). Les bits DTC sont projetés dans `fault_flags`.
-void mems_to_ecu_data(const mems_data_t *in, bool connected, ecu_data_t *out);

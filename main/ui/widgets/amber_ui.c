@@ -23,8 +23,6 @@ lv_obj_t *amber_ui_root_create(lv_obj_t *parent) {
     lv_obj_center(root);
     lv_obj_set_style_bg_color(root, ui_theme_amber_bg(), 0);
     lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(root, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_clip_corner(root, true, 0);
     // lv_obj_create rend l'objet cliquable : il capterait alors les appuis
     // destinés au navigateur (tap gauche/droite, maintien réglages).
     lv_obj_clear_flag(root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
@@ -63,18 +61,6 @@ lv_obj_t *amber_ui_label_create(lv_obj_t *parent, const lv_font_t *font,
     }
     lv_label_set_text_static(label, text);
     return label;
-}
-
-const lv_font_t *amber_ui_font_hero(void) {
-    return ui_font_or(ui_font_xl, &lv_font_montserrat_48);
-}
-
-const lv_font_t *amber_ui_font_value(void) {
-    return ui_font_or(ui_font_l, &lv_font_montserrat_20);
-}
-
-const lv_font_t *amber_ui_font_caption(void) {
-    return ui_font_or(ui_font_m, &lv_font_montserrat_14);
 }
 
 float amber_ui_bold_spread(unsigned physical_pixels) {

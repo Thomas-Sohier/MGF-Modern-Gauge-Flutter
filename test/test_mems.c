@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "domain/mems19_reader.h"
+#include "domain/mems_mapping.h"
 #include "domain/mems_protocol.h"
 #include "domain/mems_reader.h"
 #include "domain/mems_session.h"
@@ -37,9 +38,10 @@ static void test_parse_frame_80(void) {
     memset(&d, 0, sizeof(d));
     check(mems_parse_frame_80(FRAME_80, MEMS_FRAME_80_LEN, &d), "80 parses");
     check(d.engine_rpm == 1189, "rpm = 0x04a5");
-    check(d.coolant_temp == 20, "coolant = 75 - 55");
-    check(d.ambient_temp == 200, "ambient = 255 - 55");
-    check(d.intake_air_temp == 21, "intake = 76 - 55");
+    check(near(d.coolant_temp, 20.0f), "coolant = 75 - 55");
+    check(isnan(d.ambient_temp), "ambient raw 0xFF = unsupported (NAN)");
+    check(isnan(d.fuel_temp), "fuel raw 0xFF = unsupported (NAN)");
+    check(near(d.intake_air_temp, 21.0f), "intake = 76 - 55");
     check(near(d.battery_voltage, 13.0f), "battery = 130 / 10");
     check(near(d.throttle_pot_voltage, 0.68f), "throttle pot = 34 * 0.02");
     check(d.iac_position == 120, "iac position = 0x78");
@@ -68,6 +70,82 @@ static void test_parse_rejects_bad_input(void) {
     check(!mems_parse_frame_80(bad, MEMS_FRAME_80_LEN, &d),
           "80 wrong echo rejected");
     check(!mems_parse_frame_7d(FRAME_7D, 4, &d), "7d wrong size rejected");
+
+    memcpy(bad, FRAME_80, sizeof(bad));
+    bad[1] = 0x1B;
+    check(!mems_parse_frame_80(bad, MEMS_FRAME_80_LEN, &d),
+          "80 wrong size byte rejected");
+    uint8_t bad7d[MEMS_FRAME_7D_LEN];
+    memcpy(bad7d, FRAME_7D, sizeof(bad7d));
+    bad7d[1] = 0x1C;
+    check(!mems_parse_frame_7d(bad7d, MEMS_FRAME_7D_LEN, &d),
+          "7d wrong size byte rejected");
+}
+
+// Écho local du transceiver non absorbé : toute la trame est décalée d'un
+// octet (« 80 80 1C 04 … »). L'écho [0] est correct, seul l'octet de taille
+// permet de rejeter la trame.
+static void test_parse_rejects_shifted_frames(void) {
+    mems_data_t d;
+    memset(&d, 0, sizeof(d));
+    d.engine_rpm = 777;
+    uint8_t shifted[MEMS_FRAME_80_LEN];
+    shifted[0] = MEMS_CMD_DATA_80;
+    memcpy(shifted + 1, FRAME_80, MEMS_FRAME_80_LEN - 1);
+    check(!mems_parse_frame_80(shifted, MEMS_FRAME_80_LEN, &d),
+          "80 shifted by local echo rejected");
+    check(d.engine_rpm == 777, "rejected 80 leaves output untouched");
+
+    uint8_t shifted7d[MEMS_FRAME_7D_LEN];
+    shifted7d[0] = MEMS_CMD_DATA_7D;
+    memcpy(shifted7d + 1, FRAME_7D, MEMS_FRAME_7D_LEN - 1);
+    check(!mems_parse_frame_7d(shifted7d, MEMS_FRAME_7D_LEN, &d),
+          "7d shifted by local echo rejected");
+}
+
+static void test_parse_rpm_plausibility(void) {
+    mems_data_t d;
+    uint8_t f[MEMS_FRAME_80_LEN];
+    memcpy(f, FRAME_80, sizeof(f));
+    f[2] = 0x00;
+    f[3] = 0x00;
+    check(mems_parse_frame_80(f, MEMS_FRAME_80_LEN, &d) && d.engine_rpm == 0,
+          "engine stopped (0 rpm) is valid");
+    f[2] = (uint8_t)(MEMS_RPM_MAX_PLAUSIBLE >> 8);
+    f[3] = (uint8_t)(MEMS_RPM_MAX_PLAUSIBLE & 0xFF);
+    check(mems_parse_frame_80(f, MEMS_FRAME_80_LEN, &d) &&
+              d.engine_rpm == MEMS_RPM_MAX_PLAUSIBLE,
+          "rpm at plausibility bound accepted");
+    f[3]++;
+    check(!mems_parse_frame_80(f, MEMS_FRAME_80_LEN, &d),
+          "rpm above plausibility bound rejected");
+    f[2] = 0xFF;
+    f[3] = 0xFF;
+    check(!mems_parse_frame_80(f, MEMS_FRAME_80_LEN, &d),
+          "rpm 0xFFFF rejected");
+}
+
+static void test_unsupported_temps_map_to_nan(void) {
+    uint8_t f[MEMS_FRAME_80_LEN];
+    memcpy(f, FRAME_80, sizeof(f));
+    f[4] = 0xFF; // eau
+    f[6] = 0xFF; // air d'admission
+    mems_data_t d;
+    memset(&d, 0, sizeof(d));
+    check(mems_parse_frame_80(f, MEMS_FRAME_80_LEN, &d), "80 with 0xFF temps");
+    check(mems_parse_frame_7d(FRAME_7D, MEMS_FRAME_7D_LEN, &d), "7d parses");
+    ecu_data_t e;
+    mems_to_ecu_data(&d, true, &e);
+    check(isnan(e.coolant_temp), "coolant 0xFF -> NAN, never 200 C");
+    check(isnan(e.intake_air_temp), "intake 0xFF -> NAN");
+    check(isnan(e.ambient_temp), "ambient 0xFF -> NAN");
+    check(isnan(e.fuel_rail_temp), "fuel 0xFF -> NAN");
+    check(near(e.rpm, 1189.0f), "rpm still decoded");
+
+    f[4] = 0xFE; // 199 °C : valeur brute légitime, non sentinelle
+    check(mems_parse_frame_80(f, MEMS_FRAME_80_LEN, &d) &&
+              near(d.coolant_temp, 199.0f),
+          "0xFE is a real temperature");
 }
 
 static void test_to_ecu_data(void) {
@@ -82,6 +160,8 @@ static void test_to_ecu_data(void) {
     check(e.connected, "connected propagated");
     check(near(e.rpm, 1189.0f), "ecu rpm");
     check(near(e.coolant_temp, 20.0f), "ecu coolant");
+    check(isnan(e.ambient_temp) && isnan(e.fuel_rail_temp),
+          "unsupported temps stay unavailable");
     check(near(e.battery_voltage, 13.0f), "ecu battery");
     check(near(e.throttle, 2.0f), "throttle % from pot (0.68-0.6)/4*100");
     check(isnan(e.oil_temp), "oil temp unavailable (no MEMS sensor)");
@@ -125,7 +205,11 @@ typedef struct {
     uint32_t last_timeout;
     int wake_calls; // nombre d'appels au réveil 5 bauds
     int wake_fail;
-    uint8_t wake_addr; // adresse ECU reçue au dernier réveil
+    uint8_t wake_addr;       // adresse ECU reçue au dernier réveil
+    int n80, n7d;            // nombre de requêtes 0x80 / 0x7D reçues
+    int drop_7d;             // abandonne seulement les réponses 0x7D
+    const uint8_t *frame_80; // trames de réponse (NULL => référence)
+    const uint8_t *frame_7d;
 } mock_transport_t;
 
 static void mock_enqueue(mock_transport_t *m, const uint8_t *b, size_t n) {
@@ -164,10 +248,15 @@ static int mock_write(void *ctx, const uint8_t *buf, size_t len) {
         break;
     }
     case MEMS_CMD_DATA_80:
-        mock_enqueue(m, FRAME_80, MEMS_FRAME_80_LEN);
+        m->n80++;
+        mock_enqueue(m, m->frame_80 ? m->frame_80 : FRAME_80,
+                     MEMS_FRAME_80_LEN);
         break;
     case MEMS_CMD_DATA_7D:
-        mock_enqueue(m, FRAME_7D, MEMS_FRAME_7D_LEN);
+        m->n7d++;
+        if (m->drop_7d) break;
+        mock_enqueue(m, m->frame_7d ? m->frame_7d : FRAME_7D,
+                     MEMS_FRAME_7D_LEN);
         break;
     default:
         break;
@@ -217,8 +306,9 @@ static void test_session_connect_and_poll(void) {
     mems_session_t s;
     mems_session_init(&s, mems_reader_interface(&base));
     check(mems_session_connect(&s), "handshake succeeds");
-    check(s.connected, "session marked connected");
-    check(base.ecu_id[0] == MEMS_CMD_INIT_ECU_ID, "ecu id echo stored");
+    check(mems_session_is_connected(&s), "session marked connected");
+    check(mems_reader_ecu_id(&base)[0] == MEMS_CMD_INIT_ECU_ID,
+          "ecu id echo stored");
 
     ecu_data_t e;
     mems_data_t raw;
@@ -321,7 +411,9 @@ static void test_poll_success_resets_failure_count(void) {
         }
         mock.drop_data = 0;
         check(mems_session_poll(&s, &e, NULL), "recovered poll succeeds");
-        check(s.connected && s.poll_failures == 0, "success resets failures");
+        check(mems_session_is_connected(&s) &&
+                  mems_session_poll_failures(&s) == 0,
+              "success resets failures");
     }
 }
 
@@ -409,10 +501,124 @@ static void test_session_1_9_requires_wakeup(void) {
     check(!mems_session_connect(&s), "1.9 fails without wake_up support");
 }
 
+static void session_setup(mock_transport_t *mock, mems_reader_t *base,
+                          mems_session_t *s) {
+    memset(mock, 0, sizeof(*mock));
+    kline_transport_t t = {.write = mock_write,
+                           .read = mock_read,
+                           .flush = mock_flush,
+                           .ctx = mock};
+    mems_reader_init(base, t, 1);
+    mems_session_init(s, mems_reader_interface(base));
+}
+
+static void test_poll_7d_one_cycle_in_n(void) {
+    mock_transport_t mock;
+    mems_reader_t base;
+    mems_session_t s;
+    session_setup(&mock, &base, &s);
+    check(s.interval_7d == MEMS_SESSION_DEFAULT_7D_INTERVAL &&
+              MEMS_SESSION_DEFAULT_7D_INTERVAL == 3,
+          "default 0x7D interval is 1 cycle in 3");
+    check(mems_session_connect(&s), "connect for cadence");
+
+    ecu_data_t e;
+    mems_data_t raw;
+    for (int cycle = 0; cycle < 9; cycle++) {
+        check(mems_session_poll(&s, &e, &raw), "cadence poll succeeds");
+        check(near(e.estimated_air_fuel, 14.6f) && raw.lambda_voltage_mv == 435,
+              "0x7D fields keep their last value between reads");
+    }
+    check(mock.n80 == 9, "0x80 polled every cycle");
+    check(mock.n7d == 3, "0x7D polled one cycle in 3");
+
+    mems_session_set_7d_interval(&s, 0);
+    mock.n7d = 0;
+    for (int cycle = 0; cycle < 4; cycle++)
+        check(mems_session_poll(&s, &e, NULL), "interval 1 poll");
+    check(mock.n7d == 4, "interval 0/1 polls 0x7D every cycle");
+}
+
+static void test_poll_7d_failure_counts_and_stays_due(void) {
+    mock_transport_t mock;
+    mems_reader_t base;
+    mems_session_t s;
+    session_setup(&mock, &base, &s);
+    check(mems_session_connect(&s), "connect for 7d failure");
+    ecu_data_t e;
+    check(mems_session_poll(&s, &e, NULL), "first poll reads both frames");
+    check(mems_session_poll(&s, &e, NULL), "80-only poll 1");
+    check(mems_session_poll(&s, &e, NULL), "80-only poll 2");
+    check(mock.n7d == 1, "no 0x7D yet");
+
+    mock.drop_7d = 1;
+    ecu_data_t keep = {.rpm = 42.0f};
+    check(!mems_session_poll(&s, &keep, NULL), "lost 0x7D is a lost frame");
+    check(mems_session_poll_failures(&s) == 1, "0x7D loss counted");
+    check(keep.rpm == 42.0f, "failed poll leaves output untouched");
+    mock.drop_7d = 0;
+    const int before = mock.n7d;
+    check(mems_session_poll(&s, &e, NULL), "recovered poll");
+    check(mock.n7d == before + 1, "due 0x7D retried on the next cycle");
+    check(mems_session_poll_failures(&s) == 0, "success resets failures");
+}
+
+static void test_reconnect_never_reuses_old_7d(void) {
+    mock_transport_t mock;
+    mems_reader_t base;
+    mems_session_t s;
+    session_setup(&mock, &base, &s);
+    check(mems_session_connect(&s), "first connection");
+    ecu_data_t e;
+    check(mems_session_poll(&s, &e, NULL), "poll with reference 0x7D");
+    check(near(e.estimated_air_fuel, 14.6f), "reference AFR");
+
+    // Perte de liaison : 0x80 muette jusqu'à la déconnexion.
+    mock.drop_data = 1;
+    for (int i = 0; i < MEMS_SESSION_MAX_POLL_FAILURES; i++)
+        check(!mems_session_poll(&s, &e, NULL), "lost frame");
+    check(!mems_session_is_connected(&s), "session disconnected");
+
+    // Nouvelle connexion avec une 0x7D différente : le tout premier poll doit
+    // l'interroger, et ne jamais publier l'ancienne valeur.
+    uint8_t f7d[MEMS_FRAME_7D_LEN];
+    memcpy(f7d, FRAME_7D, sizeof(f7d));
+    f7d[5] = 120; // AFR 12.0
+    mock.drop_data = 0;
+    mock.frame_7d = f7d;
+    mock.n7d = 0;
+    check(mems_session_connect(&s), "reconnection");
+    mock.drop_7d = 1;
+    check(!mems_session_poll(&s, &e, NULL),
+          "first poll after reconnect needs a fresh 0x7D");
+    mock.drop_7d = 0;
+    check(mems_session_poll(&s, &e, NULL), "fresh 0x7D received");
+    check(near(e.estimated_air_fuel, 12.0f), "new session AFR, not stale one");
+    check(mock.n7d == 2, "0x7D requested on both first polls");
+}
+
+static void test_session_rejects_shifted_frame(void) {
+    mock_transport_t mock;
+    mems_reader_t base;
+    mems_session_t s;
+    session_setup(&mock, &base, &s);
+    check(mems_session_connect(&s), "connect for shifted frame");
+    uint8_t shifted[MEMS_FRAME_80_LEN];
+    shifted[0] = MEMS_CMD_DATA_80;
+    memcpy(shifted + 1, FRAME_80, MEMS_FRAME_80_LEN - 1);
+    mock.frame_80 = shifted;
+    ecu_data_t e;
+    check(!mems_session_poll(&s, &e, NULL), "shifted 0x80 is a lost frame");
+    check(mems_session_poll_failures(&s) == 1, "shifted frame counted");
+}
+
 int main(void) {
     test_parse_frame_80();
     test_parse_frame_7d();
     test_parse_rejects_bad_input();
+    test_parse_rejects_shifted_frames();
+    test_parse_rpm_plausibility();
+    test_unsupported_temps_map_to_nan();
     test_to_ecu_data();
     test_unavailable_snapshot();
     test_session_connect_and_poll();
@@ -424,6 +630,10 @@ int main(void) {
     test_session_1_9_wakes_before_handshake();
     test_session_1_9_wakeup_failure();
     test_session_1_9_requires_wakeup();
+    test_poll_7d_one_cycle_in_n();
+    test_poll_7d_failure_counts_and_stays_due();
+    test_reconnect_never_reuses_old_7d();
+    test_session_rejects_shifted_frame();
     puts("mems tests: OK");
     return 0;
 }

@@ -27,3 +27,8 @@ void mems_reader_init(mems_reader_t *r, kline_transport_t transport,
 // Vue `ecu_reader_t` de ce lecteur (à passer à `mems_session` ou à envelopper
 // dans un `mems19_reader`).
 ecu_reader_t mems_reader_interface(mems_reader_t *r);
+
+// Réponse D0 (écho + 4 octets d'ID ECU) du dernier handshake réussi.
+static inline const uint8_t *mems_reader_ecu_id(const mems_reader_t *r) {
+    return r != NULL ? r->ecu_id : NULL;
+}

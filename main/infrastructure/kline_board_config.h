@@ -44,8 +44,39 @@
 #error "MGF_KLINE_UART_NUM must select an ESP32-S3 UART (0, 1, or 2)"
 #endif
 
-#if MGF_KLINE_TX_GPIO < 0 || MGF_KLINE_TX_GPIO > 48 ||                         \
-    MGF_KLINE_RX_GPIO < 0 || MGF_KLINE_RX_GPIO > 48
+// --- Ressources GPIO : SOURCE UNIQUE de vérité ------------------------------
+// Ces prédicats sont évaluables par le préprocesseur (#if ci-dessous) ET en C
+// (validation à l'exécution dans `kline_uart_esp32.c`).
+
+#define MGF_KLINE_GPIO_IS_VALID(g) ((g) >= 0 && (g) <= 48)
+
+// GPIO34..38 are input-only for this purpose on the ESP32-S3 profile; they can
+// receive K-line data but cannot drive the transceiver's TX input. GPIO38 is
+// therefore RX-only in the default LILYGO profile (GPIO39 is reserved below).
+#define MGF_KLINE_GPIO_IS_INPUT_ONLY(g) ((g) >= 34 && (g) <= 38)
+
+// LCD RGB, sync, backlight, and the LCD's serial data pins on the H597.
+#define MGF_KLINE_GPIO_IS_DISPLAY(g)                                           \
+    ((g) == 2 || (g) == 3 || ((g) >= 5 && (g) <= 7) ||                         \
+     ((g) >= 9 && (g) <= 18) || (g) == 21 || ((g) >= 41 && (g) <= 47))
+
+// Shared I2C/touch, power, USB, boot, battery, and the remaining SD signal.
+// GPIO38 and GPIO40 are intentionally absent: they are the K-line defaults.
+#define MGF_KLINE_GPIO_IS_BOARD_RESERVED(g)                                    \
+    ((g) == 0 || (g) == 1 || (g) == 4 || (g) == 8 || (g) == 19 || (g) == 20 || \
+     (g) == 39 || (g) == 48)
+
+#define MGF_KLINE_GPIO_IS_RESERVED(g)                                          \
+    (MGF_KLINE_GPIO_IS_DISPLAY(g) || MGF_KLINE_GPIO_IS_BOARD_RESERVED(g))
+
+// Paire TX/RX utilisable pour la K-line sur cette carte.
+#define MGF_KLINE_PINS_VALID(tx, rx)                                           \
+    (MGF_KLINE_GPIO_IS_VALID(tx) && MGF_KLINE_GPIO_IS_VALID(rx) &&             \
+     (tx) != (rx) && !MGF_KLINE_GPIO_IS_INPUT_ONLY(tx) &&                      \
+     !MGF_KLINE_GPIO_IS_RESERVED(tx) && !MGF_KLINE_GPIO_IS_RESERVED(rx))
+
+#if !MGF_KLINE_GPIO_IS_VALID(MGF_KLINE_TX_GPIO) ||                             \
+    !MGF_KLINE_GPIO_IS_VALID(MGF_KLINE_RX_GPIO)
 #error "MGF_KLINE_TX_GPIO and MGF_KLINE_RX_GPIO must be ESP32-S3 GPIO numbers"
 #endif
 
@@ -53,52 +84,17 @@
 #error "K-line TX and RX must use different GPIOs"
 #endif
 
-// GPIO34..39 are input-only on the ESP32-S3; they can receive K-line data but
-// cannot drive the transceiver's TX input. GPIO38 is therefore RX-only in the
-// default LILYGO profile.
-#if MGF_KLINE_TX_GPIO == 34 || MGF_KLINE_TX_GPIO == 35 ||                      \
-    MGF_KLINE_TX_GPIO == 36 || MGF_KLINE_TX_GPIO == 37 ||                      \
-    MGF_KLINE_TX_GPIO == 38
+#if MGF_KLINE_GPIO_IS_INPUT_ONLY(MGF_KLINE_TX_GPIO)
 #error "K-line TX GPIO must be output-capable on ESP32-S3"
 #endif
 
-// LCD RGB, sync, backlight, and the LCD's serial data pins on the H597.
-#if MGF_KLINE_TX_GPIO == 2 || MGF_KLINE_TX_GPIO == 3 ||                        \
-    MGF_KLINE_TX_GPIO == 5 || MGF_KLINE_TX_GPIO == 6 ||                        \
-    MGF_KLINE_TX_GPIO == 7 || MGF_KLINE_TX_GPIO == 9 ||                        \
-    MGF_KLINE_TX_GPIO == 10 || MGF_KLINE_TX_GPIO == 11 ||                      \
-    MGF_KLINE_TX_GPIO == 12 || MGF_KLINE_TX_GPIO == 13 ||                      \
-    MGF_KLINE_TX_GPIO == 14 || MGF_KLINE_TX_GPIO == 15 ||                      \
-    MGF_KLINE_TX_GPIO == 16 || MGF_KLINE_TX_GPIO == 17 ||                      \
-    MGF_KLINE_TX_GPIO == 18 || MGF_KLINE_TX_GPIO == 21 ||                      \
-    MGF_KLINE_TX_GPIO == 41 || MGF_KLINE_TX_GPIO == 42 ||                      \
-    MGF_KLINE_TX_GPIO == 43 || MGF_KLINE_TX_GPIO == 44 ||                      \
-    MGF_KLINE_TX_GPIO == 45 || MGF_KLINE_TX_GPIO == 46 ||                      \
-    MGF_KLINE_TX_GPIO == 47 || MGF_KLINE_RX_GPIO == 2 ||                       \
-    MGF_KLINE_RX_GPIO == 3 || MGF_KLINE_RX_GPIO == 5 ||                        \
-    MGF_KLINE_RX_GPIO == 6 || MGF_KLINE_RX_GPIO == 7 ||                        \
-    MGF_KLINE_RX_GPIO == 9 || MGF_KLINE_RX_GPIO == 10 ||                       \
-    MGF_KLINE_RX_GPIO == 11 || MGF_KLINE_RX_GPIO == 12 ||                      \
-    MGF_KLINE_RX_GPIO == 13 || MGF_KLINE_RX_GPIO == 14 ||                      \
-    MGF_KLINE_RX_GPIO == 15 || MGF_KLINE_RX_GPIO == 16 ||                      \
-    MGF_KLINE_RX_GPIO == 17 || MGF_KLINE_RX_GPIO == 18 ||                      \
-    MGF_KLINE_RX_GPIO == 21 || MGF_KLINE_RX_GPIO == 41 ||                      \
-    MGF_KLINE_RX_GPIO == 42 || MGF_KLINE_RX_GPIO == 43 ||                      \
-    MGF_KLINE_RX_GPIO == 44 || MGF_KLINE_RX_GPIO == 45 ||                      \
-    MGF_KLINE_RX_GPIO == 46 || MGF_KLINE_RX_GPIO == 47
+#if MGF_KLINE_GPIO_IS_DISPLAY(MGF_KLINE_TX_GPIO) ||                            \
+    MGF_KLINE_GPIO_IS_DISPLAY(MGF_KLINE_RX_GPIO)
 #error "K-line GPIO conflicts with a LILYGO T-RGB LCD/display pin"
 #endif
 
-// Shared I2C/touch, power, USB, boot, battery, and the remaining SD signal.
-// GPIO38 and GPIO40 are intentionally absent: they are the K-line defaults.
-#if MGF_KLINE_TX_GPIO == 0 || MGF_KLINE_TX_GPIO == 1 ||                        \
-    MGF_KLINE_TX_GPIO == 4 || MGF_KLINE_TX_GPIO == 8 ||                        \
-    MGF_KLINE_TX_GPIO == 19 || MGF_KLINE_TX_GPIO == 20 ||                      \
-    MGF_KLINE_TX_GPIO == 39 || MGF_KLINE_TX_GPIO == 48 ||                      \
-    MGF_KLINE_RX_GPIO == 0 || MGF_KLINE_RX_GPIO == 1 ||                        \
-    MGF_KLINE_RX_GPIO == 4 || MGF_KLINE_RX_GPIO == 8 ||                        \
-    MGF_KLINE_RX_GPIO == 19 || MGF_KLINE_RX_GPIO == 20 ||                      \
-    MGF_KLINE_RX_GPIO == 39 || MGF_KLINE_RX_GPIO == 48
+#if MGF_KLINE_GPIO_IS_BOARD_RESERVED(MGF_KLINE_TX_GPIO) ||                     \
+    MGF_KLINE_GPIO_IS_BOARD_RESERVED(MGF_KLINE_RX_GPIO)
 #error "K-line GPIO conflicts with a reserved LILYGO T-RGB board resource"
 #endif
 

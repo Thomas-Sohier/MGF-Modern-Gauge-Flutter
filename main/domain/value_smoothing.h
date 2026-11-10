@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // Lissage exponentiel du premier ordre pour l'affichage. Les trames MEMS
-// arrivent à ~5 Hz alors que l'écran se rafraîchit à 25 Hz : sans filtre, le
+// arrivent à ~10 Hz (trame 0x80 toutes les 100 ms) alors que l'écran se rafraîchit à 25 Hz : sans filtre, le
 // compte-tours avance par paliers. `tau_ms` est la constante de temps (63 %
 // du saut atteint après tau_ms).
 //

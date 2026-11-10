@@ -125,3 +125,49 @@ void amber_draw_tick(lv_layer_t *layer, const ui_layout_t *layout, float cx,
                     cx + cosine * outer, cy + sine * outer, width, color,
                     rounded);
 }
+
+void amber_invalidate_sector(lv_obj_t *obj, float cx, float cy, float r_in,
+                             float r_out, float start, float sweep,
+                             float margin_px) {
+    if (obj == NULL || sweep <= 0.0f) return;
+    lv_area_t coords;
+    lv_obj_get_coords(obj, &coords);
+    const ui_layout_t layout = amber_draw_layout(&coords);
+    // Le rendu SW de LVGL 9.2 tronque les angles d'arc au degré entier :
+    // le bord réel peut être décalé de près d'1° (≈4 px à r=237). On élargit
+    // donc le secteur au degré entier encadrant, plus 1° de sécurité.
+    float end = ceilf(start + sweep) + 1.0f;
+    start = floorf(start) - 1.0f;
+    if (end - start >= 360.0f) {
+        start = 0.0f;
+        end = 360.0f;
+    }
+    float min_x = INFINITY, max_x = -INFINITY;
+    float min_y = INFINITY, max_y = -INFINITY;
+#define SECTOR_ADD(angle, radius)                                              \
+    do {                                                                       \
+        const float rad = (angle) * (float)M_PI / 180.0f;                      \
+        const float px = cx + cosf(rad) * (radius);                            \
+        const float py = cy + sinf(rad) * (radius);                            \
+        min_x = fminf(min_x, px);                                              \
+        max_x = fmaxf(max_x, px);                                              \
+        min_y = fminf(min_y, py);                                              \
+        max_y = fmaxf(max_y, py);                                              \
+    } while (0)
+    SECTOR_ADD(start, r_in);
+    SECTOR_ADD(start, r_out);
+    SECTOR_ADD(end, r_in);
+    SECTOR_ADD(end, r_out);
+    // Extrêmes du cercle extérieur atteints aux angles cardinaux inclus.
+    for (int k = (int)ceilf(start / 90.0f); k * 90.0f <= end; k++) {
+        SECTOR_ADD(k * 90.0f, r_out);
+    }
+#undef SECTOR_ADD
+    lv_area_t area = {
+        .x1 = (int32_t)floorf(ui_layout_x(&layout, min_x) - margin_px),
+        .y1 = (int32_t)floorf(ui_layout_y(&layout, min_y) - margin_px),
+        .x2 = (int32_t)ceilf(ui_layout_x(&layout, max_x) + margin_px),
+        .y2 = (int32_t)ceilf(ui_layout_y(&layout, max_y) + margin_px),
+    };
+    lv_obj_invalidate_area(obj, &area);
+}

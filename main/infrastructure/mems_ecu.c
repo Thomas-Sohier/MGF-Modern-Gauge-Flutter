@@ -16,7 +16,7 @@
 
 static const char *TAG = "mems_ecu";
 
-#define DEFAULT_POLL_MS      200
+#define DEFAULT_POLL_MS      100
 #define DEFAULT_RECONNECT_MS 1000
 #define READ_TIMEOUT_MS      100
 #define TASK_STACK           4096
@@ -51,9 +51,12 @@ static void publish(mems_ecu_t *ecu, const ecu_data_t *data) {
 
 static void mems_ecu_task(void *arg) {
     mems_ecu_t *ecu = arg;
+    TickType_t period = pdMS_TO_TICKS(ecu->poll_period_ms);
+    if (period == 0) period = 1;
+    TickType_t last_wake = xTaskGetTickCount();
 
     while (ecu->running) {
-        if (!ecu->session.connected) {
+        if (!mems_session_is_connected(&ecu->session)) {
             ESP_LOGI(TAG, "connexion à l'ECU MEMS…");
             if (!mems_session_connect(&ecu->session)) {
                 // Publier l'état déconnecté et temporiser avant nouvel essai.
@@ -62,26 +65,36 @@ static void mems_ecu_task(void *arg) {
                 vTaskDelay(pdMS_TO_TICKS(ecu->reconnect_delay_ms));
                 continue;
             }
-            ESP_LOGI(TAG, "ECU connectée (ID %02X %02X %02X %02X)",
-                     ecu->base_reader.ecu_id[1], ecu->base_reader.ecu_id[2],
-                     ecu->base_reader.ecu_id[3], ecu->base_reader.ecu_id[4]);
+            const uint8_t *id = mems_reader_ecu_id(&ecu->base_reader);
+            ESP_LOGI(TAG, "ECU connectée (ID %02X %02X %02X %02X)", id[1],
+                     id[2], id[3], id[4]);
+            // Repartir d'une cadence neuve après le handshake (durée variable).
+            last_wake = xTaskGetTickCount();
         }
 
+        // Cycle : 0x80 à chaque fois, 0x7D un cycle sur N (cf. mems_session).
         ecu_data_t data;
         if (mems_session_poll(&ecu->session, &data, NULL)) {
             publish(ecu, &data);
-        } else if (ecu->session.connected) {
+        } else if (mems_session_is_connected(&ecu->session)) {
             // Échec isolé : on garde le dernier instantané et on retente.
             ESP_LOGD(TAG, "trame MEMS perdue (%u/%u)",
-                     ecu->session.poll_failures,
+                     mems_session_poll_failures(&ecu->session),
                      MEMS_SESSION_MAX_POLL_FAILURES);
         } else {
             ESP_LOGW(TAG, "ECU absente ou trames expirées, reconnexion");
             // Ne pas conserver un snapshot marqué connecté après la perte.
             const ecu_data_t down = ecu_data_unavailable();
             publish(ecu, &down);
+            continue; // reconnexion immédiate, sans attendre la période
         }
-        vTaskDelay(pdMS_TO_TICKS(ecu->poll_period_ms));
+
+        // Cadence périodique réelle : la durée des échanges est absorbée dans
+        // la période. En cas de dépassement (lectures expirées), on recale la
+        // référence au lieu d'enchaîner des cycles en rafale pour rattraper.
+        if (xTaskDelayUntil(&last_wake, period) == pdFALSE) {
+            last_wake = xTaskGetTickCount();
+        }
     }
 
     // This is the final operation that touches `ecu`; the owner waits for

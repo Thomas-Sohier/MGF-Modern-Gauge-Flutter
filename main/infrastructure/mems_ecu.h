@@ -23,7 +23,7 @@ typedef struct mems_ecu_s mems_ecu_t;
 typedef struct {
     kline_uart_config_t kline;   // brochage/UART du transceiver K-line
     mems_variant_t variant;      // MEMS 1.6 (défaut) ou 1.9 (réveil 5 bauds)
-    uint32_t poll_period_ms;     // 0 => 200 ms
+    uint32_t poll_period_ms;     // période d'un cycle de poll ; 0 => 100 ms
     uint32_t reconnect_delay_ms; // 0 => 1000 ms
 } mems_ecu_config_t;
 
