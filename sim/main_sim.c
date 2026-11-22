@@ -71,7 +71,6 @@ typedef enum {
     SCENARIO_PAUSED,       // lecture média en pause
     SCENARIO_UNSYNCED,     // horloge sans source de temps fiable
     SCENARIO_RECONNECTED,  // valid -> invalid -> valid (dernier état nominal)
-    SCENARIO_CAR,          // phase roadster MGF 3D de l'écran de démarrage
     SCENARIO_MINIMAL,      // version 2D minimaliste du logo MG conservée
 } scenario_t;
 
@@ -91,7 +90,6 @@ static bool scenario_parse(const char *name, scenario_t *out) {
         {"paused", SCENARIO_PAUSED},
         {"unsynced", SCENARIO_UNSYNCED},
         {"reconnected", SCENARIO_RECONNECTED},
-        {"car", SCENARIO_CAR},
         {"minimal", SCENARIO_MINIMAL},
     };
     for (size_t i = 0; i < sizeof(k_scenarios) / sizeof(k_scenarios[0]); i++) {
@@ -507,9 +505,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "boot: allocation echouee\n");
             return 1;
         }
-        if (scenario == SCENARIO_CAR) {
-            boot_screen_set_mode(view, BOOT_SCREEN_MODE_3D_CAR);
-        } else if (scenario == SCENARIO_MINIMAL) {
+        if (scenario == SCENARIO_MINIMAL) {
             boot_screen_set_mode(view, BOOT_SCREEN_MODE_2D_MINIMAL);
         }
     } else if (strcmp(style, "amber") == 0) {

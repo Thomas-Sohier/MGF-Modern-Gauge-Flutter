@@ -73,9 +73,9 @@ struct music_screen_s {
 // Repli sans pochette : cassette audio rétro-futuriste en 2.5D, fil de fer
 // tramé de blocs « pixel » (grille ASCII, vis, encoches, cartouche matriciel).
 // Le contraste reste contenu — un aplat ambre plein serait aveuglant de nuit.
-// La cassette tourne autour de son axe vertical pendant la lecture et les
-// bobines suivent la progression ; hors lecture la pose est figée (golden
-// déterministe).
+// La cassette tourne en permanence autour de son axe vertical (avec ou sans
+// musique) et les bobines suivent la progression. L'horloge `anim_ms` vaut 0
+// au simulateur : pose de repos déterministe pour les golden.
 //
 // Repère local de la cassette : u ∈ [-82, +82] (largeur), v ∈ [-52, +52]
 // (vers le bas), z ∈ [-11, +11] (épaisseur, z > 0 vers l'observateur). Le
@@ -91,7 +91,6 @@ struct music_screen_s {
 #define CASSETTE_PITCH_DEG 13.0f
 #define CASSETTE_REST_YAW  (-26.0f)
 #define CASSETTE_SPIN_MS   12000
-#define CASSETTE_PHASE_MS  2000
 
 typedef struct {
     float cos_yaw;
@@ -252,18 +251,12 @@ static void draw_reel_3d(lv_layer_t *layer, const ui_layout_t *layout,
     }
 }
 
-// Lacet de la cassette : pose 3/4 de repos hors ligne (golden déterministe),
-// sinon rotation continue d'un tour toutes les 12 s, indexée sur la position
-// de lecture. Le décalage de phase fait retomber la position de démonstration
-// (142 s) sur la pose de repos.
+// Lacet de la cassette : rotation continue d'un tour toutes les 12 s sur
+// l'horloge d'animation, que de la musique soit lue ou non (anim_ms = 0 ->
+// pose 3/4 de repos).
 static float cover_yaw_deg(const music_screen_t *scr) {
-    if (scr == NULL || !scr->linked || !scr->has_media) {
-        return CASSETTE_REST_YAW;
-    }
-    const int64_t pos_ms = companion_media_position_at(
-        &scr->media, scr->received_ms, scr->anim_ms);
-    if (pos_ms < 0) return CASSETTE_REST_YAW;
-    const int64_t phase = (pos_ms + CASSETTE_PHASE_MS) % CASSETTE_SPIN_MS;
+    if (scr == NULL) return CASSETTE_REST_YAW;
+    const uint32_t phase = scr->anim_ms % (uint32_t)CASSETTE_SPIN_MS;
     return CASSETTE_REST_YAW + (float)phase * 360.0f / (float)CASSETTE_SPIN_MS;
 }
 
@@ -428,7 +421,7 @@ static void draw_cover_fallback(lv_layer_t *layer, const ui_layout_t *layout,
         r_tape_r = 13.0f + 6.0f * p;
     }
     // Les bobines tournent quatre fois plus vite que la cassette, soit une
-    // révolution toutes les 3 s en lecture ; figées hors ligne.
+    // révolution toutes les 3 s.
     const float phase_deg = yaw_deg * 4.0f;
     draw_reel_3d(layer, layout, &proj, -37.0f, zf, r_tape_l, phase_deg, bright,
                  dim);
@@ -515,7 +508,7 @@ static void refresh_progress(music_screen_t *scr, uint32_t now_ms) {
     // Position courante et durée totale côte à côte ; l'anneau porte la
     // progression. Hors lecture ou durée inconnue, seule la durée s'affiche
     // (« --:-- » si déconnecté).
-    char text[32];
+    char text[40]; // 2 x 16 (format_time) + " / " : pas de troncature
     if (active && seconds >= 0 && duration > 0) {
         char pos_text[16];
         char dur_text[16];
@@ -761,12 +754,11 @@ void music_screen_set_link(music_screen_t *scr, bool linked, uint32_t now_ms) {
 
 void music_screen_tick(music_screen_t *scr, uint32_t now_ms) {
     if (scr == NULL) return;
-    // Cassette de repli (sans pochette) : pendant la lecture, la rotation 3D
-    // avance à ~12,5 Hz. La géométrie reste légère (primitives vectorielles
-    // filaires), donc bornée pour l'ESP32-S3. Hors lecture, la pose est figée.
-    if (scr->cover_pixels == NULL && scr->has_media && scr->linked &&
-        scr->media.state == COMPANION_PLAYBACK_PLAYING &&
-        now_ms - scr->anim_ms >= 80U) {
+    // Cassette de repli (sans pochette) : la rotation 3D avance en permanence
+    // à ~12,5 Hz, avec ou sans musique. La géométrie reste légère (primitives
+    // vectorielles filaires), donc bornée pour l'ESP32-S3 ; page masquée =
+    // invalidation sans redessin.
+    if (scr->cover_pixels == NULL && now_ms - scr->anim_ms >= 80U) {
         scr->anim_ms = now_ms;
         amber_page_invalidate(&scr->page);
     }

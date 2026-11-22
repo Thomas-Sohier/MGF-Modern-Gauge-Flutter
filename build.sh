@@ -135,7 +135,6 @@ echo ">> génération des goldens scénarios..."
 "$BUILD/gen_golden" clock      "$GDIR/clock_reconnected_amber.png"       reconnected
 # Horloge sans source de temps fiable.
 "$BUILD/gen_golden" clock      "$GDIR/clock_unsynced_amber.png"          unsynced
-"$BUILD/gen_golden" boot       "$GDIR/boot_car_amber.png"               car
 "$BUILD/gen_golden" boot       "$GDIR/boot_minimal_amber.png"           minimal
 # Textes longs (ellipsis) et lecture en pause.
 "$BUILD/gen_golden" music      "$GDIR/music_long_amber.png"              long
