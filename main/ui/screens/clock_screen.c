@@ -4,6 +4,7 @@
 #include "ui/themes/ui_theme.h"
 #include "ui/ui_layout.h"
 #include "ui/widgets/amber_ui.h"
+#include "ui/widgets/amber_draw.h"
 #include "ui/widgets/amber_kit.h"
 #include "domain/rtc_time.h"
 
@@ -102,7 +103,7 @@ static void draw_arc(lv_layer_t *layer, float cx, float cy, float radius,
     d.color = color;
     d.opa = LV_OPA_COVER;
     d.rounded = 0;
-    lv_draw_arc(layer, &d);
+    amber_draw_arc_clipped(layer, &d);
 }
 
 static void draw_face(lv_layer_t *layer, const ui_layout_t *layout) {

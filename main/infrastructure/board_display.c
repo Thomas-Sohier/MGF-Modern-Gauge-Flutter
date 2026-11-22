@@ -551,8 +551,7 @@ lv_display_t *board_display_start(void) {
     }
     touch_bringup(s_display);
     ESP_LOGI(TAG, "LILYGO T-RGB H597 ready: profile=%s %ux%u @ %lu Hz%s",
-             s_profile.name, LCD_H_RES, LCD_V_RES,
-             (unsigned long)LCD_PCLK_HZ,
+             s_profile.name, LCD_H_RES, LCD_V_RES, (unsigned long)LCD_PCLK_HZ,
              s_touch != NULL ? ", touch=present" : ", touch=absent");
     return s_display;
 }
