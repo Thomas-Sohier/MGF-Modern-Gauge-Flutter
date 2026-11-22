@@ -29,9 +29,9 @@
 // Textes sous la pochette. Descendus au plus près de l'anneau tout en
 // gardant chaque ligne dans la corde du disque intérieur.
 #define MUSIC_TRACK_Y      238.0f
-#define MUSIC_ARTIST_Y     262.0f
-#define MUSIC_RULE_Y       276.0f
-#define MUSIC_TIME_Y       292.0f
+#define MUSIC_ARTIST_Y     260.0f
+#define MUSIC_RULE_Y       273.0f
+#define MUSIC_TIME_Y       287.0f
 #define MUSIC_TRACK_WIDTH  248.0f
 #define MUSIC_ARTIST_WIDTH 210.0f
 

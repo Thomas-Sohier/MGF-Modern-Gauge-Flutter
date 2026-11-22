@@ -168,9 +168,10 @@ static void draw_hands(lv_layer_t *layer, const ui_layout_t *layout,
     const lv_color_t bg = ui_theme_amber_bg();
 
     // Ombres ambre décalées : une bordure étroite détache les aiguilles sans
-    // ajouter de contour clair ni d'effet coûteux. L'heure reste plus massive.
+    // ajouter de contour clair ni d'effet coûteux. L'heure est massive, la
+    // minute fine et élancée : la hiérarchie se lit d'un coup d'œil.
     const float hour_width = radius * 0.11f;
-    const float minute_width = radius * 0.105f;
+    const float minute_width = radius * 0.076f;
     draw_hand(layer, cx, cy, hour_angle, radius * 0.55f,
               hour_width + 1.6f * scale, 1.0f * scale, dim);
     draw_hand(layer, cx, cy, minute_angle, radius * 0.80f,
@@ -180,6 +181,14 @@ static void draw_hands(lv_layer_t *layer, const ui_layout_t *layout,
               bright);
     draw_hand(layer, cx, cy, minute_angle, radius * 0.80f, minute_width, 0.0f,
               bright);
+
+    // Fentes intérieures sombres (aiguilles ajourées / squelettes) : seule la
+    // première moitié est évidée, le plein garde la pointe. La couleur vient de
+    // la palette active, donc la bascule inversée reste exacte.
+    draw_hand(layer, cx, cy, hour_angle, radius * 0.30f, radius * 0.032f, 0.0f,
+              bg);
+    draw_hand(layer, cx, cy, minute_angle, radius * 0.42f, radius * 0.024f,
+              0.0f, bg);
 
     // Pivot en trois couches : disque séparateur, centre sombre et crêtes
     // radiales inspirées du widget Flutter, toutes en teintes ambre.

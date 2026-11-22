@@ -21,8 +21,8 @@
 // Lecture en cours sur le téléphone (application compagnon). Le lien BLE est à
 // sens unique (téléphone -> jauge) : la pochette JPEG est réassemblée puis
 // décodée hors LVGL (companion_art_worker) et déposée ici en RGB565 ambre. En
-// l'absence d'image valide, un pictogramme musical sombre sur fond ambre sert
-// de repli.
+// l'absence d'image valide, une cassette audio vectorielle à blocs pixel sert
+// de repli (aucun aplat ambre plein : de nuit, il serait aveuglant).
 //
 // Composition : anneau de progression continu proche du bord (piste sombre,
 // départ à 12 h, sens horaire), pochette en cadrage « cover » (échelle
@@ -62,6 +62,7 @@ struct music_screen_s {
     lv_obj_t *duration;
     companion_media_t media;
     uint32_t received_ms;
+    uint32_t anim_ms; // horloge de la rotation 3D (cassette de repli)
     bool has_media;
     bool linked;
     float progress;        // 0..1, ou < 0 si inconnue
@@ -69,32 +70,370 @@ struct music_screen_s {
 };
 
 // ── Pochette ────────────────────────────────────────────────────────────────
-// Repli sans pochette : aplat ambre et pictogramme musical couleur fond. Le
-// remplissage par cordes reproduit le même bord circulaire que l'image réelle.
-static void draw_cover_fallback(lv_layer_t *layer, const ui_layout_t *layout) {
-    const lv_color_t amber = ui_theme_amber_bright();
-    const lv_color_t bg = ui_theme_amber_bg();
-    const float radius = COVER_CLIP_D * 0.5f;
-    const float cy = COVER_CLIP_XY + radius;
-    for (float y = COVER_CLIP_XY; y <= COVER_IMAGE_Y1; y += 0.75f) {
-        const float dy = y - cy;
-        const float half = sqrtf(LV_MAX(0.0f, radius * radius - dy * dy));
-        amber_draw_line(layer, layout, AMBER_KIT_CX - half, y,
-                        AMBER_KIT_CX + half, y, 1.25f, amber, false);
+// Repli sans pochette : cassette audio rétro-futuriste en 2.5D, fil de fer
+// tramé de blocs « pixel » (grille ASCII, vis, encoches, cartouche matriciel).
+// Le contraste reste contenu — un aplat ambre plein serait aveuglant de nuit.
+// La cassette tourne autour de son axe vertical pendant la lecture et les
+// bobines suivent la progression ; hors lecture la pose est figée (golden
+// déterministe).
+//
+// Repère local de la cassette : u ∈ [-82, +82] (largeur), v ∈ [-52, +52]
+// (vers le bas), z ∈ [-11, +11] (épaisseur, z > 0 vers l'observateur). Le
+// projecteur applique un lacet θ (rotation autour de l'axe vertical), une
+// plongée fixe φ = 13° qui découvre la tranche supérieure et l'épaisseur du
+// boîtier, puis une perspective douce centrée sur la fenêtre de pochette.
+#define CASSETTE_CX        160.0f
+#define CASSETTE_CY        115.0f
+#define CASSETTE_HALF_W    82.0f
+#define CASSETTE_HALF_H    52.0f
+#define CASSETTE_HALF_Z    11.0f
+#define CASSETTE_FOV       380.0f
+#define CASSETTE_PITCH_DEG 13.0f
+#define CASSETTE_REST_YAW  (-26.0f)
+#define CASSETTE_SPIN_MS   12000
+#define CASSETTE_PHASE_MS  2000
+
+typedef struct {
+    float cos_yaw;
+    float sin_yaw;
+    float cos_pitch;
+    float sin_pitch;
+} music_proj_t;
+
+typedef struct {
+    float x;
+    float y;
+    float k; // facteur de perspective (1 = plan neutre)
+} music_pt_t;
+
+static void draw_pixel_block(lv_layer_t *layer, const ui_layout_t *layout,
+                             float cx, float cy, float w, float h,
+                             lv_color_t color) {
+    lv_draw_rect_dsc_t dsc;
+    lv_draw_rect_dsc_init(&dsc);
+    dsc.bg_color = color;
+    dsc.bg_opa = LV_OPA_COVER;
+    dsc.radius = 0;
+    const lv_area_t area = {
+        (int32_t)lroundf(ui_layout_x(layout, cx - w * 0.5f)),
+        (int32_t)lroundf(ui_layout_y(layout, cy - h * 0.5f)),
+        (int32_t)lroundf(ui_layout_x(layout, cx + w * 0.5f)),
+        (int32_t)lroundf(ui_layout_y(layout, cy + h * 0.5f)),
+    };
+    lv_draw_rect(layer, &dsc, &area);
+}
+
+// Projection perspective : rotation Y (lacet), puis rotation X (plongée),
+// puis division perspective. z2 > 0 rapproche l'observateur.
+static music_pt_t project_3d(const music_proj_t *proj, float u, float v,
+                             float z) {
+    const float x1 = u * proj->cos_yaw + z * proj->sin_yaw;
+    const float z1 = -u * proj->sin_yaw + z * proj->cos_yaw;
+    const float y2 = v * proj->cos_pitch - z1 * proj->sin_pitch;
+    const float z2 = v * proj->sin_pitch + z1 * proj->cos_pitch;
+    const float k = CASSETTE_FOV / (CASSETTE_FOV - z2);
+    return (music_pt_t){
+        .x = CASSETTE_CX + x1 * k, .y = CASSETTE_CY + y2 * k, .k = k};
+}
+
+static void draw_line_3d(lv_layer_t *layer, const ui_layout_t *layout,
+                         const music_proj_t *proj, float u1, float v1, float z1,
+                         float u2, float v2, float z2, float width,
+                         lv_color_t color) {
+    const music_pt_t a = project_3d(proj, u1, v1, z1);
+    const music_pt_t b = project_3d(proj, u2, v2, z2);
+    amber_draw_line(layer, layout, a.x, a.y, b.x, b.y, width, color, false);
+}
+
+static void draw_pixel_3d(lv_layer_t *layer, const ui_layout_t *layout,
+                          const music_proj_t *proj, float u, float v, float z,
+                          float size, lv_color_t color) {
+    const music_pt_t p = project_3d(proj, u, v, z);
+    draw_pixel_block(layer, layout, p.x, p.y, size * p.k, size * p.k, color);
+}
+
+// Cercle 3D : projeté, il devient une ellipse en perspective. `phase_deg`
+// décale le point de départ, ce qui anime les pointillés de la bande.
+static void draw_circle_3d(lv_layer_t *layer, const ui_layout_t *layout,
+                           const music_proj_t *proj, float cu, float cv,
+                           float cz, float radius, int segments,
+                           float phase_deg, float width, lv_color_t color,
+                           bool dashed) {
+    if (segments < 3) segments = 3;
+    const float step = 2.0f * (float)M_PI / (float)segments;
+    const float phase = phase_deg * (float)M_PI / 180.0f;
+    music_pt_t prev = project_3d(proj, cu + radius * cosf(phase),
+                                 cv + radius * sinf(phase), cz);
+    for (int i = 1; i <= segments; i++) {
+        const float angle = phase + (float)i * step;
+        const music_pt_t cur = project_3d(proj, cu + radius * cosf(angle),
+                                          cv + radius * sinf(angle), cz);
+        // Un segment sur deux, décalés par la phase : la bande « tourne ».
+        if (!dashed || (i & 1) == 0) {
+            amber_draw_line(layer, layout, prev.x, prev.y, cur.x, cur.y, width,
+                            color, false);
+        }
+        prev = cur;
+    }
+}
+
+// Boîtier chanfreiné 164 x 104 (chanfrein 7), sommets dans le sens horaire.
+static const float k_cassette_octagon[8][2] = {
+    {-75.0f, -52.0f}, {75.0f, -52.0f}, {82.0f, -45.0f}, {82.0f, 45.0f},
+    {75.0f, 52.0f},   {-75.0f, 52.0f}, {-82.0f, 45.0f}, {-82.0f, -45.0f},
+};
+
+static void draw_octagon_3d(lv_layer_t *layer, const ui_layout_t *layout,
+                            const music_proj_t *proj, float z, float width,
+                            lv_color_t color) {
+    for (int i = 0; i < 8; i++) {
+        const int n = (i + 1) & 7;
+        draw_line_3d(layer, layout, proj, k_cassette_octagon[i][0],
+                     k_cassette_octagon[i][1], z, k_cassette_octagon[n][0],
+                     k_cassette_octagon[n][1], z, width, color);
+    }
+}
+
+// Rectangle chanfreiné (étiquette, cartouche) sur un plan z donné.
+static void draw_chamfer_3d(lv_layer_t *layer, const ui_layout_t *layout,
+                            const music_proj_t *proj, float u0, float v0,
+                            float u1, float v1, float chamfer, float z,
+                            float width, lv_color_t color) {
+    const float pts[8][2] = {
+        {u0 + chamfer, v0}, {u1 - chamfer, v0}, {u1, v0 + chamfer},
+        {u1, v1 - chamfer}, {u1 - chamfer, v1}, {u0 + chamfer, v1},
+        {u0, v1 - chamfer}, {u0, v0 + chamfer},
+    };
+    for (int i = 0; i < 8; i++) {
+        const int n = (i + 1) & 7;
+        draw_line_3d(layer, layout, proj, pts[i][0], pts[i][1], z, pts[n][0],
+                     pts[n][1], z, width, color);
+    }
+}
+
+// Bobine posée à l'intérieur de la fenêtre : bande pointillée qui tourne,
+// sillon continu, moyeu vif, cylindre de profondeur et six dents.
+static void draw_reel_3d(lv_layer_t *layer, const ui_layout_t *layout,
+                         const music_proj_t *proj, float cu, float z_face,
+                         float r_tape, float phase_deg, lv_color_t bright,
+                         lv_color_t dim) {
+    const float cv = -2.0f;
+    const float z_reel = z_face * 0.65f;
+    const float z_deep = z_face * 0.25f;
+
+    // Bande magnétique : anneau pointillé (r_tape = bande restante) et sillon
+    // continu à mi-course.
+    draw_circle_3d(layer, layout, proj, cu, cv, z_reel + 0.6f, r_tape, 16,
+                   phase_deg, 1.2f, dim, true);
+    draw_circle_3d(layer, layout, proj, cu, cv, z_reel, (r_tape + 12.5f) * 0.5f,
+                   16, 0.0f, 1.0f, dim, false);
+
+    draw_circle_3d(layer, layout, proj, cu, cv, z_reel, 10.5f, 16, 0.0f, 1.8f,
+                   bright, false);
+    // Anneau de profondeur plus petit : le moyeu se lit comme un cylindre.
+    draw_circle_3d(layer, layout, proj, cu, cv, z_deep, 8.0f, 12, 0.0f, 1.0f,
+                   dim, false);
+
+    for (int d = 0; d < 6; d++) {
+        const float angle = phase_deg + (float)(d * 60);
+        const float rad = angle * (float)M_PI / 180.0f;
+        const float ca = cosf(rad);
+        const float sa = sinf(rad);
+        draw_line_3d(layer, layout, proj, cu + ca * 10.5f, cv + sa * 10.5f,
+                     z_reel, cu + ca * 8.0f, cv + sa * 8.0f, z_deep, 1.0f, dim);
+        if ((d & 1) == 0) {
+            draw_pixel_3d(layer, layout, proj, cu + ca * 7.0f, cv + sa * 7.0f,
+                          z_reel, 2.6f, bright);
+        } else {
+            draw_line_3d(layer, layout, proj, cu + ca * 6.5f, cv + sa * 6.5f,
+                         z_reel, cu + ca * 11.5f, cv + sa * 11.5f, z_reel, 2.2f,
+                         bright);
+        }
+    }
+}
+
+// Lacet de la cassette : pose 3/4 de repos hors ligne (golden déterministe),
+// sinon rotation continue d'un tour toutes les 12 s, indexée sur la position
+// de lecture. Le décalage de phase fait retomber la position de démonstration
+// (142 s) sur la pose de repos.
+static float cover_yaw_deg(const music_screen_t *scr) {
+    if (scr == NULL || !scr->linked || !scr->has_media) {
+        return CASSETTE_REST_YAW;
+    }
+    const int64_t pos_ms = companion_media_position_at(
+        &scr->media, scr->received_ms, scr->anim_ms);
+    if (pos_ms < 0) return CASSETTE_REST_YAW;
+    const int64_t phase = (pos_ms + CASSETTE_PHASE_MS) % CASSETTE_SPIN_MS;
+    return CASSETTE_REST_YAW + (float)phase * 360.0f / (float)CASSETTE_SPIN_MS;
+}
+
+static void draw_cover_fallback(lv_layer_t *layer, const ui_layout_t *layout,
+                                const music_screen_t *scr) {
+    const lv_color_t bright = ui_theme_amber_bright();
+    const lv_color_t dim = ui_theme_amber_dim();
+    const lv_color_t separator = ui_theme_amber_separator();
+
+    const float yaw_deg = cover_yaw_deg(scr);
+    const float yaw = yaw_deg * (float)M_PI / 180.0f;
+    const float pitch = CASSETTE_PITCH_DEG * (float)M_PI / 180.0f;
+    const music_proj_t proj = {
+        .cos_yaw = cosf(yaw),
+        .sin_yaw = sinf(yaw),
+        .cos_pitch = cosf(pitch),
+        .sin_pitch = sinf(pitch),
+    };
+    const float zf =
+        (proj.cos_yaw >= 0.0f) ? CASSETTE_HALF_Z : -CASSETTE_HALF_Z;
+    const float zb = -zf;
+    // Flanc réellement tourné vers la caméra : sa normale (+u) projetée sur z
+    // vaut -sin(θ), elle n'est positive que pour le côté opposé au signe.
+    const float u_side =
+        (proj.sin_yaw >= 0.0f) ? -CASSETTE_HALF_W : CASSETTE_HALF_W;
+
+    // 1. Podium télémétrique : ellipse d'ombre en blocs espacés sous la
+    // cassette, et deux croix de visée « scanner CAO » de part et d'autre.
+    for (int i = 0; i < 26; i++) {
+        const float angle = (float)i * 2.0f * (float)M_PI / 26.0f;
+        draw_pixel_block(layer, layout, CASSETTE_CX + cosf(angle) * 72.0f,
+                         186.0f + sinf(angle) * 8.0f, 3.0f, 2.2f, dim);
+    }
+    for (int side = 0; side < 2; side++) {
+        const float x = (side == 0) ? 64.0f : 256.0f;
+        draw_pixel_block(layer, layout, x, CASSETTE_CY, 1.4f, 9.0f, dim);
+        draw_pixel_block(layer, layout, x, CASSETTE_CY, 9.0f, 1.4f, dim);
     }
 
-    // Double croche stylisée, suffisamment massive pour rester lisible sur le
-    // fond tramé de l'écran physique.
-    amber_draw_line(layer, layout, 140.0f, 88.0f, 140.0f, 157.0f, 8.0f, bg,
-                    false);
-    amber_draw_line(layer, layout, 178.0f, 78.0f, 178.0f, 147.0f, 8.0f, bg,
-                    false);
-    amber_draw_line(layer, layout, 140.0f, 88.0f, 178.0f, 78.0f, 9.0f, bg,
-                    false);
-    amber_draw_line(layer, layout, 140.0f, 105.0f, 178.0f, 95.0f, 7.0f, bg,
-                    false);
-    amber_draw_dot(layer, layout, 129.0f, 159.0f, 14.0f, bg);
-    amber_draw_dot(layer, layout, 167.0f, 149.0f, 14.0f, bg);
+    // 2. Face arrière du boîtier, en fil de fer sombre.
+    draw_octagon_3d(layer, layout, &proj, zb, 1.0f, dim);
+
+    // 3. Tranche 3D : arêtes de liaison, tramage pixel du flanc visible et de
+    // la tranche supérieure (découverte par la plongée de 13°).
+    for (int i = 0; i < 8; i++) {
+        draw_line_3d(layer, layout, &proj, k_cassette_octagon[i][0],
+                     k_cassette_octagon[i][1], zb, k_cassette_octagon[i][0],
+                     k_cassette_octagon[i][1], zf, 1.3f, separator);
+    }
+    for (int row = 0; row < 9; row++) {
+        const float v = -36.0f + (float)row * 9.0f;
+        for (int depth = 0; depth < 3; depth++) {
+            const float z = -5.5f + (float)depth * 5.5f;
+            const lv_color_t color = ((row + depth) & 1) ? separator : dim;
+            draw_pixel_3d(layer, layout, &proj, u_side, v, z, 2.6f, color);
+        }
+    }
+    for (int col = 0; col < 9; col++) {
+        draw_pixel_3d(layer, layout, &proj, -64.0f + (float)col * 16.0f,
+                      -CASSETTE_HALF_H, 0.0f, 2.6f, dim);
+    }
+
+    // 4. Trapèze du pont de tête de lecture : sur-épaisseur vers l'avant,
+    // reliée à la face par quatre arêtes 3D.
+    const float z_bridge = zf * 1.32f;
+    static const float bridge[4][2] = {
+        {-48.0f, 52.0f},
+        {-41.0f, 27.0f},
+        {41.0f, 27.0f},
+        {48.0f, 52.0f},
+    };
+    for (int i = 0; i < 4; i++) {
+        const int n = (i + 1) & 3;
+        draw_line_3d(layer, layout, &proj, bridge[i][0], bridge[i][1], z_bridge,
+                     bridge[n][0], bridge[n][1], z_bridge, 1.6f,
+                     (i == 1) ? bright : separator);
+        draw_line_3d(layer, layout, &proj, bridge[i][0], bridge[i][1], zf,
+                     bridge[i][0], bridge[i][1], z_bridge, 1.0f, dim);
+    }
+
+    // Cabestans et fentes d'entraînement pixelisées.
+    for (int k = 0; k < 2; k++) {
+        const float cu = (k == 0) ? -26.0f : 26.0f;
+        draw_circle_3d(layer, layout, &proj, cu, 41.0f, z_bridge, 4.2f, 12,
+                       0.0f, 1.2f, dim, false);
+        draw_pixel_3d(layer, layout, &proj, cu, 41.0f, z_bridge + 0.4f, 1.8f,
+                      bright);
+    }
+    for (int k = 0; k < 2; k++) {
+        const float cu = (k == 0) ? -10.0f : 10.0f;
+        draw_pixel_3d(layer, layout, &proj, cu, 41.0f, z_bridge + 0.3f, 2.2f,
+                      dim);
+        draw_pixel_3d(layer, layout, &proj, cu, 43.5f, z_bridge + 0.3f, 2.2f,
+                      bright);
+    }
+
+    // 5. Face avant : boîtier, vis de coin, étiquette ASCII, fenêtre.
+    draw_octagon_3d(layer, layout, &proj, zf, 1.8f, separator);
+    for (int k = 0; k < 4; k++) {
+        const float u = (k & 1) ? 70.0f : -70.0f;
+        const float v = (k & 2) ? 41.0f : -41.0f;
+        draw_pixel_3d(layer, layout, &proj, u, v, zf + 0.2f, 3.5f, dim);
+        draw_pixel_3d(layer, layout, &proj, u, v, zf + 0.5f, 1.2f, bright);
+    }
+
+    draw_chamfer_3d(layer, layout, &proj, -70.0f, -43.0f, 70.0f, 18.0f, 4.0f,
+                    zf, 1.1f, dim);
+
+    // Trame matricielle de l'étiquette : matrice 4x2 à gauche, deux filets au
+    // centre, badge carré ajouré à droite.
+    for (int row = 0; row < 2; row++) {
+        for (int col = 0; col < 4; col++) {
+            draw_pixel_3d(layer, layout, &proj, -62.0f + (float)col * 8.0f,
+                          -36.0f + (float)row * 6.0f, zf + 0.2f, 2.5f,
+                          separator);
+        }
+    }
+    draw_line_3d(layer, layout, &proj, -28.0f, -36.0f, zf, 42.0f, -36.0f, zf,
+                 1.0f, dim);
+    draw_line_3d(layer, layout, &proj, -28.0f, -30.0f, zf, 42.0f, -30.0f, zf,
+                 1.0f, dim);
+    for (int row = 0; row < 2; row++) {
+        for (int col = 0; col < 2; col++) {
+            draw_pixel_3d(layer, layout, &proj, 52.0f + (float)col * 6.5f,
+                          -36.0f + (float)row * 6.0f, zf + 0.2f, 2.5f, bright);
+        }
+    }
+
+    // Fenêtre panoramique des bobines.
+    draw_line_3d(layer, layout, &proj, -58.0f, -22.0f, zf, 58.0f, -22.0f, zf,
+                 1.3f, separator);
+    draw_line_3d(layer, layout, &proj, -58.0f, 18.0f, zf, 58.0f, 18.0f, zf,
+                 1.3f, separator);
+    draw_line_3d(layer, layout, &proj, -58.0f, -22.0f, zf, -58.0f, 18.0f, zf,
+                 1.3f, separator);
+    draw_line_3d(layer, layout, &proj, 58.0f, -22.0f, zf, 58.0f, 18.0f, zf,
+                 1.3f, separator);
+
+    // Échelle de bande centrale : cinq graduations, et deux pistes de pixels
+    // qui alternent au fil de la rotation.
+    const int scroll = (int)((yaw_deg - CASSETTE_REST_YAW) / 30.0f) & 1;
+    for (int k = 0; k < 5; k++) {
+        draw_pixel_3d(layer, layout, &proj, -8.0f + (float)k * 4.0f, -2.0f,
+                      zf + 0.2f, (k == 2) ? 3.2f : 2.0f, separator);
+    }
+    for (int k = 0; k < 6; k++) {
+        const float u = -10.0f + (float)k * 4.0f;
+        const bool on = (((k + scroll) & 1) == 0);
+        draw_pixel_3d(layer, layout, &proj, u, -14.0f, zf + 0.2f, 2.5f,
+                      on ? bright : dim);
+        draw_pixel_3d(layer, layout, &proj, u, 10.0f, zf + 0.2f, 2.5f,
+                      on ? dim : bright);
+    }
+
+    // Répartition dynamique de la bande : la gauche se vide pendant que la
+    // droite se remplit (progression connue), sinon valeurs fixes.
+    float r_tape_l = 18.0f;
+    float r_tape_r = 14.0f;
+    if (scr != NULL && scr->progress >= 0.0f) {
+        const float p = amber_clampf(scr->progress, 0.0f, 1.0f);
+        r_tape_l = 19.0f - 6.0f * p;
+        r_tape_r = 13.0f + 6.0f * p;
+    }
+    // Les bobines tournent quatre fois plus vite que la cassette, soit une
+    // révolution toutes les 3 s en lecture ; figées hors ligne.
+    const float phase_deg = yaw_deg * 4.0f;
+    draw_reel_3d(layer, layout, &proj, -37.0f, zf, r_tape_l, phase_deg, bright,
+                 dim);
+    draw_reel_3d(layer, layout, &proj, 37.0f, zf, r_tape_r, phase_deg, bright,
+                 dim);
 }
 
 static void draw_state(lv_layer_t *layer, const ui_layout_t *layout,
@@ -105,7 +444,7 @@ static void draw_state(lv_layer_t *layer, const ui_layout_t *layout,
     // Remplissage de repli sous l'objet image : le canvas est le seul à le
     // dessiner quand aucune pochette réelle n'est prête.
     if (scr->cover_pixels == NULL) {
-        draw_cover_fallback(layer, layout);
+        draw_cover_fallback(layer, layout, scr);
     }
 
     amber_draw_line(layer, layout, 112.0f, RULE_Y, 208.0f, RULE_Y, 1.0f,
@@ -173,17 +512,34 @@ static void refresh_progress(music_screen_t *scr, uint32_t now_ms) {
             ? (float)((double)(seconds * 1000) / (double)duration)
             : -1.0f;
 
-    // La position courante est portée uniquement par l'anneau. Le texte en
-    // bas indique donc seulement la durée totale du morceau.
-    char text[16];
-    format_time(text, sizeof(text), duration);
+    // Position courante et durée totale côte à côte ; l'anneau porte la
+    // progression. Hors lecture ou durée inconnue, seule la durée s'affiche
+    // (« --:-- » si déconnecté).
+    char text[32];
+    if (active && seconds >= 0 && duration > 0) {
+        char pos_text[16];
+        char dur_text[16];
+        format_time(pos_text, sizeof(pos_text), seconds * 1000);
+        format_time(dur_text, sizeof(dur_text), duration);
+        snprintf(text, sizeof(text), "%s / %s", pos_text, dur_text);
+    } else {
+        format_time(text, sizeof(text), duration);
+    }
     if (amber_kit_set_text(scr->duration, text)) place_duration(scr);
 
     if (seconds != scr->shown_seconds || progress != scr->progress) {
         scr->shown_seconds = seconds;
         scr->progress = progress;
-        amber_page_invalidate(&scr->page);
+        // Seuls l'anneau et le libellé de temps changent : invalider la page
+        // entière forçait LVGL à redessiner le fond sous la pochette chaque
+        // seconde (coûteux sur ESP32-S3).
         if (scr->ring != NULL) lv_obj_invalidate(scr->ring);
+        // Sans pochette bitmap, la cassette de repli anime ses bobines et sa
+        // rotation : si le tick de 80 ms ne l'a pas déjà invalidée sur ce
+        // cycle, on redessine la page au changement de seconde.
+        if (scr->cover_pixels == NULL && scr->anim_ms != now_ms) {
+            amber_page_invalidate(&scr->page);
+        }
     }
 }
 
@@ -351,7 +707,7 @@ music_screen_t *music_screen_create(lv_obj_t *parent) {
     scr->track = amber_kit_label(root, amber_kit_font_value(),
                                  ui_theme_amber_bright(), "");
     scr->artist = amber_kit_caption(root, "");
-    scr->duration = amber_kit_label(root, amber_kit_font_label(),
+    scr->duration = amber_kit_label(root, amber_kit_font_caption(),
                                     ui_theme_amber_separator(), "--:--");
     if (scr->track == NULL || scr->artist == NULL || scr->duration == NULL) {
         goto fail;
@@ -385,6 +741,9 @@ void music_screen_set_media(music_screen_t *scr, const companion_media_t *media,
         scr->media = *media;
         scr->received_ms = now_ms;
     }
+    // Repart de l'instant de réception : la rotation 3D lit la position à
+    // cette horloge (le tick ne la fait avancer que si la page l'anime).
+    scr->anim_ms = now_ms;
     refresh_texts(scr);
     refresh_progress(scr, now_ms);
     amber_page_invalidate(&scr->page);
@@ -393,6 +752,8 @@ void music_screen_set_media(music_screen_t *scr, const companion_media_t *media,
 void music_screen_set_link(music_screen_t *scr, bool linked, uint32_t now_ms) {
     if (scr == NULL || scr->linked == linked) return;
     scr->linked = linked;
+    // Aligne l'horloge de rotation sur la (re)connexion.
+    scr->anim_ms = now_ms;
     refresh_texts(scr);
     refresh_progress(scr, now_ms);
     amber_page_invalidate(&scr->page);
@@ -400,6 +761,15 @@ void music_screen_set_link(music_screen_t *scr, bool linked, uint32_t now_ms) {
 
 void music_screen_tick(music_screen_t *scr, uint32_t now_ms) {
     if (scr == NULL) return;
+    // Cassette de repli (sans pochette) : pendant la lecture, la rotation 3D
+    // avance à ~12,5 Hz. La géométrie reste légère (primitives vectorielles
+    // filaires), donc bornée pour l'ESP32-S3. Hors lecture, la pose est figée.
+    if (scr->cover_pixels == NULL && scr->has_media && scr->linked &&
+        scr->media.state == COMPANION_PLAYBACK_PLAYING &&
+        now_ms - scr->anim_ms >= 80U) {
+        scr->anim_ms = now_ms;
+        amber_page_invalidate(&scr->page);
+    }
     refresh_progress(scr, now_ms);
 }
 

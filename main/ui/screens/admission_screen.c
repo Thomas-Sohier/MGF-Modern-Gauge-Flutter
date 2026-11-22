@@ -1,5 +1,6 @@
 #include "ui/screens/admission_screen.h"
 
+#include "ui/widgets/amber_draw.h"
 #include "ui/widgets/amber_kit.h"
 
 #include <math.h>
@@ -9,6 +10,12 @@
 // Seuils d'ouverture papillon pour l'état de charge affiché en ligne d'état.
 #define THROTTLE_IDLE_MAX_PCT 3
 #define THROTTLE_FULL_MIN_PCT 90
+
+// Plage du vacuomètre : la couronne se remplit de 0 kPa vers la pression
+// collecteur, avec un repère à la pression atmosphérique (100 kPa).
+#define MAP_MIN_KPA  0.0f
+#define MAP_MAX_KPA  105.0f
+#define MAP_ATMO_KPA 100.0f
 
 enum { CELL_THROTTLE = 0, CELL_TPS, CELL_INTAKE, CELL_RPM };
 
@@ -35,12 +42,14 @@ admission_screen_t *admission_screen_create(lv_obj_t *parent) {
         .hero_caption = "PRESSION MAP",
         .cell_caption = {"PAPILLON", "TPS", "AIR ADMIS", "REGIME"},
         .cell_unit = {"%", "V", "°C", "RPM"},
-        .rim = AMBER_RIM_HAIRLINE,
+        .rim = AMBER_RIM_SEGMENTS,
     };
     if (!amber_page_create(&scr->page, parent, &spec)) {
         admission_screen_destroy(scr);
         return NULL;
     }
+    const float atmo = amber_progress(MAP_ATMO_KPA, MAP_MIN_KPA, MAP_MAX_KPA);
+    amber_page_set_rim(&scr->page, 0.0f, 0.0f, atmo, false);
     amber_page_set_status(&scr->page, "ECU NON CONNECTEE", false);
     return scr;
 }
@@ -72,6 +81,15 @@ void admission_screen_update(admission_screen_t *scr, const ecu_data_t *data) {
                      metric ? data->map_sensor_kpa
                             : data->map_sensor_kpa * 0.145038f);
     amber_page_set_hero(&scr->page, text, map_ok);
+
+    // Vacuomètre : couronne remplie de 0 à la pression MAP, repère à la
+    // pression atmosphérique (100 kPa).
+    const float atmo = amber_progress(MAP_ATMO_KPA, MAP_MIN_KPA, MAP_MAX_KPA);
+    amber_page_set_rim(
+        &scr->page, 0.0f,
+        map_ok ? amber_progress(data->map_sensor_kpa, MAP_MIN_KPA, MAP_MAX_KPA)
+               : 0.0f,
+        atmo, map_ok);
 
     const float intake = data->intake_air_temp;
     const struct {

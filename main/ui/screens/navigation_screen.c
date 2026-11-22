@@ -40,7 +40,7 @@ typedef struct {
 typedef struct {
     point_t points[9];
     unsigned count;
-    bool ring; // rond-point : anneau autour de (160, 92)
+    bool ring; // rond-point : anneau autour de (160, 97)
     bool pin;  // arrivée : pastille en bout de trait
 } route_shape_t;
 
@@ -80,7 +80,7 @@ static route_shape_t shape_of(companion_maneuver_t maneuver, bool *mirror) {
                                false,
                                false};
     case COMPANION_MANEUVER_ROUNDABOUT:
-        return (route_shape_t){{{160, 128}, {160, 112}}, 2, true, false};
+        return (route_shape_t){{{160, 130}, {160, 114}}, 2, true, false};
     case COMPANION_MANEUVER_ARRIVE:
         return (route_shape_t){{{160, 126}, {160, 96}}, 2, false, true};
     case COMPANION_MANEUVER_STRAIGHT:
@@ -152,19 +152,21 @@ static void draw_route(lv_layer_t *layer, const ui_layout_t *layout,
         if (shape.ring) {
             // Rond-point (sens giratoire, circulation à droite) : la chaussée
             // dessine l'anneau complet, le trait lumineux n'en suit que la
-            // portion parcourue (entrée en bas, sortie en haut à droite).
-            const float r = 20.0f;
+            // portion parcourue (entrée en bas, sortie en haut à droite). Le
+            // centre est abaissé et le rayon resserré pour dégager la sortie
+            // sous le titre NAVIGATION.
+            const float r = 17.0f;
             if (pass == 0) {
-                amber_draw_circle(layer, layout, AMBER_KIT_CX, 92.0f,
+                amber_draw_circle(layer, layout, AMBER_KIT_CX, 97.0f,
                                   r + width * 0.5f, width, color);
             } else {
-                amber_draw_arc_wrapped(layer, layout, AMBER_KIT_CX, 92.0f,
+                amber_draw_arc_wrapped(layer, layout, AMBER_KIT_CX, 97.0f,
                                        r + width * 0.5f, width, 315.0f, 135.0f,
                                        color, true);
             }
             const point_t exit_a = {AMBER_KIT_CX + r * 0.7071f,
-                                    92.0f - r * 0.7071f};
-            const point_t exit_b = {194.0f, 58.0f};
+                                    97.0f - r * 0.7071f};
+            const point_t exit_b = {190.0f, 67.0f};
             amber_draw_line(layer, layout, exit_a.x, exit_a.y, exit_b.x,
                             exit_b.y, width, color, true);
             draw_head(layer, layout, exit_a, exit_b, head_w, color);

@@ -1,5 +1,6 @@
 #include "ui/screens/lambda_screen.h"
 
+#include "ui/widgets/amber_draw.h"
 #include "ui/widgets/amber_kit.h"
 
 #include <math.h>
@@ -9,6 +10,12 @@
 // mélange riche ou pauvre.
 #define AFR_STOICH 14.7f
 #define AFR_BAND   0.3f
+
+// Plage de la couronne, centrée sur la stœchiométrie (14.7 AFR) : le repère
+// marque le mélange idéal et la couronne s'allume de part et d'autre vers le
+// côté riche (bas AFR) ou pauvre (haut AFR).
+#define AFR_MIN 11.7f
+#define AFR_MAX 17.7f
 
 enum { CELL_O2_LEFT = 0, CELL_O2_RIGHT, CELL_LAMBDA, CELL_HEATER };
 
@@ -28,12 +35,13 @@ lambda_screen_t *lambda_screen_create(lv_obj_t *parent) {
         .hero_caption = "AIR / CARBURANT",
         .cell_caption = {"O2 G.", "O2 D.", "LAMBDA", "CHAUFF."},
         .cell_unit = {"mV", "mV", "", "%"},
-        .rim = AMBER_RIM_HAIRLINE,
+        .rim = AMBER_RIM_SEGMENTS,
     };
     if (!amber_page_create(&scr->page, parent, &spec)) {
         lambda_screen_destroy(scr);
         return NULL;
     }
+    amber_page_set_rim(&scr->page, 0.5f, 0.5f, 0.5f, false);
     amber_page_set_status(&scr->page, "ECU NON CONNECTEE", false);
     return scr;
 }
@@ -60,6 +68,14 @@ void lambda_screen_update(lambda_screen_t *scr, const ecu_data_t *data) {
     amber_kit_format(text, sizeof(text), duty_ok, "%.0f",
                      data->lambda_sensor_duty_cycle);
     amber_page_set_cell(&scr->page, CELL_HEATER, text, duty_ok);
+
+    // Couronne centre-zéro sur la stœchiométrie : le repère reste au mélange
+    // idéal, la couronne s'allume du repère vers l'AFR courant. Mise à jour
+    // avant le retour pour que la couronne s'éteigne à la déconnexion.
+    const float stoich = amber_progress(AFR_STOICH, AFR_MIN, AFR_MAX);
+    amber_page_set_rim(&scr->page, stoich,
+                       afr_ok ? amber_progress(afr, AFR_MIN, AFR_MAX) : stoich,
+                       stoich, afr_ok);
 
     if (!connected) {
         amber_page_set_hero_caption(&scr->page, "AIR / CARBURANT", false);

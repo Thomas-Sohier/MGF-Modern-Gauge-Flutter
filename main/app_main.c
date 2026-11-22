@@ -478,7 +478,7 @@ void app_main(void) {
 
     perf_bench_start(display, navigator);
 
-    boot_screen_destroy(boot);
+    boot_screen_start_intro(boot);
     boot = NULL;
     board_display_unlock();
     lvgl_locked = false;

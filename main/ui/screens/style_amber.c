@@ -8,6 +8,7 @@
 #include "ui/widgets/amber_draw.h"
 #include "ui/ui_layout.h"
 #include "domain/value_smoothing.h"
+#include "domain/temperature_status.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -23,6 +24,13 @@
 
 #define SEG_COUNT   26    // 26 barres
 #define SEG_GAP_DEG 1.80f // espacement angulaire constant entre chaque barre
+// Zone rouge MGF (>= 6500 tr/min) : les 5 dernières barres (~6460..8000).
+#define REDLINE_FIRST_SEG 21
+
+// Arc d'échelle interne, juste sous le rayon intérieur des barres.
+#define SCALE_R (DIAL_R_IN - 3.5f)
+// 9 graduations (0, 1000, ... 8000 tr/min) sur le demi-cercle.
+#define SCALE_TICKS 8
 
 #define DIAL_START 180.0f // 9h (horizontale gauche)
 #define DIAL_SWEEP 180.0f // demi-cercle jusqu'à 3h (horizontale droite)
@@ -102,6 +110,8 @@ struct amber_screen_s {
     bool coolant_ok;
     bool battery_ok;
     bool oil_ok;
+    bool coolant_alert; // eau trop chaude (repère d'alerte dans sa cellule)
+    bool battery_alert; // tension hors plage (idem côté batterie)
     bool connected_display;
     app_settings_units_t units;
     ecu_data_t latest_data;
@@ -205,16 +215,49 @@ static void canvas_draw_cb(lv_event_t *e) {
             : 0.0f;
     const int bright = (int)lroundf(prog * SEG_COUNT);
 
-    // Dessin direct des 26 barres
+    // Dessin direct des 26 barres. La zone rouge (>= REDLINE_FIRST_SEG) porte
+    // une signature permanente, moteur au ralenti compris : bande
+    // d'accentuation externe quand la barre est éteinte et fente sombre médiane
+    // dans tous les cas (double créneau rétro-futuriste). Tout reste dans
+    // l'anneau [DIAL_R_IN, DIAL_R_OUT] pour que invalidate_bars() couvre
+    // exactement les pixels repeints.
+    const int32_t redline_accent = LV_MAX(2, bar_thickness / 5);
+    const int32_t redline_slot = LV_MAX(2, bar_thickness / 6);
+    const int32_t redline_slot_r = r_in + (bar_thickness * 3) / 5;
     for (int i = 0; i < SEG_COUNT; i++) {
         const float a0 = DIAL_START + (float)i * pitch_deg;
         const float a1 = a0 + bar_span;
-        const lv_color_t col =
-            (i < bright) ? ui_theme_amber_bright() : ui_theme_amber_dim();
-        draw_arc_bar(layer, cx, cy, r_out, bar_thickness, a0, a1, col);
+        const bool lit = i < bright;
+        draw_arc_bar(layer, cx, cy, r_out, bar_thickness, a0, a1,
+                     lit ? ui_theme_amber_bright() : ui_theme_amber_dim());
+        if (i < REDLINE_FIRST_SEG) continue;
+        if (!lit) {
+            draw_arc_bar(layer, cx, cy, r_out, redline_accent, a0, a1,
+                         ui_theme_amber_separator());
+        }
+        draw_arc_bar(layer, cx, cy, redline_slot_r, redline_slot, a0, a1,
+                     ui_theme_amber_bg());
     }
 
     // (Pas d'aiguille : les barres allumées suffisent à indiquer le régime.)
+
+    // Arc d'échelle interne sous les barres + graduations tous les 1000 tr/min
+    // (majeures tous les 2000, esprit du cadran de référence).
+    amber_draw_arc(layer, &t, DIAL_CX, DIAL_CY, SCALE_R, 1.0f, DIAL_START,
+                   DIAL_START + DIAL_SWEEP, ui_theme_amber_dim(), false);
+    for (int k = 0; k <= SCALE_TICKS; k++) {
+        const float angle =
+            DIAL_START + (float)k * (DIAL_SWEEP / (float)SCALE_TICKS);
+        if (k % 2 == 0) {
+            amber_draw_tick(layer, &t, DIAL_CX, DIAL_CY, angle,
+                            DIAL_R_IN - 8.5f, DIAL_R_IN - 2.0f, 1.6f,
+                            ui_theme_amber_separator(), false);
+        } else {
+            amber_draw_tick(layer, &t, DIAL_CX, DIAL_CY, angle,
+                            DIAL_R_IN - 6.5f, DIAL_R_IN - 2.5f, 1.1f,
+                            ui_theme_amber_dim(), false);
+        }
+    }
 
     // Séparateur horizontal
     const float hy_out = ui_layout_y(&t, VSEP_TOP_OUT);
@@ -235,6 +278,20 @@ static void canvas_draw_cb(lv_event_t *e) {
         draw_line(layer, ui_layout_x(&t, x), ui_layout_y(&t, kVSep[i][1]),
                   ui_layout_x(&t, x), ui_layout_y(&t, separator_bottom_y(x)),
                   SEP_W * t.scale, ui_theme_amber_separator());
+    }
+
+    // Repères d'alerte (eau / batterie) : filet vif posé sous le séparateur de
+    // la cellule concernée, dans le même esprit que la zone rouge. Les
+    // séparateurs eux-mêmes ne bougent pas.
+    if (scr->coolant_alert) {
+        const float y = VSEP_TOP_OUT + 3.5f;
+        amber_draw_line(layer, &t, 12.0f, y, 77.0f, y, 1.8f,
+                        ui_theme_amber_bright(), false);
+    }
+    if (scr->battery_alert) {
+        const float y = HSEP_Y + 3.5f;
+        amber_draw_line(layer, &t, 89.0f, y, 154.0f, y, 1.8f,
+                        ui_theme_amber_bright(), false);
     }
 }
 
@@ -348,6 +405,19 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     const bool coolant_ok = d->connected && isfinite(coolant);
     const bool battery_ok = d->connected && isfinite(d->battery_voltage);
     const bool oil_ok = d->connected && isfinite(oil);
+    // Alertes des cellules basses : eau trop chaude, tension hors plage. Elles
+    // pilotent un repère dessiné par le canvas, d'où l'invalidation ciblée dès
+    // que l'état bascule (indépendamment des textes et des barres).
+    const bool coolant_alert =
+        coolant_ok && (d->coolant_temp >= TEMPERATURE_COOLANT_DANGER_C);
+    const bool battery_alert = battery_ok && (d->battery_voltage < 11.8f ||
+                                              d->battery_voltage > 15.0f);
+    if (coolant_alert != scr->coolant_alert ||
+        battery_alert != scr->battery_alert) {
+        scr->coolant_alert = coolant_alert;
+        scr->battery_alert = battery_alert;
+        lv_obj_invalidate(scr->canvas);
+    }
     const bool rpm_ok = d->connected && isfinite(rpm);
     const int32_t rpm_display = rpm_ok ? (int32_t)lroundf(rpm) : INT32_MIN;
     const int32_t coolant_display =

@@ -165,7 +165,10 @@ bool companion_bridge_start(const companion_bridge_config_t *config) {
 #if MGF_ENABLE_BLE_CONFIG
     companion_art_worker_start();
 #endif
-    s_bridge.timer = lv_timer_create(companion_timer_tick, 200, &s_bridge);
+    // 80 ms (12,5 Hz) : cadence demandée par la rotation 3D de la cassette de
+    // repli de l'écran musique ; les reprises BLE/pochette/télécommande sont
+    // toutes non bloquantes, ce rythme reste très léger pour l'ESP32-S3.
+    s_bridge.timer = lv_timer_create(companion_timer_tick, 80, &s_bridge);
     if (s_bridge.timer == NULL) {
         ESP_LOGE(TAG, "could not create companion timer");
         return false;

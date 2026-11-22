@@ -12,13 +12,13 @@
 #define GESTURE_CLICK_SUPPRESSION_MS 300U
 
 // Bandeau d'alerte thermique : bandeau opaque posé sur la ligne d'état basse,
-// dans le repère logique 320 (largeur 192, hauteur 22, centre (160, 272)).
+// dans le repère logique 320 (largeur 210, hauteur 24, centre (160, 272)).
 // Aucun padding : le texte est centré sur toute la surface.
-#define THERMAL_ALERT_W      192.0f
-#define THERMAL_ALERT_H      22.0f
+#define THERMAL_ALERT_W      210.0f
+#define THERMAL_ALERT_H      24.0f
 #define THERMAL_ALERT_CX     160.0f
 #define THERMAL_ALERT_CY     272.0f
-#define THERMAL_ALERT_RADIUS 4.0f
+#define THERMAL_ALERT_RADIUS 5.0f
 #define THERMAL_ALERT_TEXT   "ALERTE THERMIQUE"
 
 typedef struct {
