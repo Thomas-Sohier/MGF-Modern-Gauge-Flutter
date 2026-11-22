@@ -33,7 +33,8 @@ void ui_instrumentation_end(const char *page, uint64_t started_at) {
         tick_count == 0 ? 0 : (uint32_t)(total_us / tick_count);
     ESP_LOGI(TAG,
              "page=%s ticks=%u ui_us(avg/max)=%u/%u free_int=%u free_psram=%u",
-             page != NULL ? page : "?", tick_count, average_us, max_us,
+             page != NULL ? page : "?", (unsigned)tick_count,
+             (unsigned)average_us, (unsigned)max_us,
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     last_log_us = now;

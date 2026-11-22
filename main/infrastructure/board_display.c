@@ -51,6 +51,15 @@ static const char *TAG = "board_disp";
 #ifndef MGF_LILYGO_T_RGB_V2
 #define MGF_LILYGO_T_RGB_V2 0
 #endif
+// Horloge pixel forcée (Hz) ; 0 conserve celle du profil de la dalle.
+#ifndef MGF_LCD_PCLK_HZ
+#define MGF_LCD_PCLK_HZ 0
+#endif
+#if MGF_LCD_PCLK_HZ > 0
+#define LCD_PCLK_HZ ((uint32_t)(MGF_LCD_PCLK_HZ))
+#else
+#define LCD_PCLK_HZ (s_profile.pclk_hz)
+#endif
 
 typedef struct {
     const char *name;
@@ -93,7 +102,10 @@ static const lilygo_display_profile_t s_profile = {
 #else
 static const lilygo_display_profile_t s_profile = {
     .name = "original",
-    .pclk_hz = 8 * 1000 * 1000,
+    // 16 MHz (PLL 160 MHz / 10) -> 53,7 Hz. Le profil LILYGO d'origine est
+    // à 8 MHz (26,9 Hz) : image validée à l'œil à 16 MHz sur la H597, retour
+    // possible avec -DMGF_LCD_PCLK_HZ=8000000.
+    .pclk_hz = 16 * 1000 * 1000,
     .hsync_pulse_width = 1,
     .hsync_back_porch = 30,
     .hsync_front_porch = 50,
@@ -119,6 +131,7 @@ static lv_indev_t *s_touch_indev;
 #define TOUCH_REG_CHIP_ID        0xA7
 #define TOUCH_REG_DIS_AUTO_SLEEP 0xFE
 #define TOUCH_WAKE_ATTEMPTS      2
+#define TOUCH_READ_PERIOD_MS     30
 
 // Niveau bas minimal pour éteindre (et réinitialiser) l'AW9364.
 #define BACKLIGHT_OFF_HOLD_US 3000
@@ -215,7 +228,7 @@ static esp_err_t panel_init(esp_lcd_panel_io_handle_t *out_io,
         .disp_gpio_num = -1,
         .timings =
             {
-                .pclk_hz = s_profile.pclk_hz,
+                .pclk_hz = LCD_PCLK_HZ,
                 .h_res = LCD_H_RES,
                 .v_res = LCD_V_RES,
                 .hsync_pulse_width = s_profile.hsync_pulse_width,
@@ -260,7 +273,10 @@ static esp_err_t panel_init(esp_lcd_panel_io_handle_t *out_io,
 
 static lv_display_t *lvgl_bringup(esp_lcd_panel_io_handle_t io,
                                   esp_lcd_panel_handle_t panel) {
-    const lvgl_port_cfg_t port_config = ESP_LVGL_PORT_INIT_CONFIG();
+    lvgl_port_cfg_t port_config = ESP_LVGL_PORT_INIT_CONFIG();
+    // Cœur 1 dédié au rendu : l'interruption du tampon de rebond RGB
+    // (installée depuis la tâche main) et le BLE restent sur le cœur 0.
+    port_config.task_affinity = 1;
     esp_err_t err = lvgl_port_init(&port_config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "LVGL port init failed: %s", esp_err_to_name(err));
@@ -401,6 +417,11 @@ static void touch_bringup(lv_display_t *display) {
             lv_indev_set_read_cb(touch_indev, touch_read);
             lv_indev_set_driver_data(touch_indev, touch);
             lv_indev_set_display(touch_indev, display);
+            // Le timer de lecture hérite de LV_DEF_REFR_PERIOD (10 ms) : une
+            // lecture I2C de ~0,3 ms à 100 Hz est inutile, 30 ms suffisent
+            // aux gestes (cadence d'origine, cf. sim/test_navigator_touch.c).
+            lv_timer_set_period(lv_indev_get_read_timer(touch_indev),
+                                TOUCH_READ_PERIOD_MS);
         }
         lvgl_port_unlock();
     }
@@ -531,7 +552,7 @@ lv_display_t *board_display_start(void) {
     touch_bringup(s_display);
     ESP_LOGI(TAG, "LILYGO T-RGB H597 ready: profile=%s %ux%u @ %lu Hz%s",
              s_profile.name, LCD_H_RES, LCD_V_RES,
-             (unsigned long)s_profile.pclk_hz,
+             (unsigned long)LCD_PCLK_HZ,
              s_touch != NULL ? ", touch=present" : ", touch=absent");
     return s_display;
 }

@@ -5,6 +5,7 @@
 #include <sys/time.h>
 
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 #include "lvgl.h"
 
 #ifndef MGF_ENABLE_BLE_CONFIG
@@ -84,8 +85,22 @@ static void apply_remote_key(companion_bridge_t *bridge, companion_key_t key) {
 }
 #endif
 
+// Diagnostic du gel d'écran : la tâche LVGL s'abonne au watchdog de tâches et
+// le nourrit à chaque passage de ce timer (200 ms). Si elle reste bloquée plus
+// de CONFIG_ESP_TASK_WDT_TIMEOUT_S, le panic écrit un core dump en flash.
+static void lvgl_watchdog_feed(void) {
+    static bool subscribed;
+    if (!subscribed) {
+        const esp_err_t err = esp_task_wdt_add(NULL);
+        subscribed = err == ESP_OK || err == ESP_ERR_INVALID_ARG;
+        ESP_LOGI(TAG, "LVGL task watchdog: %s", esp_err_to_name(err));
+    }
+    if (subscribed) esp_task_wdt_reset();
+}
+
 static void companion_timer_tick(lv_timer_t *timer) {
     companion_bridge_t *bridge = lv_timer_get_user_data(timer);
+    lvgl_watchdog_feed();
     music_screen_t *music = bridge->config.music;
     const uint32_t now = lv_tick_get();
 #if MGF_ENABLE_BLE_CONFIG

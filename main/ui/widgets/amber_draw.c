@@ -2,6 +2,8 @@
 
 #include <math.h>
 
+#include "src/misc/lv_area_private.h"
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -60,7 +62,62 @@ void amber_draw_arc(lv_layer_t *layer, const ui_layout_t *layout, float cx,
     dsc.color = color;
     dsc.opa = LV_OPA_COVER;
     dsc.rounded = rounded;
-    lv_draw_arc(layer, &dsc);
+    amber_draw_arc_clipped(layer, &dsc);
+}
+
+void amber_draw_arc_clipped(lv_layer_t *layer, const lv_draw_arc_dsc_t *dsc) {
+    // Secteur encadrant au degré entier (LVGL tronque les angles), comme
+    // amber_invalidate_sector. Un arc complet ou replié garde le chemin LVGL.
+    const float start = floorf(dsc->start_angle);
+    const float end = ceilf(dsc->end_angle);
+    if (end <= start || end - start >= 360.0f) {
+        lv_draw_arc(layer, dsc);
+        return;
+    }
+    const float r_out = (float)dsc->radius;
+    const float r_in = (float)LV_MAX(0, dsc->radius - dsc->width);
+    float min_x = INFINITY, max_x = -INFINITY;
+    float min_y = INFINITY, max_y = -INFINITY;
+#define SECTOR_ADD(angle, radius)                                              \
+    do {                                                                       \
+        const float rad = (angle) * (float)M_PI / 180.0f;                      \
+        const float px = cosf(rad) * (radius);                                 \
+        const float py = sinf(rad) * (radius);                                 \
+        min_x = fminf(min_x, px);                                              \
+        max_x = fmaxf(max_x, px);                                              \
+        min_y = fminf(min_y, py);                                              \
+        max_y = fmaxf(max_y, py);                                              \
+    } while (0)
+    SECTOR_ADD(start, r_in);
+    SECTOR_ADD(start, r_out);
+    SECTOR_ADD(end, r_in);
+    SECTOR_ADD(end, r_out);
+    for (int k = (int)ceilf(start / 90.0f); k * 90.0f <= end; k++) {
+        SECTOR_ADD(k * 90.0f, r_out);
+    }
+#undef SECTOR_ADD
+    // Marge : antialiasing, plus le demi-disque des extrémités arrondies.
+    const float margin = 2.0f + (dsc->rounded ? (float)dsc->width : 0.0f);
+    const lv_area_t sector = {
+        .x1 = dsc->center.x + (int32_t)floorf(min_x - margin),
+        .y1 = dsc->center.y + (int32_t)floorf(min_y - margin),
+        .x2 = dsc->center.x + (int32_t)ceilf(max_x + margin),
+        .y2 = dsc->center.y + (int32_t)ceilf(max_y + margin),
+    };
+    const lv_area_t saved = layer->_clip_area;
+    lv_area_t clip;
+    if (!lv_area_intersect(&clip, &saved, &sector)) return;
+    // Zone entièrement à l'intérieur du cercle intérieur : l'anneau ne peut
+    // pas la toucher (cas d'un texte central redessiné sous un long filet).
+    const float far_x = (float)LV_MAX(LV_ABS(clip.x1 - dsc->center.x),
+                                      LV_ABS(clip.x2 - dsc->center.x));
+    const float far_y = (float)LV_MAX(LV_ABS(clip.y1 - dsc->center.y),
+                                      LV_ABS(clip.y2 - dsc->center.y));
+    const float reach = r_in - margin;
+    if (reach > 0.0f && far_x * far_x + far_y * far_y < reach * reach) return;
+    layer->_clip_area = clip;
+    lv_draw_arc(layer, dsc);
+    layer->_clip_area = saved;
 }
 
 void amber_draw_arc_wrapped(lv_layer_t *layer, const ui_layout_t *layout,

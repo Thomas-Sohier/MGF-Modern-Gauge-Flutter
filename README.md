@@ -77,7 +77,7 @@ les protections automobiles sont obligatoires.
 
 ## Build & flash
 
-Nécessite **ESP-IDF ≥ 5.3** installé et sourcé (`. $IDF_PATH/export.sh`).
+Version validée : **ESP-IDF 5.4.2**, sourcé (`. $IDF_PATH/export.sh`).
 
 ```bash
 idf.py set-target esp32s3
@@ -86,12 +86,43 @@ idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
 Les dépendances (LVGL, esp_lvgl_port, esp_lcd_st7701, esp_lcd_touch_cst816s,
-esp_io_expander_tca9554…) sont téléchargées au premier `build` dans
+esp_io_expander_tca95xx_16bit…) sont téléchargées au premier `build` dans
 `managed_components/`.
 
-> ⚠️ Le firmware n'a pas encore été compilé/validé sur matériel (ESP-IDF absent
-> de l'environnement de portage). Points de validation listés dans `CLAUDE.md`
-> (séquence d'init ST7701, timings RGB, tactile).
+### Poste Windows
+
+Installation (une fois) : Python 3.12 (`winget install Python.Python.3.12`)
+puis ESP-IDF cloné dans `C:\Espressif` :
+
+```powershell
+git clone -b v5.4.2 --recursive --depth 1 --shallow-submodules `
+  https://github.com/espressif/esp-idf.git C:\Espressif\esp-idf-v5.4.2
+$env:IDF_TOOLS_PATH = "C:\Espressif\tools"
+C:\Espressif\esp-idf-v5.4.2\install.ps1 esp32s3
+```
+
+Build et flash, dans chaque nouveau PowerShell :
+
+```powershell
+$env:IDF_TOOLS_PATH = "C:\Espressif\tools"
+. C:\Espressif\esp-idf-v5.4.2\export.ps1
+idf.py -p COM4 flash monitor
+```
+
+La T-RGB apparaît en USB-Serial-JTAG (`VID_303A&PID_1001`), sans pilote.
+Si plusieurs ESP32-S3 sont branchés, l'identifier sans rien écrire :
+`python -m esptool --port COMx flash_id` → la T-RGB annonce
+**Embedded PSRAM 8MB** et **16MB** de flash.
+
+### Démarrage attendu (moniteur série)
+
+- `board_disp: LILYGO T-RGB H597 ready: profile=original 480x480` ;
+- `optional CST820 touch attached (0x15)` (l'ID lu vaut `0xff`, le pilote
+  ne le vérifie pas) ;
+- `RTC DS3231 absente ou inaccessible` : normal sans module externe ;
+- `ble_config: BLE link started (pairing closed, bonded phones only)`.
+
+Image incorrecte ou décalée → reconstruire avec `-DMGF_LILYGO_T_RGB_V2=1`.
 
 ## Structure
 
@@ -148,6 +179,7 @@ plus « rétro »).
 
 ## Statut
 
-Code **non compilé dans l'environnement de génération** (ESP-IDF absent).
-Écrit pour LVGL 9.x / ESP-IDF 5.3+. À valider par un premier `idf.py build`
-sur un poste équipé du toolchain.
+Compilé avec ESP-IDF 5.4.2 et **flashé sur la T-RGB H597** le 2026-11-15 :
+démarrage complet (écran, tactile, BLE), ECU simulée (K-line désactivée par
+défaut). Restent à valider sur la carte : rendu à l'œil, tactile et K-line
+réelle (cf. `docs/lilygo-roadmap.md`).

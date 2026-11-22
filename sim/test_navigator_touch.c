@@ -1,6 +1,6 @@
 // Test d'intégration tactile du navigateur contre le vrai LVGL du simulateur :
 // un pointeur virtuel rejoue taps, maintiens et glissements, lus toutes les
-// 30 ms comme sur la cible (CONFIG_LV_DEF_REFR_PERIOD). Vérifie que les gestes
+// 30 ms comme sur la cible (TOUCH_READ_PERIOD_MS). Vérifie que les gestes
 // atteignent bien la racine du navigateur (horizontal = page, haut = réglages)
 // sans casser le tap latéral ni le maintien.
 

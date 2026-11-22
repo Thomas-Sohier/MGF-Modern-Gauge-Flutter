@@ -19,6 +19,10 @@ void amber_draw_line(lv_layer_t *layer, const ui_layout_t *layout, float x1,
 void amber_draw_arc(lv_layer_t *layer, const ui_layout_t *layout, float cx,
                     float cy, float radius, float width, float start, float end,
                     lv_color_t color, bool rounded);
+// lv_draw_arc restreint au rectangle englobant du secteur : le rendu SW de
+// LVGL parcourt sinon, pour chaque arc, tout le carré du cercle complet
+// présent dans la zone à redessiner.
+void amber_draw_arc_clipped(lv_layer_t *layer, const lv_draw_arc_dsc_t *dsc);
 void amber_draw_arc_wrapped(lv_layer_t *layer, const ui_layout_t *layout,
                             float cx, float cy, float radius, float width,
                             float start, float sweep, lv_color_t color,

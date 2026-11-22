@@ -158,7 +158,7 @@ static void draw_arc_bar(lv_layer_t *l, int32_t cx, int32_t cy, int32_t r_out,
     d.color = c;
     d.opa = LV_OPA_COVER;
     d.rounded = 0; // Extrémités coupées radialement droites
-    lv_draw_arc(l, &d);
+    amber_draw_arc_clipped(l, &d);
 }
 
 // Géométrie angulaire des barres, partagée par le dessin et l'invalidation.

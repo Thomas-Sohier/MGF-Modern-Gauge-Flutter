@@ -40,6 +40,7 @@
 #include "app/settings_bridge.h"
 #include "app/companion_bridge.h"
 #include "infrastructure/runtime_diagnostics.h"
+#include "infrastructure/perf_bench.h"
 
 #ifndef MGF_ENABLE_BLE_CONFIG
 #define MGF_ENABLE_BLE_CONFIG 0
@@ -332,7 +333,7 @@ void app_main(void) {
         }
     }
     const page_row_t page_rows[] = {
-        PAGE_ROW_UNITS(amber, "RPM", 40, amber_page_settings),
+        PAGE_ROW_UNITS(amber, "RPM", 10, amber_page_settings),
         PAGE_ROW(faults, "DEFAUTS", 1000),
         PAGE_ROW_UNITS(temps, "TEMPERATURES", 150, temps_page_settings),
         PAGE_ROW(injection, "INJECTION", 80),
@@ -450,7 +451,7 @@ void app_main(void) {
     const dashboard_controller_config_t controller_config = {
         .navigator = navigator,
         .ecu_source = ecu_source,
-        .period_ms = 40,
+        .period_ms = 10,
     };
     controller = dashboard_controller_create(&controller_config);
     if (controller == NULL || !dashboard_controller_start(controller)) {
@@ -474,6 +475,8 @@ void app_main(void) {
     if (diagnostics == NULL) {
         ESP_LOGW(TAG, "runtime diagnostics disabled or unavailable");
     }
+
+    perf_bench_start(display, navigator);
 
     boot_screen_destroy(boot);
     boot = NULL;

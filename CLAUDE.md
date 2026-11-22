@@ -43,6 +43,11 @@ piloté par l'ECU MEMS de la MGF (K-line) ou une ECU simulée. Le style de réf�
   Transceiver automobile externe et protections obligatoires : jamais de 12 V
   sur un GPIO.
 
+> Horloge pixel du profil d'origine : **16 MHz** (53,7 Hz ; LILYGO livre
+> 8 MHz = 26,9 Hz), image validée à l'œil sur la H597. Retour arrière :
+> `-DMGF_LCD_PCLK_HZ=8000000`. La tâche LVGL est épinglée sur le **cœur 1**
+> (interruption du tampon de rebond RGB et BLE sur le cœur 0).
+
 > ⚠️ Build ESP-IDF 5.4.2 validé par l'utilisateur, **pas encore testé sur la
 > carte** (cf. `docs/lilygo-roadmap.md`). ESP-IDF 5.4.2 est installé hors
 > du PATH : `. ~/.cache/mgf-gauge-esp-idf/esp-idf-v5.4.2/export.sh` avant
@@ -76,7 +81,15 @@ tools/check_iram.sh                                # marge DIRAM (la région IRA
 ```
 
 Options CMake : `MGF_USE_MEMS_KLINE`, `MGF_MEMS_VARIANT`, `MGF_KLINE_*`,
-`MGF_ENABLE_BLE_CONFIG`, `MGF_RUNTIME_DIAGNOSTICS`, `MGF_LILYGO_T_RGB_V2`.
+`MGF_ENABLE_BLE_CONFIG`, `MGF_RUNTIME_DIAGNOSTICS`, `MGF_LILYGO_T_RGB_V2`,
+`MGF_LCD_PCLK_HZ`, `MGF_PERF_BENCH` (+ `MGF_PERF_BENCH_PAGE_MS`).
+
+**Banc de mesure sur carte** : `-DMGF_PERF_BENCH=1` fait défiler les pages et
+journalise par page (`mgf_bench`) images/s, temps de rendu/flush, surface
+redessinée, charge CPU par tâche et tas. La charge CPU demande
+`CONFIG_FREERTOS_USE_TRACE_FACILITY` + `CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS`
+(à mettre dans un sdkconfig de mesure, pas dans l'image normale). Référence
+2026-11-15 à 16 MHz : RPM 49 images/s, rendu 11 ms.
 
 ## Organisation
 
@@ -139,6 +152,13 @@ docs/                 # K-line MEMS, NVS, BLE, RTC, roadmap LILYGO
   libellés à **22 px** ; grandes valeurs à 30/56/72 px.
 - **Lissage** : le RPM affiché suit la valeur ECU (~10 Hz) via
   `value_smoothing_step` (τ 100 ms) pour éviter un bargraph en escalier.
+- **Arcs clippés** : tout arc passe par `amber_draw_arc_clipped`, qui
+  restreint le clip du calque au rectangle englobant du secteur. Sans cela le
+  rendu SW de LVGL parcourt, pour chaque barre, tout le carré du cercle
+  présent dans la zone redessinée (RPM : 72 ms -> 13 ms par trame). Ne pas
+  appeler `lv_draw_arc` directement pour un secteur.
+- **Cadence** : contrôleur et page RPM à 10 ms, `LV_DEF_REFR_PERIOD` à 10 ms ;
+  c'est l'attente de synchro verticale du flush qui cadence le rendu.
 - **Invalidation partielle** : un changement de régime n'invalide que les
   barres concernées, la couronne du kit que les segments/repères changés
   (`amber_invalidate_sector`, élargi au degré entier car LVGL tronque les

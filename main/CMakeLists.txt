@@ -13,6 +13,9 @@ set(MGF_MEMS_VARIANT MEMS_VARIANT_1_9 CACHE STRING "MEMS variant (MEMS_VARIANT_1
 set(MGF_ENABLE_BLE_CONFIG 1 CACHE STRING "Enable the NimBLE link: settings + companion app services (0/1)")
 set(MGF_BLE_CONFIG_OPEN_ON_BOOT 0 CACHE STRING "Open BLE configuration advertising at boot (0/1; service images only)")
 set(MGF_RUNTIME_DIAGNOSTICS 0 CACHE STRING "Enable periodic runtime diagnostics (0/1)")
+set(MGF_PERF_BENCH 0 CACHE STRING "Auto-cycle pages and log render/CPU statistics (0/1)")
+set(MGF_PERF_BENCH_PAGE_MS 8000 CACHE STRING "Perf bench dwell time per page (ms)")
+set(MGF_LCD_PCLK_HZ 0 CACHE STRING "Override the RGB pixel clock in Hz (0 keeps the panel profile value)")
 set(MGF_BLE_CONFIG_SRCS)
 if(MGF_ENABLE_BLE_CONFIG)
     # Les CONFIG_* ne sont pas chargés pendant l'expansion des dépendances.
@@ -61,6 +64,7 @@ idf_component_register(
         "infrastructure/kline_uart_esp32.c"
         "infrastructure/mems_ecu.c"
         "infrastructure/runtime_diagnostics.c"
+        "infrastructure/perf_bench.c"
         "infrastructure/settings_store.c"
         "infrastructure/settings_persistence.c"
         ${MGF_BLE_CONFIG_SRCS}
@@ -121,4 +125,8 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     MGF_ENABLE_BLE_CONFIG=${MGF_ENABLE_BLE_CONFIG}
     MGF_BLE_CONFIG_OPEN_ON_BOOT=${MGF_BLE_CONFIG_OPEN_ON_BOOT}
     MGF_RUNTIME_DIAGNOSTICS=${MGF_RUNTIME_DIAGNOSTICS}
+    MGF_PERF_BENCH=${MGF_PERF_BENCH}
+    MGF_LCD_PCLK_HZ=${MGF_LCD_PCLK_HZ}
+    MGF_PERF_BENCH_PAGE_MS=${MGF_PERF_BENCH_PAGE_MS}
+    MGF_UI_INSTRUMENTATION=${MGF_PERF_BENCH}
 )
