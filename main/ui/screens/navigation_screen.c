@@ -7,20 +7,32 @@
 #include <math.h>
 #include <string.h>
 
-// Guidage reçu de l'application compagnon (notification Google Maps) :
-// pictogramme de manœuvre vectoriel, distance en valeur héros, consigne et
-// voie sous un filet, heure d'arrivée dans la ligne d'état commune. La
-// manœuvre est déduite du texte de la consigne : l'icône PNG envoyée par le
-// téléphone n'est pas exploitée par le rendu ambre.
-#define DISTANCE_Y    158.0f
-#define INSTRUCTION_Y 199.0f
-#define STREET_Y      225.0f
-#define TEXT_WIDTH    236.0f
-#define ROUTE_CORE_W  5.0f
-#define ROUTE_ROAD_W  15.0f
-#define ARROW_CORE_W  6.0f
-#define ARROW_ROAD_W  17.0f
-#define HEAD_LEN      15.0f
+// Guidage reçu de l'application compagnon (notification Google Maps) rendu
+// comme un tracé vectoriel anguleux, épuré :
+//   - aucune jauge ni couronne : le cadran reste nu ;
+//   - la manœuvre est un vecteur de cap (rail éteint + veine vive), remplacé
+//     par une mire octogonale sobre quand aucun guidage n'est actif ;
+//   - la distance est la valeur héros, la consigne puis la voie suivent en
+//     ambre vif : l'espacement suffit à la hiérarchie, sans filet, crochets
+//     ni croix de visée.
+// La manœuvre est déduite du texte de la consigne : l'icône PNG envoyée par
+// le téléphone n'est pas exploitée par le rendu ambre.
+#define DISTANCE_Y    156.0f
+#define INSTRUCTION_Y 198.0f
+#define STREET_Y      224.0f
+#define TEXT_WIDTH    244.0f
+
+// Centre de la zone de manœuvre et de la mire hors-ligne.
+#define HUD_CY       96.0f
+#define ROUTE_RAIL_W 11.0f // gabarit de couloir, bords francs
+#define ROUTE_CORE_W 3.8f  // vecteur de cap lumineux
+#define HEAD_LEN     14.0f
+#define HEAD_W       3.8f
+#define RING_R       17.0f
+#define RING_CY      97.0f
+
+// Mire hors-ligne centrée sur la zone de manœuvre.
+#define RADAR_R 22.0f
 
 struct navigation_screen_s {
     amber_page_t page;
@@ -41,7 +53,7 @@ typedef struct {
     point_t points[9];
     unsigned count;
     bool ring; // rond-point : anneau autour de (160, 97)
-    bool pin;  // arrivée : pastille en bout de trait
+    bool pin;  // arrivée : cible d'acquisition en bout de trait
 } route_shape_t;
 
 static route_shape_t shape_of(companion_maneuver_t maneuver, bool *mirror) {
@@ -94,91 +106,158 @@ static float mx(float x, bool mirror) {
     return mirror ? 2.0f * AMBER_KIT_CX - x : x;
 }
 
-// Pointe de flèche au bout du segment (a -> b).
+// ── Primitives de tracé ─────────────────────────────────────────────────────
+static void draw_octagon(lv_layer_t *layer, const ui_layout_t *layout, float cx,
+                         float cy, float radius, float width,
+                         lv_color_t color) {
+    point_t pts[8];
+    for (int i = 0; i < 8; i++) {
+        // Sommets décalés de 22,5° : pans hauts/bas/latéraux à plat.
+        const float angle = (22.5f + 45.0f * (float)i) * 0.0174532925f;
+        pts[i] =
+            (point_t){cx + radius * cosf(angle), cy + radius * sinf(angle)};
+    }
+    for (int i = 0; i < 8; i++) {
+        const point_t a = pts[i];
+        const point_t b = pts[(i + 1) % 8];
+        amber_draw_line(layer, layout, a.x, a.y, b.x, b.y, width, color, false);
+    }
+}
+
+static void draw_diamond(lv_layer_t *layer, const ui_layout_t *layout, float cx,
+                         float cy, float radius, float width,
+                         lv_color_t color) {
+    amber_draw_line(layer, layout, cx - radius, cy, cx, cy - radius, width,
+                    color, false);
+    amber_draw_line(layer, layout, cx, cy - radius, cx + radius, cy, width,
+                    color, false);
+    amber_draw_line(layer, layout, cx + radius, cy, cx, cy + radius, width,
+                    color, false);
+    amber_draw_line(layer, layout, cx, cy + radius, cx - radius, cy, width,
+                    color, false);
+}
+
+// Chevron ouvert vers l'arrière depuis la pointe (tx, ty), de direction (ux,
+// uy) : ailettes à 45° ciselées, sans arrondi.
+static void draw_chevron(lv_layer_t *layer, const ui_layout_t *layout, float tx,
+                         float ty, float ux, float uy, float len, float width,
+                         lv_color_t color) {
+    const float c = 0.70710678f;
+    const float bx = -ux;
+    const float by = -uy;
+    amber_draw_line(layer, layout, tx, ty, tx + len * (bx * c - by * c),
+                    ty + len * (bx * c + by * c), width, color, false);
+    amber_draw_line(layer, layout, tx, ty, tx + len * (bx * c + by * c),
+                    ty + len * (-bx * c + by * c), width, color, false);
+}
+
+// Tête de flèche vectorielle + chevron d'écho en retrait sur la tige.
 static void draw_head(lv_layer_t *layer, const ui_layout_t *layout, point_t a,
-                      point_t b, float width, lv_color_t color) {
+                      point_t b, lv_color_t color) {
     const float dx = b.x - a.x;
     const float dy = b.y - a.y;
     const float len = sqrtf(dx * dx + dy * dy);
     if (len <= 0.0f) return;
     const float ux = dx / len;
     const float uy = dy / len;
-    // Deux branches à ±45° de la direction inverse.
-    const float c = 0.70710678f;
-    const float bx = -ux;
-    const float by = -uy;
-    const point_t arm1 = {b.x + HEAD_LEN * (bx * c - by * c),
-                          b.y + HEAD_LEN * (bx * c + by * c)};
-    const point_t arm2 = {b.x + HEAD_LEN * (bx * c + by * c),
-                          b.y + HEAD_LEN * (-bx * c + by * c)};
-    amber_draw_line(layer, layout, b.x, b.y, arm1.x, arm1.y, width, color,
-                    true);
-    amber_draw_line(layer, layout, b.x, b.y, arm2.x, arm2.y, width, color,
-                    true);
+    draw_chevron(layer, layout, b.x, b.y, ux, uy, HEAD_LEN, HEAD_W, color);
+    const float back = HEAD_LEN * 1.15f;
+    draw_chevron(layer, layout, b.x - ux * back, b.y - uy * back, ux, uy,
+                 HEAD_LEN * 0.62f, HEAD_W * 0.8f, color);
 }
 
-static void draw_route(lv_layer_t *layer, const ui_layout_t *layout,
-                       void *context) {
-    const navigation_screen_t *scr = context;
-    const lv_color_t sep = ui_theme_amber_separator();
-    // Filet entre distance et consigne, dans l'esprit de la grille commune.
-    amber_draw_line(layer, layout, 72.0f, 181.0f, 248.0f, 181.0f, 1.333f, sep,
-                    false);
-    if (scr == NULL || !scr->nav.active) {
-        // Pas de guidage : repère discret à la place du pictogramme.
-        amber_draw_circle(layer, layout, AMBER_KIT_CX, 96.0f, 22.0f, 1.4f,
-                          ui_theme_amber_dim());
-        amber_draw_dot(layer, layout, AMBER_KIT_CX, 96.0f, 4.0f,
-                       ui_theme_amber_dim());
-        return;
-    }
+// Mire hors-ligne : simple octogone à pans coupés et point central.
+static void draw_radar_mire(lv_layer_t *layer, const ui_layout_t *layout) {
+    const lv_color_t dim = ui_theme_amber_dim();
+    draw_octagon(layer, layout, AMBER_KIT_CX, HUD_CY, RADAR_R, 1.3f, dim);
+    amber_draw_dot(layer, layout, AMBER_KIT_CX, HUD_CY, 3.5f, dim);
+}
 
+static void draw_maneuver(lv_layer_t *layer, const ui_layout_t *layout,
+                          const companion_nav_t *nav) {
     bool mirror;
-    const route_shape_t shape = shape_of(scr->nav.maneuver, &mirror);
+    const route_shape_t shape = shape_of(nav->maneuver, &mirror);
     point_t pts[9];
     for (unsigned i = 0; i < shape.count; i++) {
         pts[i] = (point_t){mx(shape.points[i].x, mirror), shape.points[i].y};
     }
 
-    for (unsigned pass = 0; pass < 2; pass++) {
-        const float width = pass == 0 ? ROUTE_ROAD_W : ROUTE_CORE_W;
-        const float head_w = pass == 0 ? ARROW_ROAD_W : ARROW_CORE_W;
-        const lv_color_t color =
-            pass == 0 ? ui_theme_amber_dim() : ui_theme_amber_bright();
+    const lv_color_t rail = ui_theme_amber_dim();
+    const lv_color_t vein = ui_theme_amber_bright();
+    const lv_color_t plot = ui_theme_amber_separator();
+
+    // Passe 0 : gabarit de couloir éteint, bords francs (aucun arrondi, esprit
+    // CAO). Passe 1 : vecteur de cap lumineux et incisif.
+    for (unsigned pass = 0; pass < 2U; pass++) {
+        const bool rail_pass = pass == 0U;
+        const float width = rail_pass ? ROUTE_RAIL_W : ROUTE_CORE_W;
+        const lv_color_t color = rail_pass ? rail : vein;
         for (unsigned i = 0; i + 1U < shape.count; i++) {
             amber_draw_line(layer, layout, pts[i].x, pts[i].y, pts[i + 1U].x,
-                            pts[i + 1U].y, width, color, true);
+                            pts[i + 1U].y, width, color, false);
         }
+        // Sommets : pastille de jonction (le trait à bouts francs laisserait
+        // une entaille dans les coudes) et plots de repère posés sur le rail,
+        // sous la veine lumineuse (un point sombre sur la veine ferait tache).
+        for (unsigned i = 1; i + 1U < shape.count; i++) {
+            amber_draw_dot(layer, layout, pts[i].x, pts[i].y, width * 0.5f,
+                           color);
+            if (rail_pass) {
+                amber_draw_dot(layer, layout, pts[i].x, pts[i].y, 2.4f, plot);
+            }
+        }
+
         if (shape.ring) {
-            // Rond-point (sens giratoire, circulation à droite) : la chaussée
-            // dessine l'anneau complet, le trait lumineux n'en suit que la
-            // portion parcourue (entrée en bas, sortie en haut à droite). Le
-            // centre est abaissé et le rayon resserré pour dégager la sortie
-            // sous le titre NAVIGATION.
-            const float r = 17.0f;
-            if (pass == 0) {
-                amber_draw_circle(layer, layout, AMBER_KIT_CX, 97.0f,
+            // Rond-point (circulation à droite) : la chaussée dessine l'anneau
+            // complet, le vecteur n'en suit que la portion parcourue (entrée
+            // en bas, sortie en haut à droite). Centre abaissé et rayon
+            // resserré pour dégager la sortie sous le titre NAVIGATION.
+            const float r = RING_R;
+            if (rail_pass) {
+                amber_draw_circle(layer, layout, AMBER_KIT_CX, RING_CY,
                                   r + width * 0.5f, width, color);
             } else {
-                amber_draw_arc_wrapped(layer, layout, AMBER_KIT_CX, 97.0f,
+                amber_draw_arc_wrapped(layer, layout, AMBER_KIT_CX, RING_CY,
                                        r + width * 0.5f, width, 315.0f, 135.0f,
-                                       color, true);
+                                       color, false);
             }
             const point_t exit_a = {AMBER_KIT_CX + r * 0.7071f,
-                                    97.0f - r * 0.7071f};
+                                    RING_CY - r * 0.7071f};
             const point_t exit_b = {190.0f, 67.0f};
             amber_draw_line(layer, layout, exit_a.x, exit_a.y, exit_b.x,
-                            exit_b.y, width, color, true);
-            draw_head(layer, layout, exit_a, exit_b, head_w, color);
+                            exit_b.y, width, color, false);
+            if (!rail_pass) draw_head(layer, layout, exit_a, exit_b, color);
         } else if (shape.pin) {
             const point_t end = pts[shape.count - 1U];
-            amber_draw_dot(layer, layout, end.x, end.y - 12.0f,
-                           pass == 0 ? 15.0f : 9.0f, color);
+            if (rail_pass) {
+                draw_octagon(layer, layout, end.x, end.y - 9.0f, 13.0f, 1.1f,
+                             rail);
+            }
         } else if (shape.count >= 2U) {
             draw_head(layer, layout, pts[shape.count - 2U],
-                      pts[shape.count - 1U], head_w, color);
+                      pts[shape.count - 1U], color);
         }
     }
+
+    if (shape.pin) {
+        // Arrivée : cible d'acquisition (losange + point) plutôt qu'une
+        // pastille pleine.
+        const point_t end = pts[shape.count - 1U];
+        draw_diamond(layer, layout, end.x, end.y - 9.0f, 8.0f, 1.8f,
+                     ui_theme_amber_bright());
+        amber_draw_dot(layer, layout, end.x, end.y - 9.0f, 2.4f,
+                       ui_theme_amber_bright());
+    }
+}
+
+static void draw_route(lv_layer_t *layer, const ui_layout_t *layout,
+                       void *context) {
+    const navigation_screen_t *scr = context;
+    if (scr == NULL || !scr->linked || !scr->nav.active) {
+        draw_radar_mire(layer, layout);
+        return;
+    }
+    draw_maneuver(layer, layout, &scr->nav);
 }
 
 static void refresh(navigation_screen_t *scr) {
@@ -200,18 +279,21 @@ static void refresh(navigation_screen_t *scr) {
             amber_kit_place(scr->street, AMBER_KIT_CX, STREET_Y,
                             AMBER_ALIGN_CENTER);
         }
+        lv_obj_set_style_text_color(scr->street, ui_theme_amber_separator(), 0);
         amber_page_set_status(&scr->page, "", false);
         amber_page_invalidate(&scr->page);
         return;
     }
 
-    // Distance numérique en héros ; un texte (« MAINTENANT ») reste lisible
-    // en consigne plutôt que de déborder en 56 px.
+    // Une distance numérique commence par un chiffre ; sinon la consigne est
+    // immédiate (« MAINTENANT ») et vaut zéro mètre.
     const bool numeric =
         nav->distance_value[0] >= '0' && nav->distance_value[0] <= '9';
-    amber_page_set_hero(&scr->page, numeric ? nav->distance_value : "--",
-                        numeric);
-    amber_readout_set_unit(&scr->page.hero, numeric ? nav->distance_unit : "");
+
+    // Une consigne immédiate (« MAINTENANT ») est une distance nulle, pas une
+    // mesure indisponible : elle s'affiche en ambre vif.
+    amber_page_set_hero(&scr->page, numeric ? nav->distance_value : "0", true);
+    amber_readout_set_unit(&scr->page.hero, numeric ? nav->distance_unit : "M");
 
     const char *instruction = nav->instruction[0] != '\0' ? nav->instruction
                               : (!numeric && nav->distance_value[0] != '\0')
@@ -222,10 +304,13 @@ static void refresh(navigation_screen_t *scr) {
                         AMBER_ALIGN_CENTER);
     }
     lv_obj_set_style_text_color(scr->instruction, ui_theme_amber_bright(), 0);
+    // La voie est la cible recherchée des yeux : ambre vif, pleine largeur
+    // disponible à cette hauteur (corde du cadran).
     if (amber_kit_set_text(scr->street, nav->street)) {
         amber_kit_place(scr->street, AMBER_KIT_CX, STREET_Y,
                         AMBER_ALIGN_CENTER);
     }
+    lv_obj_set_style_text_color(scr->street, ui_theme_amber_bright(), 0);
     amber_page_set_status(&scr->page, nav->eta, true);
     amber_page_invalidate(&scr->page);
 }
@@ -246,7 +331,7 @@ navigation_screen_t *navigation_screen_create(lv_obj_t *parent) {
     };
     if (!amber_page_create(&scr->page, parent, &spec)) goto fail;
 
-    // La valeur héros descend sous le pictogramme de manœuvre.
+    // La valeur héros descend sous la zone de manœuvre.
     scr->page.hero.y = DISTANCE_Y;
     amber_readout_layout(&scr->page.hero);
 
