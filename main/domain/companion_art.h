@@ -40,6 +40,9 @@ bool companion_parse_art_control(const char *json, size_t length,
 typedef struct {
     uint8_t *buffer;
     size_t capacity;
+    // Identifiant du transfert en cours, recopié du contrôle : il suit la
+    // pochette jusqu'à l'écran pour éviter de réafficher la même image.
+    char art_id[COMPANION_ART_ID_MAX];
     size_t total_bytes;
     uint16_t chunk_count;
     size_t chunk_size; // taille d'un chunk plein, fixée par le chunk 0
@@ -72,4 +75,6 @@ bool companion_art_reassembler_complete(const companion_art_reassembler_t *r);
 typedef struct {
     uint8_t *data;
     size_t length;
+    // Identifiant annoncé par le contrôle ("" si inconnu).
+    char art_id[COMPANION_ART_ID_MAX];
 } companion_art_jpeg_t;

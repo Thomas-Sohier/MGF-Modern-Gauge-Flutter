@@ -54,6 +54,12 @@ bool ble_config_service_is_started(void);
 bool ble_config_service_is_pairing_open(void);
 // Un téléphone appairé est connecté, lien chiffré avec sa clé.
 bool ble_config_service_phone_linked(void);
+// Une connexion GAP est active, qu'elle soit déjà chiffrée ou encore en cours
+// d'authentification/appairage. Lecture cross-core (tâche LVGL / esp_timer).
+bool ble_config_service_has_connection(void);
+// Filet de sécurité : relance l'advertising s'il a échoué transitoirement
+// (service démarré et synchronisé, sans connexion). No-op sinon.
+void ble_config_service_ensure_advertising(void);
 // Fenêtre d'appairage : autorise la création d'un bond. La fermeture coupe un
 // lien encore non authentifié mais garde le téléphone appairé connecté.
 esp_err_t ble_config_service_open_pairing(void);

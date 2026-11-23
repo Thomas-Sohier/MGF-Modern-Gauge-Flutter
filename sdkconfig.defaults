@@ -110,8 +110,10 @@ CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
 # Le JSON du compagnon est décodé dans la tâche hôte (~1,5 Ko de pile).
 CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=6144
 # Écritures longues (JSON jusqu'à 512 octets en « prepare write ») : marge de
-# tampons au-delà des 12 blocs par défaut.
-CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=24
+# tampons au-delà des 12 blocs par défaut. 48 blocs (alloués en PSRAM via
+# CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL) évitent la perte de chunks
+# WRITE_NO_RSP de 512 octets lors des rafales de transfert de pochette.
+CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=48
 # MTU 517 (max Android) : une pochette part en écritures de 512 octets au lieu
 # de ~250, soit deux fois moins d'allers-retours radio partagés avec l'A2DP.
 CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=517

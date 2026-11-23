@@ -31,9 +31,12 @@ static bool s_started;
 static volatile bool s_pairing_open;
 static volatile bool s_link_secure;
 static esp_timer_handle_t s_auth_timer;
-static bool s_synced;
-static bool s_advertising;
-static uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+// État partagé entre la tâche NimBLE (cœur 0, écriture) et la tâche LVGL /
+// esp_timer (cœur 1, lecture) : volatile pour que -O2 ne les garde pas en
+// registre entre deux passages de boucle.
+static volatile bool s_synced;
+static volatile bool s_advertising;
+static volatile uint16_t s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 static ble_config_service_config_t s_config;
 static char s_device_name[BLE_CONFIG_DEVICE_NAME_MAX_LENGTH + 1U];
 static uint8_t s_own_addr_type;
@@ -241,10 +244,12 @@ static void advertise(void) {
     params.disc_mode = BLE_GAP_DISC_MODE_GEN;
     rc = ble_gap_adv_start(s_own_addr_type, NULL, BLE_HS_FOREVER, &params,
                            gap_event, NULL);
-    if (rc != 0) {
-        ESP_LOGE(TAG, "cannot start advertising: %d", rc);
-    } else {
+    if (rc == 0 || rc == BLE_HS_EALREADY) {
+        // EALREADY : un advertising tourne déjà (reprise après reset du
+        // contrôleur) ; l'état doit refléter la réalité, pas l'erreur.
         s_advertising = true;
+    } else {
+        ESP_LOGE(TAG, "cannot start advertising: %d", rc);
     }
 }
 
@@ -286,6 +291,21 @@ static void on_encryption(uint16_t conn_handle, int status) {
         // Un téléphone appairé vient de se lier : la fenêtre a rempli son rôle.
         ble_config_service_close_pairing();
     }
+    // Paramètres équilibrés : des intervalles plus courts accélèrent les
+    // rafales de chunks de pochette et réduisent la latence de la télécommande
+    // sans saturer la radio partagée avec l'A2DP.
+    const struct ble_gap_upd_params params = {
+        .itvl_min = 12, // 15 ms
+        .itvl_max = 24, // 30 ms
+        .latency = 0,
+        .supervision_timeout = 400, // 4 s
+        .min_ce_len = 0,
+        .max_ce_len = 0,
+    };
+    const int upd_rc = ble_gap_update_params(conn_handle, &params);
+    if (upd_rc != 0 && upd_rc != BLE_HS_ENOTCONN && upd_rc != BLE_HS_EALREADY) {
+        ESP_LOGD(TAG, "conn params update request skipped: %d", upd_rc);
+    }
     ESP_LOGI(TAG, "bonded phone linked");
 }
 
@@ -317,7 +337,18 @@ static int gap_event(struct ble_gap_event *event, void *arg) {
         s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
         s_link_secure = false;
         s_advertising = false;
+        // Libère les messages et tout tampon PSRAM de pochette en cours de
+        // réassemblage : la prochaine connexion repart d'un état propre.
+        companion_gatt_reset();
         advertise();
+        return 0;
+    case BLE_GAP_EVENT_MTU:
+        ESP_LOGI(TAG, "MTU updated: conn=%u cid=%u mtu=%u",
+                 (unsigned)event->mtu.conn_handle,
+                 (unsigned)event->mtu.channel_id, (unsigned)event->mtu.value);
+        return 0;
+    case BLE_GAP_EVENT_CONN_UPDATE:
+        ESP_LOGD(TAG, "conn updated: status=%d", event->conn_update.status);
         return 0;
     case BLE_GAP_EVENT_ADV_COMPLETE:
         s_advertising = false;
@@ -347,6 +378,17 @@ static int gap_event(struct ble_gap_event *event, void *arg) {
 
 static void on_reset(int reason) {
     ESP_LOGE(TAG, "NimBLE reset: %d", reason);
+    // Un reset interne (contrôleur perdu, timeout) doit purger l'état avant le
+    // prochain on_sync(), sinon advertise() croit qu'une annonce tourne encore
+    // ou qu'une connexion est toujours établie et ne repart jamais.
+    if (s_auth_timer != NULL) {
+        esp_timer_stop(s_auth_timer);
+    }
+    s_synced = false;
+    s_advertising = false;
+    s_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+    s_link_secure = false;
+    companion_gatt_reset();
 }
 
 static void on_sync(void) {
@@ -449,6 +491,16 @@ bool ble_config_service_is_pairing_open(void) {
 
 bool ble_config_service_phone_linked(void) {
     return s_conn_handle != BLE_HS_CONN_HANDLE_NONE && s_link_secure;
+}
+
+bool ble_config_service_has_connection(void) {
+    return s_conn_handle != BLE_HS_CONN_HANDLE_NONE;
+}
+
+void ble_config_service_ensure_advertising(void) {
+    // advertise() porte déjà toutes les conditions (démarré, synchronisé, pas
+    // d'annonce en cours, pas de connexion) : il est idempotent.
+    advertise();
 }
 
 esp_err_t ble_config_service_open_pairing(void) {

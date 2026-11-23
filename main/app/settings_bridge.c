@@ -29,6 +29,10 @@ struct settings_bridge_s {
     settings_screen_t *screen;
     lv_timer_t *timer;
     ble_window_t ble_window;
+#if MGF_ENABLE_BLE_CONFIG
+    app_settings_t ble_synced;
+    bool has_ble_synced;
+#endif
 };
 
 static settings_bridge_t s_bridge;
@@ -76,6 +80,14 @@ bool settings_bridge_apply(void *context, const app_settings_t *settings) {
     clock_screen_set_utc_offset(bridge->clock, settings->utc_offset_minutes);
     board_display_backlight_set_brightness(
         display_brightness_level(settings->brightness_percent));
+#if MGF_ENABLE_BLE_CONFIG
+    if (ble_config_service_is_started()) {
+        if (ble_config_service_sync_settings(settings) == ESP_OK) {
+            bridge->ble_synced = *settings;
+            bridge->has_ble_synced = true;
+        }
+    }
+#endif
     return true;
 }
 
@@ -167,7 +179,13 @@ static void settings_timer_tick(lv_timer_t *timer) {
     if (bridge->ble_window.open && !ble_config_service_is_pairing_open()) {
         ble_window_close(&bridge->ble_window);
     }
-    if (ble_window_tick(&bridge->ble_window, lv_tick_get(), false)) {
+    // Retry : sans ce filet, un échec transitoire de ble_gap_adv_start au boot
+    // laissait la jauge invisible jusqu'au redémarrage suivant.
+    ble_config_service_ensure_advertising();
+    // Une connexion en cours (appairage inclus) repousse l'échéance : la
+    // fenêtre ne coupe pas un téléphone en train de se lier à 5:00 pile.
+    if (ble_window_tick(&bridge->ble_window, lv_tick_get(),
+                        ble_config_service_has_connection())) {
         ESP_LOGI(TAG, "BLE pairing window expired");
         (void)ble_config_service_close_pairing();
     }
@@ -177,8 +195,13 @@ static void settings_timer_tick(lv_timer_t *timer) {
 #if MGF_ENABLE_BLE_CONFIG
     if (ble_config_service_is_started()) {
         app_settings_t current;
-        if (settings_runtime_read(runtime, &current)) {
-            ble_config_service_sync_settings(&current);
+        if (settings_runtime_read(runtime, &current) &&
+            (!bridge->has_ble_synced ||
+             !app_settings_equal(&current, &bridge->ble_synced))) {
+            if (ble_config_service_sync_settings(&current) == ESP_OK) {
+                bridge->ble_synced = current;
+                bridge->has_ble_synced = true;
+            }
         }
     }
 #endif

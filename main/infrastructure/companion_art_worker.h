@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "domain/companion_art.h"
@@ -25,6 +26,11 @@ void companion_art_worker_start(void);
 bool companion_art_worker_submit(companion_art_jpeg_t *art);
 // Récupère le dernier résultat décodé sans blocage (propriété transférée).
 bool companion_art_worker_take(uint16_t **pixels, int *width, int *height);
+// Récupère le dernier résultat décodé ainsi que son art_id (si art_id != NULL
+// et art_id_size > 0).
+bool companion_art_worker_take_with_id(uint16_t **pixels, int *width,
+                                       int *height, char *art_id,
+                                       size_t art_id_size);
 // Libère un buffer rendu par `take` (PSRAM ou tas hôte).
 void companion_art_worker_free(uint16_t *pixels);
 // Arrête la tâche, purge les tampons en attente. Idempotent.

@@ -724,15 +724,20 @@ void music_screen_set_media(music_screen_t *scr, const companion_media_t *media,
     if (scr == NULL) return;
     // Une nouvelle pochette compagnon n'est envoyée que lorsque l'art_id
     // change ; l'ancienne image est donc abandonnée ici et remplacée par le
-    // worker si un transfert suit. Même art_id (réémission de position) ou
-    // déconnexion (media == NULL) conservent l'image affichée.
-    if (media != NULL && strcmp(scr->media.art_id, media->art_id) != 0) {
+    // worker si un transfert suit. Même art_id (réémission de position) garde
+    // l'image affichée. Un média effacé (déconnexion) doit en revanche purger
+    // l'état complet : aucune pochette obsolète ne doit subsister au-dessus de
+    // « TELEPHONE / NON CONNECTE », et la reconnexion sur le même morceau est
+    // traitée comme un nouvel art_id (donc nouveau transfert).
+    if (media == NULL || strcmp(scr->media.art_id, media->art_id) != 0) {
         music_screen_set_cover(scr, NULL, 0, 0);
     }
     scr->has_media = media != NULL;
     if (media != NULL) {
         scr->media = *media;
         scr->received_ms = now_ms;
+    } else {
+        memset(&scr->media, 0, sizeof(scr->media));
     }
     // Repart de l'instant de réception : la rotation 3D lit la position à
     // cette horloge (le tick ne la fait avancer que si la page l'anime).
@@ -745,6 +750,13 @@ void music_screen_set_media(music_screen_t *scr, const companion_media_t *media,
 void music_screen_set_link(music_screen_t *scr, bool linked, uint32_t now_ms) {
     if (scr == NULL || scr->linked == linked) return;
     scr->linked = linked;
+    if (!linked) {
+        // La perte du téléphone efface média et pochette : rien ne doit rester
+        // affiché, et le prochain état reçu repart d'art_id vide.
+        music_screen_set_cover(scr, NULL, 0, 0);
+        scr->has_media = false;
+        memset(&scr->media, 0, sizeof(scr->media));
+    }
     // Aligne l'horloge de rotation sur la (re)connexion.
     scr->anim_ms = now_ms;
     refresh_texts(scr);

@@ -37,3 +37,11 @@ bool companion_gatt_take_key(companion_key_t *out);
 bool companion_gatt_take_art(companion_art_jpeg_t *out);
 // Libère un tampon de pochette non transféré.
 void companion_gatt_free_art(uint8_t *data);
+
+// Nombre de ticks d'inactivité (~5 s à 80 ms/tick) avant abandon d'un
+// réassemblage de pochette incomplet (chunk WRITE_NO_RSP perdu).
+#define COMPANION_ART_TIMEOUT_TICKS 64U
+
+// Incrémente le compteur d'inactivité d'un transfert de pochette en cours
+// et libère le tampon PSRAM s'il dépasse COMPANION_ART_TIMEOUT_TICKS.
+void companion_gatt_tick_art_timeout(void);

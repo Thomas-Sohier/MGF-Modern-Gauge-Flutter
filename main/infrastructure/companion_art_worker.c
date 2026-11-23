@@ -1,6 +1,7 @@
 #include "infrastructure/companion_art_worker.h"
 
 #include <stddef.h>
+#include <string.h>
 
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -40,6 +41,7 @@ typedef struct {
     uint16_t *out;
     int out_width;
     int out_height;
+    char out_art_id[COMPANION_ART_ID_MAX];
 } art_worker_t;
 
 static art_worker_t s_worker;
@@ -98,6 +100,8 @@ static void art_worker_task(void *argument) {
             s_worker.out = pixels;
             s_worker.out_width = MUSIC_COVER_WIDTH;
             s_worker.out_height = MUSIC_COVER_HEIGHT;
+            memcpy(s_worker.out_art_id, job.art_id,
+                   sizeof(s_worker.out_art_id));
             s_worker.has_out = true;
         }
         xSemaphoreGive(s_worker.lock);
@@ -159,6 +163,12 @@ bool companion_art_worker_submit(companion_art_jpeg_t *art) {
 }
 
 bool companion_art_worker_take(uint16_t **pixels, int *width, int *height) {
+    return companion_art_worker_take_with_id(pixels, width, height, NULL, 0);
+}
+
+bool companion_art_worker_take_with_id(uint16_t **pixels, int *width,
+                                       int *height, char *art_id,
+                                       size_t art_id_size) {
     if (pixels == NULL || width == NULL || height == NULL ||
         s_worker.lock == NULL) {
         return false;
@@ -171,6 +181,13 @@ bool companion_art_worker_take(uint16_t **pixels, int *width, int *height) {
         *height = s_worker.out_height;
         s_worker.out = NULL;
         s_worker.has_out = false;
+        if (art_id != NULL && art_id_size > 0) {
+            // Copie tronquée et toujours terminée : l'appelant ne connaît pas
+            // forcément la longueur exacte de l'identifiant.
+            strncpy(art_id, s_worker.out_art_id, art_id_size - 1U);
+            art_id[art_id_size - 1U] = '\0';
+            s_worker.out_art_id[0] = '\0';
+        }
         has = true;
     }
     xSemaphoreGive(s_worker.lock);
@@ -191,6 +208,7 @@ void companion_art_worker_stop(void) {
     art_free(s_worker.out);
     s_worker.out = NULL;
     s_worker.has_out = false;
+    s_worker.out_art_id[0] = '\0';
     xSemaphoreGive(s_worker.lock);
     xSemaphoreGive(s_worker.wake);
     xSemaphoreTake(s_worker.stopped, portMAX_DELAY);

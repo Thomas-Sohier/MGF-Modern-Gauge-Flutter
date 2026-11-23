@@ -68,6 +68,8 @@ typedef enum {
 static companion_art_reassembler_t s_art;
 static uint8_t *s_art_buffer;
 static bool s_art_ready;
+// Inactivité du transfert en cours, comptée par companion_gatt_tick_art_timeout.
+static unsigned s_art_idle_ticks;
 
 static uint8_t *art_alloc(size_t size) {
     void *p = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -84,6 +86,7 @@ static uint8_t *art_detach_locked(void) {
     uint8_t *old = s_art_buffer;
     s_art_buffer = NULL;
     s_art_ready = false;
+    s_art_idle_ticks = 0;
     companion_art_reassembler_reset(&s_art);
     s_art.buffer = NULL;
     s_art.capacity = 0;
@@ -144,7 +147,10 @@ static int handle_art_control(size_t length) {
         s_art.buffer = buffer;
         s_art.capacity = control.total_bytes;
         begin_ok = companion_art_reassembler_begin(&s_art, &control);
-        if (begin_ok) s_art_buffer = buffer;
+        if (begin_ok) {
+            s_art_buffer = buffer;
+            s_art_idle_ticks = 0;
+        }
         if (!begin_ok) {
             s_art.buffer = NULL;
             s_art.capacity = 0;
@@ -174,6 +180,7 @@ static int handle_art_data(size_t length) {
     portENTER_CRITICAL(&s_lock);
     if (!s_art_ready && s_art.active) {
         if (companion_art_reassembler_push(&s_art, s_chunk, length)) {
+            s_art_idle_ticks = 0;
             if (companion_art_reassembler_complete(&s_art)) {
                 s_art_ready = true;
                 completed_bytes = s_art.bytes_received;
@@ -352,8 +359,10 @@ bool companion_gatt_take_art(companion_art_jpeg_t *out) {
     if (s_art_ready && s_art_buffer != NULL) {
         out->data = s_art_buffer;
         out->length = s_art.total_bytes;
+        memcpy(out->art_id, s_art.art_id, sizeof(out->art_id));
         s_art_buffer = NULL;
         s_art_ready = false;
+        s_art_idle_ticks = 0;
         companion_art_reassembler_reset(&s_art);
         s_art.buffer = NULL;
         s_art.capacity = 0;
@@ -365,6 +374,29 @@ bool companion_gatt_take_art(companion_art_jpeg_t *out) {
 
 void companion_gatt_free_art(uint8_t *data) {
     art_free(data);
+}
+
+void companion_gatt_tick_art_timeout(void) {
+    uint8_t *to_free = NULL;
+    unsigned received_count = 0;
+    unsigned chunk_count = 0;
+    portENTER_CRITICAL(&s_lock);
+    // Un transfert complet (s_art_ready) attend son consommateur : il n'expire
+    // pas. Seul un réassemblage en cours peut rester bloqué sur un chunk perdu.
+    if (s_art.active && !s_art_ready) {
+        s_art_idle_ticks++;
+        if (s_art_idle_ticks >= COMPANION_ART_TIMEOUT_TICKS) {
+            received_count = s_art.received_count;
+            chunk_count = s_art.chunk_count;
+            to_free = art_detach_locked();
+        }
+    }
+    portEXIT_CRITICAL(&s_lock);
+    if (to_free != NULL) {
+        art_free(to_free);
+        ESP_LOGW(TAG, "pochette abandonnée (timeout %u/%u chunks)",
+                 received_count, chunk_count);
+    }
 }
 
 bool companion_gatt_take_media(companion_media_t *out) {

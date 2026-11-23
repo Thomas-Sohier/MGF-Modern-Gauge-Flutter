@@ -99,6 +99,7 @@ int main(void) {
     assert(jpeg.data == allocations[0]);
     assert(jpeg.length == sizeof(expected));
     assert(memcmp(jpeg.data, expected, sizeof(expected)) == 0);
+    assert(strcmp(jpeg.art_id, "cover") == 0);
     assert(!companion_gatt_take_art(&jpeg));
     companion_gatt_reset(); // Ownership has moved to the caller, not reset.
     assert(live_allocations == 1);
@@ -136,6 +137,36 @@ int main(void) {
     companion_gatt_free_art(jpeg.data);
     companion_gatt_reset();
     assert(live_allocations == 0);
+
+    // Transfert bloqué (chunk 1 jamais reçu) : les ticks d'inactivité finissent
+    // par libérer le tampon PSRAM.
+    assert(control() == 0);
+    assert(live_allocations == 1);
+    assert(write_chr(4, first, sizeof(first)) == 0);
+    for (unsigned i = 0; i + 1U < COMPANION_ART_TIMEOUT_TICKS; i++) {
+        companion_gatt_tick_art_timeout();
+        assert(live_allocations == 1);
+        assert(!companion_gatt_take_art(&jpeg)); // jamais complet
+    }
+    companion_gatt_tick_art_timeout(); // dépassement du délai
+    assert(live_allocations == 0);
+    assert(!companion_gatt_take_art(&jpeg));
+    // Le transfert abandonné n'accepte plus de chunk tardif.
+    assert(write_chr(4, last, sizeof(last)) == BLE_ATT_ERR_UNLIKELY);
+    assert(live_allocations == 0);
+
+    // Une pochette complète non consommée n'expire pas.
+    assert(control() == 0);
+    complete();
+    for (unsigned i = 0; i < COMPANION_ART_TIMEOUT_TICKS * 2U; i++) {
+        companion_gatt_tick_art_timeout();
+    }
+    assert(live_allocations == 1);
+    assert(companion_gatt_take_art(&jpeg));
+    companion_gatt_free_art(jpeg.data);
+    companion_gatt_reset();
+    assert(live_allocations == 0);
+
     puts("companion GATT ownership tests passed");
     return 0;
 }

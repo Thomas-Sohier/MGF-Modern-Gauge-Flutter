@@ -2,18 +2,20 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <sys/time.h>
 
 #include "esp_log.h"
 #include "esp_task_wdt.h"
 #include "lvgl.h"
 
+#include "domain/companion_protocol.h"
+
 #ifndef MGF_ENABLE_BLE_CONFIG
 #define MGF_ENABLE_BLE_CONFIG 0
 #endif
 
 #if MGF_ENABLE_BLE_CONFIG
-#include "domain/companion_protocol.h"
 #include "domain/music_cover.h"
 #include "domain/rtc_time.h"
 #include "infrastructure/ble_config_service.h"
@@ -28,6 +30,9 @@ typedef struct {
     companion_bridge_config_t config;
     lv_timer_t *timer;
     bool linked;
+    // Dernier art_id annoncé par le média courant : sert à jeter une pochette
+    // d'un morceau déjà passé (zapping) avant même de la décoder.
+    char current_art_id[COMPANION_MEDIA_ART_ID_MAX];
 } companion_bridge_t;
 
 static companion_bridge_t s_bridge;
@@ -105,30 +110,83 @@ static void companion_timer_tick(lv_timer_t *timer) {
     const uint32_t now = lv_tick_get();
 #if MGF_ENABLE_BLE_CONFIG
     navigation_screen_t *navigation = bridge->config.navigation;
+    // Expire tout réassemblage de pochette bloqué (transfert interrompu) :
+    // sans cela le prochain contrôle …0003 serait refusé indéfiniment.
+    companion_gatt_tick_art_timeout();
     const bool linked = ble_config_service_phone_linked();
     if (linked != bridge->linked) {
         bridge->linked = linked;
         ESP_LOGI(TAG, "companion phone %s", linked ? "linked" : "lost");
-        if (!linked) music_screen_set_media(music, NULL, now);
-        music_screen_set_link(music, linked, now);
-        navigation_screen_set_link(navigation, linked);
+        if (!linked) {
+            bridge->current_art_id[0] = '\0';
+            music_screen_set_media(music, NULL, now);
+            music_screen_set_link(music, false, now);
+            navigation_screen_set_link(navigation, false);
+        } else {
+            music_screen_set_link(music, true, now);
+            navigation_screen_set_link(navigation, true);
+        }
+    }
+    if (!linked) {
+        // Déconnecté : on purge les messages orphelins déjà en boîte aux lettres
+        // pour qu'ils ne réactivent jamais l'UI après la perte du téléphone.
+        companion_art_jpeg_t stale_art;
+        if (companion_gatt_take_art(&stale_art)) {
+            companion_gatt_free_art(stale_art.data);
+        }
+        uint16_t *stale_cover = NULL;
+        int stale_width = 0;
+        int stale_height = 0;
+        if (companion_art_worker_take_with_id(&stale_cover, &stale_width,
+                                              &stale_height, NULL, 0)) {
+            companion_art_worker_free(stale_cover);
+        }
+        companion_media_t stale_media;
+        (void)companion_gatt_take_media(&stale_media);
+        companion_nav_t stale_nav;
+        (void)companion_gatt_take_nav(&stale_nav);
+        companion_key_t stale_key;
+        while (companion_gatt_take_key(&stale_key)) {
+        }
+        music_screen_tick(music, now);
+        return;
     }
     companion_media_t media;
     if (companion_gatt_take_media(&media)) {
+        // Mémorisé AVANT le rendu : c'est la référence pour juger les pochettes
+        // qui arrivent ensuite (une art_id différente est périmée).
+        strncpy(bridge->current_art_id, media.art_id,
+                sizeof(bridge->current_art_id) - 1U);
+        bridge->current_art_id[sizeof(bridge->current_art_id) - 1U] = '\0';
         music_screen_set_media(music, &media, now);
     }
     // Pochette : le JPEG complet part au worker (décodage hors LVGL) ; l'image
     // ambre prête est reprise ici, dans la tâche LVGL, sans jamais bloquer.
     companion_art_jpeg_t art;
     if (companion_gatt_take_art(&art)) {
-        companion_art_worker_submit(&art);
+        // Pochette d'un morceau déjà passé (zapping pendant le transfert) :
+        // inutile de la décoder, elle serait rejetée à la remise.
+        if (bridge->current_art_id[0] != '\0' && art.art_id[0] != '\0' &&
+            strcmp(art.art_id, bridge->current_art_id) != 0) {
+            companion_gatt_free_art(art.data);
+        } else {
+            companion_art_worker_submit(&art);
+        }
     }
     uint16_t *cover = NULL;
     int cover_width = 0;
     int cover_height = 0;
-    if (companion_art_worker_take(&cover, &cover_width, &cover_height)) {
-        if (cover_width == MUSIC_COVER_WIDTH &&
-            cover_height == MUSIC_COVER_HEIGHT) {
+    char cover_art_id[COMPANION_ART_ID_MAX] = {0};
+    if (companion_art_worker_take_with_id(&cover, &cover_width, &cover_height,
+                                          cover_art_id, sizeof(cover_art_id))) {
+        // Le décodage JPEG a pu finir après un changement de morceau : ne
+        // jamais écraser la nouvelle pochette avec l'ancienne.
+        if (bridge->current_art_id[0] != '\0' && cover_art_id[0] != '\0' &&
+            strcmp(cover_art_id, bridge->current_art_id) != 0) {
+            ESP_LOGI(TAG, "stale cover dropped (art_id mismatch)");
+            companion_art_worker_free(cover);
+        } else if (cover_width == MUSIC_COVER_WIDTH &&
+                   cover_height == MUSIC_COVER_HEIGHT) {
             // Le worker rend toujours la palette normale (forme canonique) :
             // conversion exacte vers la palette active avant remise.
             if (ui_theme_is_inverted()) {

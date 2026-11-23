@@ -183,7 +183,9 @@ static void draw_route(lv_layer_t *layer, const ui_layout_t *layout,
 
 static void refresh(navigation_screen_t *scr) {
     const companion_nav_t *nav = &scr->nav;
-    if (!nav->active) {
+    // Sans téléphone lié, aucun guidage ne doit s'afficher même si un état
+    // `nav` périmé traîne avec active == true.
+    if (!scr->linked || !nav->active) {
         amber_page_set_hero(&scr->page, "--", false);
         amber_readout_set_unit(&scr->page.hero, "");
         if (amber_kit_set_text(scr->instruction,
@@ -271,10 +273,10 @@ fail:
 void navigation_screen_set_route(navigation_screen_t *scr,
                                  const companion_nav_t *nav) {
     if (scr == NULL) return;
-    if (nav != NULL) {
-        scr->nav = *nav;
-    } else {
+    if (!scr->linked || nav == NULL) {
         memset(&scr->nav, 0, sizeof(scr->nav));
+    } else {
+        scr->nav = *nav;
     }
     refresh(scr);
 }

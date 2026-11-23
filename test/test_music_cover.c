@@ -60,6 +60,8 @@ static void test_reassembler(void) {
     companion_art_control_t control = {
         .art_id = "x", .total_bytes = 5, .chunk_count = 2};
     assert(companion_art_reassembler_begin(&r, &control));
+    // L'identifiant suit le transfert jusqu'à la pochette décodée.
+    assert(strcmp(r.art_id, "x") == 0);
     const uint8_t chunk0[] = {0x00, 0x00, 'a', 'b', 'c'};
     assert(companion_art_reassembler_push(&r, chunk0, sizeof(chunk0)));
     assert(!companion_art_reassembler_complete(&r));
@@ -73,6 +75,9 @@ static void test_reassembler(void) {
     assert(companion_art_reassembler_push(&r, chunk1, sizeof(chunk1)));
     assert(companion_art_reassembler_complete(&r));
     assert(memcmp(buffer, "abcde", 5) == 0);
+    assert(strcmp(r.art_id, "x") == 0);
+    companion_art_reassembler_reset(&r);
+    assert(r.art_id[0] == '\0');
 
     // Un chunk arrivé après le 0 mais dans le désordre reste accepté tant que
     // la taille des chunks pleins est connue et les longueurs cohérentes.

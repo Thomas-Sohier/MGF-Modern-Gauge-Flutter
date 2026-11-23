@@ -5,7 +5,10 @@
 
 #include "domain/flat_json.h"
 
-#define SCRATCH_SIZE (2U * (COMPANION_PAYLOAD_MAX + 1U))
+// Clé et valeur se partagent ce tampon par moitiés (258 octets chacune) :
+// largement de quoi couvrir COMPANION_LINE_MAX * 2 = 192 octets, sans les
+// 510 octets de pile superflus sur celle de nimble_host_task.
+#define SCRATCH_SIZE (COMPANION_PAYLOAD_MAX + 4U)
 
 // ── Normalisation du texte ──────────────────────────────────────────────────
 typedef struct {

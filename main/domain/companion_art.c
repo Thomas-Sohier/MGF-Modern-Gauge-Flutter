@@ -77,6 +77,7 @@ void companion_art_reassembler_init(companion_art_reassembler_t *r,
 
 void companion_art_reassembler_reset(companion_art_reassembler_t *r) {
     if (r == NULL) return;
+    r->art_id[0] = '\0';
     r->total_bytes = 0;
     r->chunk_count = 0;
     r->chunk_size = 0;
@@ -91,7 +92,9 @@ bool companion_art_reassembler_begin(companion_art_reassembler_t *r,
                                      const companion_art_control_t *control) {
     if (r == NULL || r->buffer == NULL || control == NULL) return false;
     companion_art_reassembler_reset(r);
-    if (control->total_bytes == 0 ||
+    if (control->art_id[0] == '\0' ||
+        strlen(control->art_id) >= COMPANION_ART_ID_MAX ||
+        control->total_bytes == 0 ||
         control->total_bytes > COMPANION_ART_MAX_BYTES ||
         control->chunk_count == 0 ||
         control->chunk_count > COMPANION_ART_MAX_CHUNKS ||
@@ -99,6 +102,7 @@ bool companion_art_reassembler_begin(companion_art_reassembler_t *r,
         control->total_bytes > r->capacity) {
         return false;
     }
+    memcpy(r->art_id, control->art_id, strlen(control->art_id) + 1U);
     r->total_bytes = control->total_bytes;
     r->chunk_count = control->chunk_count;
     r->active = true;
