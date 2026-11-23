@@ -25,6 +25,13 @@ typedef struct {
     mems_variant_t variant;      // MEMS 1.6 (défaut) ou 1.9 (réveil 5 bauds)
     uint32_t poll_period_ms;     // période d'un cycle de poll ; 0 => 100 ms
     uint32_t reconnect_delay_ms; // 0 => 1000 ms
+
+    // Notification optionnelle des transitions de connexion ECU. Appelée
+    // depuis la tâche `mems_ecu` (jamais sous le verrou de l'instantané), une
+    // seule fois par changement d'état — la première publication comprise,
+    // pour que l'appelant n'ait pas à deviner l'état initial.
+    void (*on_connection_changed)(void *ctx, bool connected);
+    void *connection_ctx;
 } mems_ecu_config_t;
 
 // Crée l'instance (UART + session), sans démarrer la tâche.

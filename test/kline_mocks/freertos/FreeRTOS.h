@@ -14,4 +14,5 @@ typedef unsigned int TickType_t;
     ((TickType_t)(((uint64_t)(ms) * configTICK_RATE_HZ) / 1000u))
 #define pdTRUE        1
 #define pdFALSE       0
+#define pdPASS        1
 #define portMAX_DELAY ((TickType_t) - 1)

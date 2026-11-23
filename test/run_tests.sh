@@ -108,6 +108,18 @@ gcc -std=c11 -Wall -Wextra -Werror -I"$ROOT/main" \
 "$BUILD_DIR/test_mems"
 
 gcc -std=c11 -Wall -Wextra -Werror \
+    -I"$ROOT/test/kline_mocks" -I"$ROOT/test/mocks" -I"$ROOT/main" \
+    "$ROOT/test/test_mems_ecu.c" \
+    "$ROOT/main/infrastructure/mems_ecu.c" \
+    "$ROOT/main/domain/mems_protocol.c" \
+    "$ROOT/main/domain/mems_mapping.c" \
+    "$ROOT/main/domain/mems_reader.c" \
+    "$ROOT/main/domain/mems19_reader.c" \
+    "$ROOT/main/domain/mems_session.c" \
+    -lm -o "$BUILD_DIR/test_mems_ecu"
+"$BUILD_DIR/test_mems_ecu"
+
+gcc -std=c11 -Wall -Wextra -Werror \
     -I"$ROOT/test/kline_mocks" -I"$ROOT/main" \
     "$ROOT/test/test_kline_uart.c" \
     "$ROOT/main/infrastructure/kline_uart_esp32.c" \

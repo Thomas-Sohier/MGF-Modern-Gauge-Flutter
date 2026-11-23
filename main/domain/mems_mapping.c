@@ -1,6 +1,19 @@
 #include "domain/mems_mapping.h"
 
+#include <math.h>
 #include <stddef.h>
+
+// Le moteur pas-à-pas de ralenti est piloté en pas (0..180, 180 = 100 %).
+// L'UI affiche un pourcentage : convertir, et laisser 0xFF (ou une valeur hors
+// plage) indisponible plutôt que de publier une position aberrante.
+#define MEMS_IAC_FULL_SCALE_STEPS 180.0f
+
+static float steps_to_percent(int steps) {
+    if (steps < 0 || steps >= 0xFF) return NAN;
+    float pct = (float)steps * 100.0f / MEMS_IAC_FULL_SCALE_STEPS;
+    if (pct > 100.0f) pct = 100.0f;
+    return pct;
+}
 
 void mems_to_ecu_data(const mems_data_t *in, bool connected, ecu_data_t *out) {
     if (in == NULL || out == NULL) return;
@@ -24,7 +37,18 @@ void mems_to_ecu_data(const mems_data_t *in, bool connected, ecu_data_t *out) {
     out->estimated_air_fuel = in->air_fuel_ratio;
     out->lambda_mv = (float)in->lambda_voltage_mv;
     out->o2_mv = (float)in->lambda_voltage_mv;
-    out->idle_valve_position = (float)in->iac_position;
+    out->idle_valve_position = steps_to_percent(in->iac_position);
+    out->idle_base_position = steps_to_percent(in->idle_base_position);
+    out->idle_error = in->idle_error;
+
+    // Champs propres à la trame 0x7D : uniquement publier si elle a été reçue
+    // (sinon NAN, comme les autres mesures absentes de cette variante).
+    if (in->has_7d_data) {
+        out->fuelling_feedback_percent = in->fuelling_feedback_percent;
+        out->short_term_trim_percent = in->short_term_trim_percent;
+        out->long_term_trim = in->long_term_trim_percent;
+        out->ignition_advance_offset = in->ignition_advance_offset;
+    }
 
     out->faults_available = true;
     out->fault_flags =

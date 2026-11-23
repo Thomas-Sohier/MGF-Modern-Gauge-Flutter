@@ -66,6 +66,26 @@
 
 static const char *TAG = "mgf_gauge";
 
+// Diagnostics runtime hors du cadre de pile de `app_main` : le callback de la
+// tâche `mems_ecu` lit ce pointeur, et `app_main` retourne à la fin du boot —
+// une variable locale serait un pointeur pendant dès la première publication.
+// Mis à jour au démarrage et à l'arrêt des diagnostics.
+static runtime_diagnostics_t *s_diagnostics = NULL;
+
+#if MGF_USE_MEMS_KLINE
+// La tâche MEMS signale les transitions de la liaison K-line : les diagnostics
+// reflètent l'ECU réellement connectée (READY) ou absente (DEGRADED) au fil de
+// l'eau, sans relire l'instantané ni interroger la session.
+static void on_mems_connection_changed(void *ctx, bool connected) {
+    runtime_diagnostics_t *const *diag_ptr = ctx;
+    if (diag_ptr == NULL || *diag_ptr == NULL) return;
+    runtime_diagnostics_set_service_state(
+        *diag_ptr, RUNTIME_DIAGNOSTICS_SERVICE_ECU,
+        connected ? RUNTIME_DIAGNOSTICS_STATE_READY
+                  : RUNTIME_DIAGNOSTICS_STATE_DEGRADED);
+}
+#endif
+
 static bool disconnected_ecu_read(void *context, ecu_data_t *out) {
     (void)context;
     if (out == NULL) return false;
@@ -426,6 +446,11 @@ void app_main(void) {
             },
         .variant = MGF_MEMS_VARIANT,
         .poll_period_ms = 100,
+        // `&s_diagnostics` (et non l'adresse de la locale) : le pointeur est
+        // relu à chaque notification, y compris après le `return` de
+        // `app_main`.
+        .on_connection_changed = on_mems_connection_changed,
+        .connection_ctx = &s_diagnostics,
     };
     mems_ecu = mems_ecu_create(&mems_cfg);
     if (mems_ecu == NULL || !mems_ecu_start(mems_ecu)) {
@@ -475,6 +500,7 @@ void app_main(void) {
     if (diagnostics == NULL) {
         ESP_LOGW(TAG, "runtime diagnostics disabled or unavailable");
     }
+    s_diagnostics = diagnostics;
 
     perf_bench_start(display, navigator);
 
@@ -509,7 +535,12 @@ void app_main(void) {
 
 cleanup:
     // All LVGL objects and LVGL timers are stopped before the port is torn down.
-    if (diagnostics != NULL) runtime_diagnostics_stop(diagnostics);
+    if (diagnostics != NULL) {
+        // Detach the MEMS callback first: it ignores a NULL pointer, so the
+        // task can no longer reach the diagnostics that are about to be freed.
+        s_diagnostics = NULL;
+        runtime_diagnostics_stop(diagnostics);
+    }
     if (controller != NULL) dashboard_controller_destroy(controller);
     // Timer compagnon puis worker de pochettes, puis timer de réglages.
     companion_bridge_destroy();

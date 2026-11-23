@@ -29,8 +29,13 @@ static bool mems_reader_send_and_receive(void *ctx, uint8_t cmd, uint8_t *resp,
 
     // Purge les octets tardifs d'un échange précédent en échec : sans cela,
     // une réponse en retard décalerait toutes les trames suivantes.
+    // La pause P3 est appliquée AVANT la purge : elle laisse à l'ECU le temps
+    // de finir de transmettre sa réponse précédente sur la ligne half-duplex.
+    if (r->has_exchanged && t->delay_ms != NULL)
+        t->delay_ms(t->ctx, MEMS_INTER_COMMAND_DELAY_MS);
     if (t->flush != NULL) t->flush(t->ctx);
     if (t->write(t->ctx, &cmd, 1) != 1) return false;
+    r->has_exchanged = true;
 
     size_t got = 0;
     int retry = 0;
@@ -43,9 +48,13 @@ static bool mems_reader_send_and_receive(void *ctx, uint8_t cmd, uint8_t *resp,
         }
         if ((size_t)n > expected - got) return false;
         got += (size_t)n;
+        // Écho de commande en tête de réponse : le vérifier dès le premier
+        // octet évite d'attendre les 29/33 octets d'une trame dont on sait
+        // déjà qu'elle est décalée (et de consommer les retries de timeout).
+        if (resp[0] != cmd) return false;
     }
 
-    return resp[0] == cmd; // l'ECU ré-émet la commande en tête de réponse
+    return true; // l'ECU ré-émet la commande en tête de réponse
 }
 
 static bool mems_reader_connect(void *ctx) {
@@ -66,9 +75,15 @@ static bool mems_reader_connect(void *ctx) {
     if (!mems_reader_send_and_receive(r, MEMS_CMD_HEARTBEAT, buf,
                                       MEMS_RESP_HEARTBEAT))
         return false;
+    // Écho local matériel non filtré (transceiver 1 fil, MGF_KLINE_LOCAL_ECHO=0)
+    // : la réponse devient « F4 F4 00 », l'écho [0] reste correct et seul le
+    // dédoublement du 2e octet permet de détecter la désynchronisation.
+    if (buf[1] == MEMS_CMD_HEARTBEAT) return false;
     if (!mems_reader_send_and_receive(r, MEMS_CMD_INIT_ECU_ID, buf,
                                       MEMS_RESP_ECU_ID))
         return false;
+    // Même contrôle sur l'ID ECU : « D0 D0 99 00 02 » est un écho doublé.
+    if (buf[1] == MEMS_CMD_INIT_ECU_ID) return false;
 
     memcpy(r->ecu_id, buf, MEMS_RESP_ECU_ID);
     r->connected = true;

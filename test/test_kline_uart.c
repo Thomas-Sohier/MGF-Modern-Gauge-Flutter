@@ -120,7 +120,13 @@ esp_err_t gpio_reset_pin(int gpio_num) {
 
 esp_err_t gpio_set_direction(int gpio_num, gpio_mode_t mode) {
     (void)gpio_num;
-    (void)mode;
+    // Le détachement UART met le TX en sortie : le niveau doit déjà être haut
+    // (ligne K-line au repos), sinon le driver de sortie provoquerait un front
+    // bas parasite sur la K-line.
+    if (mode == GPIO_MODE_OUTPUT) {
+        assert(uart_mock.gpio_level_count > 0 &&
+               uart_mock.gpio_levels[uart_mock.gpio_level_count - 1] == 1);
+    }
     return ESP_OK;
 }
 
@@ -287,6 +293,37 @@ static void test_slow_init_timing_with_coarse_tick(void) {
     kline_uart_destroy(k);
 }
 
+static void test_delay_ms_and_subtick_timeout(void) {
+    memset(&uart_mock, 0, sizeof(uart_mock));
+    uart_mock.wait_result = ESP_OK;
+    kline_uart_config_t config = valid_config(false);
+    kline_uart_t *k = kline_uart_create(&config);
+    assert(k != NULL);
+    kline_transport_t transport = kline_uart_transport(k);
+    assert(transport.delay_ms != NULL);
+
+    // Une pause non nulle doit toujours coûter au moins un tick, même quand
+    // le tick (10 ms à 100 Hz) est plus grossier que la durée demandée.
+    int64_t before = uart_mock.now_us;
+    transport.delay_ms(transport.ctx, 5);
+    assert(uart_mock.now_us - before >= MOCK_TICK_US);
+
+    // Idem pour un timeout de lecture : 0 tick transformerait la lecture en
+    // simple scrutation non bloquante alors que 1 ms a été demandé.
+    assert(uart_mock.len == uart_mock.pos);
+    uint8_t byte = 0;
+    before = uart_mock.now_us;
+    assert(transport.read(transport.ctx, &byte, 1, 1) == 0);
+    assert(uart_mock.now_us - before >= MOCK_TICK_US);
+
+    // Une pause de 0 ms ne doit pas bloquer (cas d'un appelant sans attente).
+    before = uart_mock.now_us;
+    transport.delay_ms(transport.ctx, 0);
+    assert(uart_mock.now_us == before);
+
+    kline_uart_destroy(k);
+}
+
 int main(void) {
     test_runtime_configuration_validation();
     test_transport_and_local_echo();
@@ -294,6 +331,7 @@ int main(void) {
     test_local_echo_reads_partial_chunks();
     test_slow_init_error_reattaches_uart();
     test_slow_init_timing_with_coarse_tick();
+    test_delay_ms_and_subtick_timeout();
     puts("kline uart tests: OK");
     return 0;
 }

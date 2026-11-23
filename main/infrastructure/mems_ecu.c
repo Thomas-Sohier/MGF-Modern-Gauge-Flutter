@@ -38,6 +38,13 @@ struct mems_ecu_s {
 
     TaskHandle_t task;
     volatile bool running;
+
+    // Notification hors verrou des transitions de connexion (cf. config).
+    // Écrit uniquement par la tâche, d'où l'absence de synchronisation propre.
+    void (*on_connection_changed)(void *ctx, bool connected);
+    void *connection_ctx;
+    bool last_notified_connected;
+    bool has_notified_connection;
 };
 
 static void publish(mems_ecu_t *ecu, const ecu_data_t *data) {
@@ -46,6 +53,30 @@ static void publish(mems_ecu_t *ecu, const ecu_data_t *data) {
         ecu->snapshot_us = esp_timer_get_time();
         ecu->has_snapshot = true;
         xSemaphoreGive(ecu->lock);
+    }
+
+    // Hors mutex : le callback remonte vers d'autres services (diagnostics),
+    // qui ne doivent pas être appelés sous le verrou de l'instantané. Une seule
+    // notification par changement d'état, la première publication incluse.
+    if (ecu->on_connection_changed != NULL &&
+        (!ecu->has_notified_connection ||
+         ecu->last_notified_connected != data->connected)) {
+        ecu->has_notified_connection = true;
+        ecu->last_notified_connected = data->connected;
+        ecu->on_connection_changed(ecu->connection_ctx, data->connected);
+    }
+}
+
+// Attente avant reconnexion découpée en tranches : `mems_ecu_destroy` ne doit
+// pas patienter une seconde entière quand l'ECU est absente.
+static void delay_reconnect_interruptible(const mems_ecu_t *ecu) {
+    uint32_t remaining = ecu->reconnect_delay_ms;
+    while (ecu->running && remaining > 0) {
+        uint32_t step = remaining > 50 ? 50 : remaining;
+        TickType_t ticks = pdMS_TO_TICKS(step);
+        if (ticks == 0) ticks = 1;
+        vTaskDelay(ticks);
+        remaining -= step;
     }
 }
 
@@ -62,7 +93,7 @@ static void mems_ecu_task(void *arg) {
                 // Publier l'état déconnecté et temporiser avant nouvel essai.
                 const ecu_data_t down = ecu_data_unavailable();
                 publish(ecu, &down);
-                vTaskDelay(pdMS_TO_TICKS(ecu->reconnect_delay_ms));
+                delay_reconnect_interruptible(ecu);
                 continue;
             }
             const uint8_t *id = mems_reader_ecu_id(&ecu->base_reader);
@@ -117,6 +148,8 @@ mems_ecu_t *mems_ecu_create(const mems_ecu_config_t *config) {
     ecu->reconnect_delay_ms = config->reconnect_delay_ms > 0
                                   ? config->reconnect_delay_ms
                                   : DEFAULT_RECONNECT_MS;
+    ecu->on_connection_changed = config->on_connection_changed;
+    ecu->connection_ctx = config->connection_ctx;
 
     ecu->lock = xSemaphoreCreateMutex();
     ecu->stopped = xSemaphoreCreateBinary();

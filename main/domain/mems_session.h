@@ -16,6 +16,14 @@
 // interrogée qu'un cycle sur 3 ; la trame 0x80 (régime) l'est à chaque cycle.
 #define MEMS_SESSION_DEFAULT_7D_INTERVAL 3u
 
+// MEMS n'a pas de checksum : un bit-flip isolé sur l'octet de température d'eau
+// peut faire sauter l'affichage au-dessus du seuil d'alerte sur une seule
+// trame. Un franchissement du seuil qui ne s'accompagne pas d'une montée
+// plausible (plus de MEMS_SESSION_COOLANT_MAX_STEP_C en un cycle) n'est publié
+// qu'après confirmation par la trame suivante.
+#define MEMS_SESSION_COOLANT_ALERT_C    105.0f
+#define MEMS_SESSION_COOLANT_MAX_STEP_C 15.0f
+
 // Couche de poll + décodage MEMS — calquée sur `ECUReaderInstance.GetDataframes`
 // du projet Go. Agnostique de la variante et du transport : elle pilote un
 // `ecu_reader_t` (MEMS 1.6 ou 1.9, indifféremment) et décode les trames en
@@ -27,7 +35,10 @@ typedef struct {
         poll_failures;   // échecs de poll consécutifs depuis le dernier succès
     uint8_t interval_7d; // 0x7D interrogée un cycle sur `interval_7d` (>= 1)
     uint8_t cycles_since_7d; // cycles réussis depuis la dernière 0x7D
-    bool has_7d;      // `last` contient une 0x7D valide de CETTE connexion
+    bool has_7d; // `last` contient une 0x7D valide de CETTE connexion
+    // Un franchissement brutal du seuil d'alerte thermique a été vu sur le
+    // cycle précédent et attend confirmation (filtrage des bit-flips).
+    bool coolant_spike_pending;
     mems_data_t last; // dernier instantané décodé (champs 0x7D conservés)
 } mems_session_t;
 

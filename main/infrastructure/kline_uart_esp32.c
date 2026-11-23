@@ -38,6 +38,16 @@ struct kline_uart_s {
     bool local_echo;
 };
 
+// pdMS_TO_TICKS arrondit à l'inférieur : avec configTICK_RATE_HZ=100 (tick de
+// 10 ms) toute demande < 10 ms tombe à 0 tick, et donc un délai ou un timeout
+// non nul devient une opération non bloquante. Un appelant qui demande
+// explicitement d'attendre au moins 1 ms doit toujours patienter un tick.
+static TickType_t kline_ms_to_ticks(uint32_t ms) {
+    if (ms == 0) return 0;
+    TickType_t ticks = pdMS_TO_TICKS(ms);
+    return ticks > 0 ? ticks : 1;
+}
+
 static int kline_write(void *ctx, const uint8_t *buf, size_t len) {
     kline_uart_t *k = ctx;
     if (k == NULL || (buf == NULL && len != 0) || len > INT32_MAX) return -1;
@@ -46,7 +56,8 @@ static int kline_write(void *ctx, const uint8_t *buf, size_t len) {
     int written = uart_write_bytes(k->uart_num, (const char *)buf, len);
     if (written < 0 || (size_t)written != len) return -1;
     // Attendre l'émission complète pour respecter le rythme half-duplex.
-    if (uart_wait_tx_done(k->uart_num, pdMS_TO_TICKS(50)) != ESP_OK) return -1;
+    if (uart_wait_tx_done(k->uart_num, kline_ms_to_ticks(50)) != ESP_OK)
+        return -1;
 
     // Dans un montage avec loopback local, l'écho arrive avant la réponse ECU.
     // Une absence d'écho est une erreur lorsque l'option est activée : il ne
@@ -58,8 +69,8 @@ static int kline_write(void *ctx, const uint8_t *buf, size_t len) {
         while (offset < len) {
             size_t chunk = len - offset;
             if (chunk > sizeof(echo)) chunk = sizeof(echo);
-            int n =
-                uart_read_bytes(k->uart_num, echo, chunk, pdMS_TO_TICKS(50));
+            int n = uart_read_bytes(k->uart_num, echo, chunk,
+                                    kline_ms_to_ticks(50));
             if (n <= 0 || (size_t)n > chunk ||
                 memcmp(echo, buf + offset, (size_t)n) != 0) {
                 return -1;
@@ -75,8 +86,17 @@ static int kline_read(void *ctx, uint8_t *buf, size_t len,
     kline_uart_t *k = ctx;
     if (k == NULL || (buf == NULL && len != 0)) return -1;
     if (len == 0) return 0;
-    int n = uart_read_bytes(k->uart_num, buf, len, pdMS_TO_TICKS(timeout_ms));
+    int n =
+        uart_read_bytes(k->uart_num, buf, len, kline_ms_to_ticks(timeout_ms));
     return n; // >=0 nombre d'octets, <0 erreur
+}
+
+// Pause inter-commande du protocole MEMS (timing P3 ISO-9141). Passer par
+// vTaskDelay (et non un attente active) rend la main pendant l'attente.
+static void kline_delay_ms(void *ctx, uint32_t ms) {
+    kline_uart_t *k = ctx;
+    if (k == NULL || ms == 0) return;
+    vTaskDelay(kline_ms_to_ticks(ms));
 }
 
 static void kline_flush(void *ctx) {
@@ -114,8 +134,8 @@ static bool kline_wait_for_slow_init_sync(kline_uart_t *k,
         if (remaining_us <= 0) return false;
         uint32_t remaining_ms = (uint32_t)((remaining_us + 999) / 1000);
         uint8_t byte = 0;
-        int n =
-            uart_read_bytes(k->uart_num, &byte, 1, pdMS_TO_TICKS(remaining_ms));
+        int n = uart_read_bytes(k->uart_num, &byte, 1,
+                                kline_ms_to_ticks(remaining_ms));
         if (n <= 0) return false;
         if (byte == sync[matched]) {
             matched++;
@@ -156,13 +176,18 @@ static int kline_wake_up(void *ctx, uint8_t ecu_address) {
     // générés pendant les 5 bauds sont ignorés par le chercheur de synchro.
     uart_flush_input(k->uart_num);
 
-    // Détacher le TX de l'UART pour le piloter en GPIO.
+    // Détacher le TX de l'UART pour le piloter en GPIO. Le niveau haut (ligne
+    // K-line au repos) est écrit *avant* d'activer le driver de sortie :
+    // gpio_set_level sur une broche encore en entrée ne pilote rien, alors que
+    // passer en GPIO_MODE_OUTPUT avec un niveau bas pré-chargé ferait
+    // apparaître un front bas parasite (interprété par l'ECU comme un start
+    // bit) au moment où le driver s'active.
     if (gpio_reset_pin(k->tx_gpio) != ESP_OK ||
-        gpio_set_direction(k->tx_gpio, GPIO_MODE_OUTPUT) != ESP_OK ||
-        gpio_set_level(k->tx_gpio, 1) != ESP_OK) {
+        gpio_set_level(k->tx_gpio, 1) != ESP_OK ||
+        gpio_set_direction(k->tx_gpio, GPIO_MODE_OUTPUT) != ESP_OK) {
         return kline_wake_up_abort(k);
     }
-    vTaskDelay(pdMS_TO_TICKS(2000)); // ligne stable avant le start bit
+    vTaskDelay(kline_ms_to_ticks(2000)); // ligne stable avant le start bit
 
     const int b = KLINE_SLOW_INIT_BIT_MS;
     int64_t start = esp_timer_get_time();
@@ -258,6 +283,7 @@ kline_transport_t kline_uart_transport(kline_uart_t *k) {
         .read = kline_read,
         .flush = kline_flush,
         .wake_up = kline_wake_up,
+        .delay_ms = kline_delay_ms,
         .ctx = k,
     };
 }

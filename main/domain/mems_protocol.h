@@ -71,7 +71,10 @@ typedef struct {
     bool park_neutral_switch;   // point mort / parking
     uint8_t dtc0;               // codes défaut (bitfield) trame 0x80
     uint8_t dtc1;
-    int iac_position;       // position moteur pas-à-pas ralenti (0..180)
+    int iac_position;       // position moteur pas-à-pas ralenti (0..180 pas)
+    int idle_base_position; // position de base ralenti (0..180 pas)
+    // Erreur de régulation de ralenti (octets 20..21 big-endian) ; NAN si 0xFFFF.
+    float idle_error;
     float ignition_advance; // ° (brut / 2 - 24)
     float coil_time;        // ms (brut * 0.002)
 
@@ -81,6 +84,16 @@ typedef struct {
     float air_fuel_ratio;  // (brut / 10)
     int lambda_voltage_mv; // mV (brut * 5)
     bool closed_loop;      // régulation lambda en boucle fermée
+
+    // Trame 0x7D — présence. Positionné par `mems_parse_frame_7d` et jamais
+    // effacé par `mems_parse_frame_80` : la session conserve ainsi les champs
+    // 0x7D entre deux interrogations (un cycle sur `interval_7d`).
+    bool has_7d_data;
+    // Correction lambda court terme, en % (brut - 100 ; 100 % = aucune action).
+    float fuelling_feedback_percent;
+    float short_term_trim_percent; // brut - 100
+    float long_term_trim_percent;  // brut - 128
+    float ignition_advance_offset; // (brut - 128) * 0.5 °
 
     // Défauts dérivés des bits DTC (rosco.go)
     bool coolant_sensor_fault;

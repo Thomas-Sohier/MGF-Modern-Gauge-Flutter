@@ -21,19 +21,25 @@
 #define F80_PARK_NEUTRAL 13
 #define F80_DTC0         14
 #define F80_DTC1         15
+#define F80_IDLE_BASE    17
 #define F80_IAC_POS      19
+#define F80_IDLE_ERR_HI  20
+#define F80_IDLE_ERR_LO  21
 #define F80_IGN_ADVANCE  23
 #define F80_COIL_HI      24
 #define F80_COIL_LO      25
 
 // --- Trame 0x7D -------------------------------------------------------------
-#define F7D_CMD        0
-#define F7D_SIZE       1
-#define F7D_IGN_SWITCH 2
-#define F7D_THROTTLE   3
-#define F7D_AFR        5
-#define F7D_LAMBDA_V   7
-#define F7D_LOOP       11
+#define F7D_CMD             0
+#define F7D_SIZE            1
+#define F7D_IGN_SWITCH      2
+#define F7D_THROTTLE        3
+#define F7D_AFR             5
+#define F7D_LAMBDA_V        7
+#define F7D_LOOP            11
+#define F7D_LONG_TERM_TRIM  12
+#define F7D_SHORT_TERM_TRIM 13
+#define F7D_IGN_ADV_OFFSET  21
 
 // --- Bits DTC (structures.go) -----------------------------------------------
 #define DTC0_COOLANT_SENSOR 0x01u
@@ -75,6 +81,11 @@ bool mems_parse_frame_80(const uint8_t *frame, size_t len, mems_data_t *out) {
     out->dtc0 = frame[F80_DTC0];
     out->dtc1 = frame[F80_DTC1];
     out->iac_position = frame[F80_IAC_POS];
+    out->idle_base_position = frame[F80_IDLE_BASE];
+    out->idle_error =
+        (frame[F80_IDLE_ERR_HI] == 0xFF && frame[F80_IDLE_ERR_LO] == 0xFF)
+            ? NAN
+            : (float)((frame[F80_IDLE_ERR_HI] << 8) | frame[F80_IDLE_ERR_LO]);
     out->ignition_advance = (float)frame[F80_IGN_ADVANCE] / 2.0f - 24.0f;
     out->coil_time =
         (float)((frame[F80_COIL_HI] << 8) | frame[F80_COIL_LO]) * 0.002f;
@@ -97,5 +108,18 @@ bool mems_parse_frame_7d(const uint8_t *frame, size_t len, mems_data_t *out) {
     out->air_fuel_ratio = (float)frame[F7D_AFR] / 10.0f;
     out->lambda_voltage_mv = (int)frame[F7D_LAMBDA_V] * 5;
     out->closed_loop = frame[F7D_LOOP] != 0;
+
+    // Correction lambda : 0xFF = non supporté / non appris.
+    const uint8_t stft = frame[F7D_SHORT_TERM_TRIM];
+    out->fuelling_feedback_percent = stft == 0xFF ? NAN : (float)stft;
+    out->short_term_trim_percent =
+        stft == 0xFF ? NAN : (float)((int)stft - 100);
+    const uint8_t ltft = frame[F7D_LONG_TERM_TRIM];
+    out->long_term_trim_percent = ltft == 0xFF ? NAN : (float)((int)ltft - 128);
+    const uint8_t adv = frame[F7D_IGN_ADV_OFFSET];
+    out->ignition_advance_offset =
+        adv == 0xFF ? NAN : (float)((int)adv - 128) * 0.5f;
+
+    out->has_7d_data = true;
     return true;
 }

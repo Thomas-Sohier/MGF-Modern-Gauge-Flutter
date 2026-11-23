@@ -1,5 +1,6 @@
 #include "domain/mems_session.h"
 
+#include <math.h>
 #include <string.h>
 
 #include "domain/mems_mapping.h"
@@ -8,6 +9,7 @@ static void forget_snapshot(mems_session_t *s) {
     memset(&s->last, 0, sizeof(s->last));
     s->has_7d = false;
     s->cycles_since_7d = 0;
+    s->coolant_spike_pending = false;
 }
 
 void mems_session_init(mems_session_t *s, ecu_reader_t reader) {
@@ -51,6 +53,33 @@ static bool poll_once(mems_session_t *s, mems_data_t *data, bool want_7d) {
            mems_parse_frame_7d(f7d, MEMS_FRAME_7D_LEN, data);
 }
 
+// Filtre anti bit-flip sur la température d'eau. MEMS n'ayant pas de checksum,
+// un octet `F80_COOLANT` corrompu peut faire franchir le seuil d'alerte sur une
+// trame isolée. Un franchissement du seuil qui saute de plus de
+// MEMS_SESSION_COOLANT_MAX_STEP_C en un cycle est donc retenu une trame : le
+// cycle courant conserve l'ancienne valeur, et seule la trame suivante (qui
+// reconfirme) publie la surchauffe. Une montée progressive, ou une session qui
+// démarre déjà chaude, passent immédiatement.
+static void apply_coolant_spike_filter(mems_session_t *s, mems_data_t *data) {
+    const float prev = s->last.coolant_temp;
+    const float next = data->coolant_temp;
+    const bool implausible_jump =
+        s->has_7d && isfinite(prev) && prev < MEMS_SESSION_COOLANT_ALERT_C &&
+        isfinite(next) && next >= MEMS_SESSION_COOLANT_ALERT_C &&
+        next - prev > MEMS_SESSION_COOLANT_MAX_STEP_C;
+    if (!implausible_jump) {
+        s->coolant_spike_pending = false;
+        return;
+    }
+    if (s->coolant_spike_pending) {
+        // 2e trame consécutive : la surchauffe est confirmée, on la publie.
+        s->coolant_spike_pending = false;
+        return;
+    }
+    s->coolant_spike_pending = true;
+    data->coolant_temp = prev;
+}
+
 bool mems_session_poll(mems_session_t *s, ecu_data_t *out, mems_data_t *raw) {
     if (s == NULL || out == NULL || !s->connected) return false;
 
@@ -66,6 +95,7 @@ bool mems_session_poll(mems_session_t *s, ecu_data_t *out, mems_data_t *raw) {
         return false;
     }
     s->poll_failures = 0;
+    apply_coolant_spike_filter(s, &data);
     s->last = data;
     if (want_7d) {
         s->has_7d = true;

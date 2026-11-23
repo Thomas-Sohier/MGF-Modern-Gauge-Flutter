@@ -78,15 +78,26 @@ Le réveil est une primitive **matérielle** : le décorateur l'invoque via
 MEMS n'a **pas de checksum**. Une trame n'est acceptée que si :
 
 - sa longueur est exacte (29 o pour `0x80`, 33 o pour `0x7D`) ;
-- l'octet [0] est l'écho de la commande ;
-- l'octet [1] est la taille annoncée (`0x1C` pour `0x80`, `0x20` pour `0x7D`).
-  C'est ce contrôle qui détecte un **décalage d'un octet**, typiquement l'écho
-  local du transceiver non absorbé alors que `MGF_KLINE_LOCAL_ECHO=0`
-  (« `80 80 1C …` ») ;
+- l'octet [0] est l'écho de la commande (vérifié **dès le premier octet reçu**
+  pour avorter immédiatement sans attendre la fin de trame ni consommer les
+  retries de timeout) ;
+- lors du handshake, les réponses multi-octets `HEARTBEAT` (`0xF4`) et `ECU_ID`
+  (`0xD0`) ne doublent pas l'octet de commande en [1] (détecte dès la connexion
+  un écho local matériel non filtré lorsque `MGF_KLINE_LOCAL_ECHO=0`) ;
+- l'octet [1] des trames de données est la taille annoncée (`0x1C` pour `0x80`,
+  `0x20` pour `0x7D`), ce qui détecte tout **décalage d'un octet** en session ;
 - le régime est plausible (≤ `MEMS_RPM_MAX_PLAUSIBLE` = 10000 tr/min ; 0 reste
-  valide, moteur arrêté). Aucune autre borne n'est appliquée.
+  valide, moteur arrêté) ;
+- un saut de température d'eau franchissant le seuil d'alerte (`105 °C`) de plus
+  de `15 °C` en un seul cycle est confirmé sur **deux trames consécutives**
+  (`mems_session.c`) afin qu'un bit-flip isolé ne déclenche pas de fausse
+  `ALERTE THERMIQUE` globale (une montée progressive ou un démarrage déjà chaud
+  passent sans délai).
 
-Une trame rejetée compte comme une **trame perdue** pour la session.
+Une pause inter-commande P3 (`MEMS_INTER_COMMAND_DELAY_MS` = 5 ms,
+`transport.delay_ms`) est observée entre deux échanges consécutifs pour laisser
+à l'ECU half-duplex le temps de retourner sa ligne avant la purge et l'écriture
+suivantes. Une trame rejetée compte comme une **trame perdue** pour la session.
 
 Tables complètes des octets : `domain/mems_protocol.c`.
 

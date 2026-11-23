@@ -27,5 +27,9 @@ typedef struct {
     // Renvoie >= 0 si effectué, < 0 en erreur. Optionnel (NULL => non supporté ;
     // requis pour la variante MEMS 1.9).
     int (*wake_up)(void *ctx, uint8_t ecu_address);
+    // Pause inter-commande (`ms` millisecondes) laissant à l'ECU half-duplex
+    // le temps de retourner sa ligne après une réponse (timing P3 ISO-9141).
+    // Optionnel (NULL => pas de pause).
+    void (*delay_ms)(void *ctx, uint32_t ms);
     void *ctx;
 } kline_transport_t;
