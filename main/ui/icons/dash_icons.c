@@ -178,6 +178,28 @@ static void draw_oil(lv_layer_t *layer, const lv_area_t *a, lv_color_t color) {
     draw_line(layer, color, lw, sx(a, 865), sy(a, 520), sx(a, 865), sy(a, 560));
 }
 
+/* -------------------- 3b. FUEL (Pompe à essence automobile) --------------- */
+
+static void draw_fuel(lv_layer_t *layer, const lv_area_t *a, lv_color_t color) {
+    const lv_coord_t lw = sw(a, 55);
+
+    /* Corps du distributeur + séparation du cadran supérieur */
+    draw_rect_outline(layer, color, lw, sw(a, 30), sx(a, 210), sy(a, 220),
+                      sx(a, 630), sy(a, 780));
+    draw_line(layer, color, lw, sx(a, 210), sy(a, 470), sx(a, 630), sy(a, 470));
+
+    /* Socle inférieur */
+    draw_line(layer, color, lw, sx(a, 160), sy(a, 780), sx(a, 680), sy(a, 780));
+
+    /* Flexible latéral et pistolet */
+    draw_line(layer, color, lw, sx(a, 630), sy(a, 560), sx(a, 735), sy(a, 560));
+    draw_line(layer, color, lw, sx(a, 735), sy(a, 560), sx(a, 735), sy(a, 700));
+    draw_line(layer, color, lw, sx(a, 735), sy(a, 700), sx(a, 835), sy(a, 700));
+    draw_line(layer, color, lw, sx(a, 835), sy(a, 700), sx(a, 835), sy(a, 360));
+    draw_line(layer, color, lw, sx(a, 835), sy(a, 360), sx(a, 730), sy(a, 260));
+    draw_line(layer, color, lw, sx(a, 730), sy(a, 260), sx(a, 730), sy(a, 345));
+}
+
 /* -------------------- 4. OBD LINK (Maillons de chaîne) -------------------- */
 
 static void draw_obd_link(lv_layer_t *layer, const lv_area_t *a,
@@ -272,6 +294,9 @@ static void dash_icon_draw_event(lv_event_t *e) {
         break;
     case DASH_ICON_OIL:
         draw_oil(layer, &a, color);
+        break;
+    case DASH_ICON_FUEL:
+        draw_fuel(layer, &a, color);
         break;
     case DASH_ICON_ENGINE:
         draw_engine(layer, &a, color);

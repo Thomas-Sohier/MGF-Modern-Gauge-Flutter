@@ -7,6 +7,7 @@
 #include "ui/widgets/amber_kit.h"
 #include "ui/widgets/amber_draw.h"
 #include "ui/ui_layout.h"
+#include "domain/fuel_consumption.h"
 #include "domain/value_smoothing.h"
 #include "domain/temperature_status.h"
 
@@ -67,7 +68,7 @@ static const float kVSep[3][2] = {
 #define RPM_UNIT_Y 170.0f
 
 // ── 1. CONSTANTES : indicateurs bas ──────────────────────────────────────────
-enum { M_COOLANT = 0, M_BATTERY, M_OIL, M_OBD, M_COUNT };
+enum { M_COOLANT = 0, M_BATTERY, M_FUEL, M_OBD, M_COUNT };
 typedef struct {
     dash_icon_type_t icon;
     float x, icon_y, label_y;
@@ -76,7 +77,7 @@ typedef struct {
 static const ind_def_t kInd[M_COUNT] = {
     {DASH_ICON_COOLANT, 45.0f, 190.333f, 225.333f},
     {DASH_ICON_BATTERY, 121.667f, 220.333f, 255.333f},
-    {DASH_ICON_OIL, 198.333f, 220.333f, 255.333f},
+    {DASH_ICON_FUEL, 198.333f, 220.333f, 255.333f},
     {DASH_ICON_OBD_LINK, 275.0f, 190.333f, 225.333f},
 };
 #define IND_ICON_SZ 48.0f
@@ -85,6 +86,7 @@ static const ind_def_t kInd[M_COUNT] = {
 
 static const char *unit_of(int index, app_settings_units_t units) {
     if (index == M_BATTERY) return "V";
+    if (index == M_FUEL) return "L/h";
     return units == APP_SETTINGS_UNITS_IMPERIAL ? "°F" : "°C";
 }
 
@@ -106,10 +108,10 @@ struct amber_screen_s {
     int32_t rpm_display;
     int32_t coolant_display;
     int32_t battery_display;
-    int32_t oil_display;
+    int32_t fuel_display;
     bool coolant_ok;
     bool battery_ok;
-    bool oil_ok;
+    bool fuel_ok;
     bool coolant_alert; // eau trop chaude (repère d'alerte dans sa cellule)
     bool battery_alert; // tension hors plage (idem côté batterie)
     bool connected_display;
@@ -368,7 +370,6 @@ void amber_screen_set_units(amber_screen_t *scr, app_settings_units_t units) {
     }
     scr->units = units;
     amber_readout_set_unit(&scr->readout[M_COOLANT], unit_of(M_COOLANT, units));
-    amber_readout_set_unit(&scr->readout[M_OIL], unit_of(M_OIL, units));
     scr->has_snapshot = false;
     if (scr->has_latest_data) amber_screen_update(scr, &scr->latest_data);
 }
@@ -380,6 +381,20 @@ static void format_temperature(char *buf, size_t size, float value) {
         return;
     }
     snprintf(buf, size, "%.0f", value);
+}
+
+// Débit horaire en L/h : au dixième sous 10 L/h (ex. « 1.4 L/h » au ralenti),
+// entier au-delà pour tenir dans la cellule sans chevaucher les séparateurs.
+static void format_fuel_lph(char *buf, size_t size, float value) {
+    if (!isfinite(value) || value < 0.0f) {
+        snprintf(buf, size, "--");
+        return;
+    }
+    if (value < 9.95f) {
+        snprintf(buf, size, "%.1f", value);
+    } else {
+        snprintf(buf, size, "%.0f", value);
+    }
 }
 
 void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
@@ -398,13 +413,13 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     const float rpm = scr->rpm_smoothed;
 
     const float coolant = temperature_display(d->coolant_temp, scr->units);
-    const float oil = temperature_display(d->oil_temp, scr->units);
+    const float fuel_lph = fuel_consumption_lph(d);
     // Une mesure n'est valable que si l'ECU est connectee et la valeur finie :
     // connecte=false avec des valeurs residuelles ne doit jamais afficher des
     // chiffres perimes (readouts comme compte-tours).
     const bool coolant_ok = d->connected && isfinite(coolant);
     const bool battery_ok = d->connected && isfinite(d->battery_voltage);
-    const bool oil_ok = d->connected && isfinite(oil);
+    const bool fuel_ok = d->connected && isfinite(fuel_lph);
     // Alertes des cellules basses : eau trop chaude, tension hors plage. Elles
     // pilotent un repère dessiné par le canvas, d'où l'invalidation ciblée dès
     // que l'état bascule (indépendamment des textes et des barres).
@@ -424,7 +439,10 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
         coolant_ok ? (int32_t)lroundf(coolant) : INT32_MIN;
     const int32_t battery_display =
         battery_ok ? (int32_t)lroundf(d->battery_voltage * 10.0f) : INT32_MIN;
-    const int32_t oil_display = oil_ok ? (int32_t)lroundf(oil) : INT32_MIN;
+    const int32_t fuel_display = !fuel_ok ? INT32_MIN
+                                 : fuel_lph < 9.95f
+                                     ? (int32_t)lroundf(fuel_lph * 10.0f)
+                                     : (int32_t)lroundf(fuel_lph) * 10;
     const float progress =
         rpm_ok ? LV_CLAMP(0.0f, (rpm - RPM_MIN) / (RPM_MAX - RPM_MIN), 1.0f)
                : 0.0f;
@@ -434,10 +452,10 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
         !scr->has_snapshot || rpm_display != scr->rpm_display ||
         coolant_display != scr->coolant_display ||
         battery_display != scr->battery_display ||
-        oil_display != scr->oil_display ||
+        fuel_display != scr->fuel_display ||
         d->connected != scr->connected_display ||
         coolant_ok != scr->coolant_ok || battery_ok != scr->battery_ok ||
-        oil_ok != scr->oil_ok;
+        fuel_ok != scr->fuel_ok;
     const bool dial_changed =
         !scr->has_snapshot || rpm_segment != scr->rpm_segment;
     if (!text_changed && !dial_changed) return;
@@ -462,11 +480,11 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
         }
         amber_readout_set(&scr->readout[M_BATTERY], buf, battery_ok);
     }
-    if (oil_display != scr->oil_display || !scr->has_snapshot) {
-        format_temperature(buf, sizeof(buf), oil_ok ? oil : NAN);
-        amber_readout_set(&scr->readout[M_OIL], buf, oil_ok);
+    if (fuel_display != scr->fuel_display || !scr->has_snapshot) {
+        format_fuel_lph(buf, sizeof(buf), fuel_ok ? fuel_lph : NAN);
+        amber_readout_set(&scr->readout[M_FUEL], buf, fuel_ok);
     }
-    // Icones eau/batterie/huile : vives si la mesure est valable, attenuees
+    // Icones eau/batterie/carburant : vives si la mesure est valable, attenuees
     // sinon. Setters idempotents (aucune invalidation si rien ne change).
     if (!scr->has_snapshot || coolant_ok != scr->coolant_ok) {
         dash_icon_set_color(scr->icons[M_COOLANT], coolant_ok
@@ -478,9 +496,10 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
                                                        ? ui_theme_amber_bright()
                                                        : ui_theme_amber_dim());
     }
-    if (!scr->has_snapshot || oil_ok != scr->oil_ok) {
-        dash_icon_set_color(scr->icons[M_OIL], oil_ok ? ui_theme_amber_bright()
-                                                      : ui_theme_amber_dim());
+    if (!scr->has_snapshot || fuel_ok != scr->fuel_ok) {
+        dash_icon_set_color(scr->icons[M_FUEL], fuel_ok
+                                                    ? ui_theme_amber_bright()
+                                                    : ui_theme_amber_dim());
     }
     if (d->connected != scr->connected_display || !scr->has_snapshot) {
         // Connecte : chaine normale + « OBD ». Deconnecte : chaine barree +
@@ -510,10 +529,10 @@ void amber_screen_update(amber_screen_t *scr, const ecu_data_t *d) {
     scr->rpm_display = rpm_display;
     scr->coolant_display = coolant_display;
     scr->battery_display = battery_display;
-    scr->oil_display = oil_display;
+    scr->fuel_display = fuel_display;
     scr->coolant_ok = coolant_ok;
     scr->battery_ok = battery_ok;
-    scr->oil_ok = oil_ok;
+    scr->fuel_ok = fuel_ok;
     scr->connected_display = d->connected;
     scr->has_snapshot = true;
 }
